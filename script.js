@@ -1,20 +1,24 @@
 const MODES = {
     pomodoro: { time: 25 * 60, id: 'btn-pomodoro', class: 'mode-pomodoro' },
     shortBreak: { time: 5 * 60, id: 'btn-short-break', class: 'mode-short-break' },
-    longBreak: { time: 15 * 60, id: 'btn-long-break', class: 'mode-long-break' }
+    longBreak: { time: 15 * 60, id: 'btn-long-break', class: 'mode-long-break' },
+    custom: { time: 10 * 60, id: 'btn-custom', class: 'mode-custom' }
 };
 
 let currentMode = 'pomodoro';
-let timerInterval = null;
-let timeLeft = MODES[currentMode].time;
-let isRunning = false;
+const timerStates = {
+    pomodoro: { timeLeft: MODES.pomodoro.time, isRunning: false, interval: null },
+    shortBreak: { timeLeft: MODES.shortBreak.time, isRunning: false, interval: null },
+    longBreak: { timeLeft: MODES.longBreak.time, isRunning: false, interval: null },
+    custom: { timeLeft: MODES.custom.time, isRunning: false, interval: null }
+};
 
 // DOM Elements
 const timeDisplay = document.getElementById('time-left');
 const startBtn = document.getElementById('start-btn');
 const resetBtn = document.getElementById('reset-btn');
 const circle = document.querySelector('.progress-ring__circle');
-const radius = circle.r.baseVal.value;
+const radius = parseFloat(circle.getAttribute('r')) || 110;
 const circumference = radius * 2 * Math.PI;
 
 circle.style.strokeDasharray = `${circumference} ${circumference}`;
@@ -30,81 +34,176 @@ Object.keys(MODES).forEach(mode => {
     document.getElementById(MODES[mode].id).addEventListener('click', () => switchMode(mode));
 });
 
+let audioCtx = null;
+
+function initAudio() {
+    try {
+        if (!audioCtx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    } catch (e) {
+        console.error("Audio init error:", e);
+    }
+}
+
+function requestNotification() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
+}
+
 startBtn.addEventListener('click', () => {
-    if (isRunning) {
-        pauseTimer();
+    initAudio();
+    requestNotification();
+    if (timerStates[currentMode].isRunning) {
+        pauseTimer(currentMode);
     } else {
-        startTimer();
+        startTimer(currentMode);
     }
 });
 
-resetBtn.addEventListener('click', resetTimer);
+resetBtn.addEventListener('click', () => resetTimer(currentMode));
+
+timeDisplay.addEventListener('blur', applyCustomTime);
+timeDisplay.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        timeDisplay.blur();
+    }
+});
+
+function applyCustomTime() {
+    if (currentMode !== 'custom') return;
+    const text = timeDisplay.textContent.trim();
+    const parts = text.split(':');
+    let mins = 0;
+    let secs = 0;
+    
+    if (parts.length >= 2) {
+        mins = parseInt(parts[0]) || 0;
+        secs = parseInt(parts[1]) || 0;
+    } else if (parts.length === 1) {
+        mins = parseInt(parts[0]) || 0;
+    }
+    
+    if (mins > 999) mins = 999;
+    if (secs > 59) secs = 59;
+    
+    let totalSeconds = mins * 60 + secs;
+    if (totalSeconds < 1) totalSeconds = 1;
+
+    MODES.custom.time = totalSeconds;
+    timerStates.custom.timeLeft = totalSeconds;
+    updateDisplay();
+}
 
 function switchMode(mode) {
-    if (isRunning) {
-        const confirmSwitch = confirm('Timer is running. Are you sure you want to switch modes?');
-        if (!confirmSwitch) return;
-        pauseTimer();
-    }
+    if (mode === currentMode) return;
 
     // Update UI active buttons
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(MODES[mode].id).classList.add('active');
 
     // Update Body class for theme colors
-    document.body.classList.remove('mode-pomodoro', 'mode-short-break', 'mode-long-break');
+    document.body.classList.remove('mode-pomodoro', 'mode-short-break', 'mode-long-break', 'mode-custom');
     document.body.classList.add(MODES[mode].class);
 
     currentMode = mode;
-    timeLeft = MODES[mode].time;
     updateDisplay();
-    setProgress(1); // Full circle
+    updateStartButton();
 }
 
-function startTimer() {
-    isRunning = true;
-    startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
-    startBtn.classList.remove('primary-btn');
-    startBtn.style.background = 'rgba(255,255,255,0.2)';
-    startBtn.style.color = 'white';
+function updateStartButton() {
+    const state = timerStates[currentMode];
+    
+    if (currentMode === 'custom' && !state.isRunning) {
+        timeDisplay.setAttribute('contenteditable', 'true');
+        timeDisplay.classList.add('editable');
+        timeDisplay.title = "Click to edit time";
+    } else {
+        timeDisplay.setAttribute('contenteditable', 'false');
+        timeDisplay.classList.remove('editable');
+        timeDisplay.title = "";
+    }
+    
+    if (state.isRunning) {
+        startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+        startBtn.classList.remove('primary-btn');
+        startBtn.classList.add('pause-btn');
+    } else {
+        if (state.timeLeft < MODES[currentMode].time) {
+            startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
+        } else {
+            startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+        }
+        startBtn.classList.remove('pause-btn');
+        startBtn.classList.add('primary-btn');
+    }
+}
 
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        updateDisplay();
+function startTimer(mode) {
+    const state = timerStates[mode];
+    if (state.isRunning) return;
+    
+    state.isRunning = true;
+    if (mode === currentMode) {
+        updateStartButton();
+    }
+
+    state.interval = setInterval(() => {
+        state.timeLeft--;
         
-        const progress = timeLeft / MODES[currentMode].time;
-        setProgress(progress);
+        if (mode === currentMode) {
+            updateDisplay();
+        }
 
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            isRunning = false;
-            playAlarm();
-            resetTimer();
+        if (state.timeLeft <= 0) {
+            clearInterval(state.interval);
+            state.interval = null;
+            state.isRunning = false;
+            playAlarm(mode);
+            resetTimer(mode);
         }
     }, 1000);
 }
 
-function pauseTimer() {
-    isRunning = false;
-    clearInterval(timerInterval);
-    startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
-    startBtn.style.background = 'white';
-    startBtn.style.color = 'var(--bg-gradient-start)';
+function pauseTimer(mode) {
+    const state = timerStates[mode];
+    state.isRunning = false;
+    if (state.interval) {
+        clearInterval(state.interval);
+        state.interval = null;
+    }
+    
+    if (mode === currentMode) {
+        updateStartButton();
+    }
 }
 
-function resetTimer() {
-    pauseTimer();
-    timeLeft = MODES[currentMode].time;
-    updateDisplay();
-    setProgress(1);
+function resetTimer(mode) {
+    pauseTimer(mode);
+    timerStates[mode].timeLeft = MODES[mode].time;
+    if (mode === currentMode) {
+        updateDisplay();
+    }
 }
 
 function updateDisplay() {
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
+    const state = timerStates[currentMode];
+    const minutes = Math.floor(state.timeLeft / 60);
+    const seconds = state.timeLeft % 60;
     const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     timeDisplay.textContent = timeString;
     document.title = `${timeString} - Focusly`;
+    
+    const progress = state.timeLeft / MODES[currentMode].time;
+    setProgress(progress);
 }
 
 function setProgress(percent) {
@@ -112,24 +211,33 @@ function setProgress(percent) {
     circle.style.strokeDashoffset = offset;
 }
 
-function playAlarm() {
+function playAlarm(mode) {
     // Simple beep using Web Audio API
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    try {
+        if (audioCtx) {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+    } catch (e) {
+        console.error("Audio playback error:", e);
+    }
     
-    // Notification if permitted
-    if (Notification.permission === 'granted') {
-        new Notification('Focusly Timer', {
-            body: `${currentMode === 'pomodoro' ? 'Focus' : 'Break'} session complete!`,
-            icon: 'favicon.ico'
-        });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
+    // Notification if permitted and supported
+    if ('Notification' in window && Notification.permission === 'granted') {
+        let modeName = 'Focus';
+        if (mode === 'shortBreak') modeName = 'Short Break';
+        if (mode === 'longBreak') modeName = 'Long Break';
+        if (mode === 'custom') modeName = 'Custom';
+        try {
+            new Notification('Focusly Timer', {
+                body: `${modeName} session complete!`,
+                icon: 'favicon.ico'
+            });
+        } catch (e) {}
     }
 }
 
@@ -206,7 +314,7 @@ function renderTasks() {
                 </div>
                 <span class="task-text">${escapeHtml(task.text)}</span>
             </div>
-            <button class="delete-btn" onclick="deleteTask('${task.id}')">
+            <button class="delete-btn" aria-label="Delete Task" onclick="deleteTask('${task.id}')">
                 <i class="fa-solid fa-trash"></i>
             </button>
         `;

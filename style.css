@@ -14,6 +14,7 @@
     --pomodoro-color: #ef4444;
     --short-break-color: #10b981;
     --long-break-color: #3b82f6;
+    --custom-color: #f59e0b;
 
     --font-main: 'Outfit', sans-serif;
 }
@@ -30,19 +31,19 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     position: relative;
+    padding: 24px 0;
 }
 
 /* Dynamic background */
 .background-animation {
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
+    position: fixed;
+    top: -50vh;
+    left: -50vw;
+    width: 200vw;
+    height: 200vh;
     background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
                 radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 30%);
     background-position: 0 0, 50% 50%;
@@ -58,16 +59,12 @@ body {
 .app-container {
     width: 90%;
     max-width: 480px;
+    margin: auto;
     z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 24px;
-    max-height: 90vh;
-    overflow-y: auto;
-    /* Hide scrollbar */
-    scrollbar-width: none; 
 }
-.app-container::-webkit-scrollbar { display: none; }
 
 .glass-panel {
     background: var(--glass-bg);
@@ -157,6 +154,24 @@ header p {
     font-weight: 700;
     letter-spacing: -2px;
     z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.time-left.editable {
+    cursor: text;
+    border-bottom: 2px dashed rgba(255,255,255,0.3);
+    outline: none;
+    padding: 0 10px;
+    border-radius: 8px;
+}
+
+.time-left.editable:hover {
+    border-bottom-color: rgba(255,255,255,0.6);
+}
+
+.time-left.editable:focus {
+    border-bottom-color: var(--custom-color);
+    background: rgba(255,255,255,0.1);
 }
 
 .progress-ring-container {
@@ -207,6 +222,17 @@ header p {
 
 .primary-btn:active {
     transform: translateY(0);
+}
+
+.pause-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.pause-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .secondary-btn {
@@ -368,3 +394,65 @@ body.mode-short-break .nav-btn.active { background: var(--short-break-color); bo
 
 body.mode-long-break .progress-ring__circle { stroke: var(--long-break-color); }
 body.mode-long-break .nav-btn.active { background: var(--long-break-color); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+
+body.mode-custom .progress-ring__circle { stroke: var(--custom-color); }
+body.mode-custom .nav-btn.active { background: var(--custom-color); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+
+/* Responsive adjustments for mobile devices */
+@media (max-width: 480px) {
+    .glass-panel {
+        padding: 20px 16px;
+    }
+    
+    header h1 {
+        font-size: 2.2rem;
+    }
+    
+    .timer-nav {
+        gap: 4px;
+        padding: 4px;
+    }
+    
+    .nav-btn {
+        padding: 8px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .timer-display {
+        width: 220px;
+        height: 220px;
+    }
+    
+    .time-left {
+        font-size: 4rem;
+    }
+    
+    .control-btn {
+        padding: 12px;
+        font-size: 1rem;
+    }
+    
+    .task-item {
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 360px) {
+    .timer-display {
+        width: 190px;
+        height: 190px;
+    }
+    
+    .time-left {
+        font-size: 3.5rem;
+    }
+
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .nav-btn {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+}
