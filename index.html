@@ -3,33 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="manifest.json">
     <title>Focusly - Your Personal Productivity Hub</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="background-animation"></div>
-    
+
     <div class="app-container glass-panel">
         <header>
             <h1><i class="fa-solid fa-leaf"></i> Focusly</h1>
-            <p>Master your time, achieve your goals.</p>
+            <div class="header-meta">
+                <p>Master your time, achieve your goals.</p>
+                <div class="header-right">
+                    <div class="streak-badge hidden" id="streak-badge"></div>
+                    <div class="header-actions">
+                        <button id="shortcuts-btn" class="icon-btn secondary-btn" aria-label="Shortcuts" title="Keyboard Shortcuts (?)"><i class="fa-solid fa-keyboard"></i></button>
+                        <button id="settings-btn" class="icon-btn secondary-btn" aria-label="Settings" title="Settings (S)"><i class="fa-solid fa-sliders"></i></button>
+                        <button id="analytics-btn" class="icon-btn secondary-btn" aria-label="Analytics" title="Analytics (A)"><i class="fa-solid fa-chart-simple"></i></button>
+                        <button id="theme-toggle-btn" class="icon-btn secondary-btn" aria-label="Toggle Theme" title="Dark/Light (D)"><i class="fa-solid fa-moon"></i></button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main>
             <section class="timer-section">
                 <div class="timer-nav">
-                    <button class="nav-btn active" id="btn-pomodoro">Pomodoro</button>
-                    <button class="nav-btn" id="btn-short-break">Short Break</button>
-                    <button class="nav-btn" id="btn-long-break">Long Break</button>
-                    <button class="nav-btn" id="btn-custom">Custom</button>
+                    <button class="nav-btn active" id="btn-pomodoro" title="Focus (1)">Focus</button>
+                    <button class="nav-btn" id="btn-short-break" title="Short Break (2)">Short</button>
+                    <button class="nav-btn" id="btn-long-break" title="Long Break (3)">Long</button>
+                    <button class="nav-btn" id="btn-custom" title="Custom (4)">Custom</button>
                 </div>
-                
+
                 <div class="timer-display glass-panel-inner">
                     <div class="time-left" id="time-left">25:00</div>
                     <div class="progress-ring-container">
@@ -38,6 +49,9 @@
                         </svg>
                     </div>
                 </div>
+
+                <div class="pomodoro-dots" id="pomodoro-dots"></div>
+
                 <div class="timer-controls">
                     <button id="start-btn" class="control-btn primary-btn"><i class="fa-solid fa-play"></i> Start</button>
                     <button id="reset-btn" class="control-btn secondary-btn"><i class="fa-solid fa-rotate-right"></i> Reset</button>
@@ -45,18 +59,229 @@
             </section>
 
             <section class="tasks-section">
-                <h2>Tasks</h2>
+                <div class="tasks-header">
+                    <h2>Tasks</h2>
+                    <div class="task-header-actions">
+                        <button id="clear-completed-btn" class="text-btn" title="Remove completed tasks">Clear done</button>
+                        <select id="sort-select" class="sort-select" title="Sort tasks">
+                            <option value="default">Sort: Default</option>
+                            <option value="priority">Sort: Priority</option>
+                            <option value="category">Sort: Category</option>
+                            <option value="pomodoros">Sort: Pomodoros</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="task-input-container">
-                    <input type="text" id="task-input" placeholder="What are you working on?">
+                    <input type="text" id="task-input" placeholder="Add a task... (press N)">
+                    <select id="quick-priority" class="quick-select" title="Priority">
+                        <option value="none">—</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Med</option>
+                        <option value="high">High</option>
+                    </select>
                     <button id="add-task-btn" class="icon-btn" aria-label="Add Task"><i class="fa-solid fa-plus"></i></button>
                 </div>
-                <ul id="task-list" class="task-list">
-                    <!-- Tasks will be injected here via JS -->
-                </ul>
+
+                <div class="category-filter" id="category-filter">
+                    <button class="filter-chip active" data-cat="all">All</button>
+                </div>
+
+                <ul id="task-list" class="task-list"></ul>
             </section>
         </main>
     </div>
 
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- Modals Overlay -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+
+        <!-- Task Details Modal -->
+        <div id="task-modal" class="modal-content glass-panel hidden">
+            <header class="modal-header">
+                <h3>Task Details</h3>
+                <button class="close-modal-btn icon-btn secondary-btn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Task Name</label>
+                    <input type="text" id="edit-task-name" class="modal-input">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="edit-task-priority" class="modal-input">
+                            <option value="none">None</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" id="edit-task-category" class="modal-input" placeholder="Work, Personal…">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Est. Pomodoros</label>
+                        <input type="number" id="edit-task-est" class="modal-input" min="1" max="20" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Recurring</label>
+                        <select id="edit-task-recurring" class="modal-input">
+                            <option value="none">None</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input type="text" id="edit-task-notes" class="modal-input" placeholder="Optional notes…">
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="save-task-btn" class="control-btn primary-btn">Save Changes</button>
+            </footer>
+        </div>
+
+        <!-- Analytics / Stats Modal -->
+        <div id="analytics-modal" class="modal-content glass-panel hidden">
+            <header class="modal-header">
+                <h3><i class="fa-solid fa-chart-simple"></i> Stats Dashboard</h3>
+                <button class="close-modal-btn icon-btn secondary-btn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4 id="stat-pomodoros-today">0</h4>
+                        <p>Focus Today</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="stat-tasks-today">0</h4>
+                        <p>Tasks Today</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="stat-focus-time">0h</h4>
+                        <p>Focus Time (Week)</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="stat-streak">0 🔥</h4>
+                        <p>Day Streak</p>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <h4>7-Day Activity</h4>
+                    <div class="bar-chart" id="bar-chart"></div>
+                    <div class="chart-legend">
+                        <span class="legend-dot legend-focus"></span><span>Focus sessions</span>
+                        <span class="legend-dot legend-tasks"></span><span>Tasks done</span>
+                    </div>
+                </div>
+                <div class="history-list-container">
+                    <h4>Recent Completions</h4>
+                    <ul id="history-list" class="history-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-content glass-panel hidden">
+            <header class="modal-header">
+                <h3><i class="fa-solid fa-sliders"></i> Settings</h3>
+                <button class="close-modal-btn icon-btn secondary-btn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>Presets</h4>
+                    <div class="preset-grid">
+                        <button class="preset-btn" data-preset="standard">Standard<br><small>25 / 5 / 15</small></button>
+                        <button class="preset-btn" data-preset="short">Short<br><small>20 / 3 / 10</small></button>
+                        <button class="preset-btn" data-preset="long">Long<br><small>50 / 10 / 20</small></button>
+                        <button class="preset-btn" data-preset="90">Deep Work<br><small>90 / 15 / 30</small></button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>Timer Durations (minutes)</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Focus</label>
+                            <input type="number" id="setting-pomodoro" class="modal-input" min="1" max="120">
+                        </div>
+                        <div class="form-group">
+                            <label>Short Break</label>
+                            <input type="number" id="setting-short" class="modal-input" min="1" max="30">
+                        </div>
+                        <div class="form-group">
+                            <label>Long Break</label>
+                            <input type="number" id="setting-long" class="modal-input" min="1" max="60">
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="setting-autoswitch" class="toggle-input">
+                        <span class="toggle-slider"></span>
+                        Auto-switch to break when timer ends
+                    </label>
+                </div>
+                <div class="settings-section">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="setting-sound" class="toggle-input">
+                        <span class="toggle-slider"></span>
+                        Play alarm sound
+                    </label>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="save-settings-btn" class="control-btn primary-btn">Apply</button>
+            </footer>
+        </div>
+
+        <!-- Keyboard Shortcuts Modal -->
+        <div id="shortcuts-modal" class="modal-content glass-panel hidden">
+            <header class="modal-header">
+                <h3><i class="fa-solid fa-keyboard"></i> Keyboard Shortcuts</h3>
+                <button class="close-modal-btn icon-btn secondary-btn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-group">
+                        <h4>Timer</h4>
+                        <div class="shortcut-item"><kbd>Space</kbd><span>Start / Pause</span></div>
+                        <div class="shortcut-item"><kbd>R</kbd><span>Reset</span></div>
+                        <div class="shortcut-item"><kbd>1</kbd><span>Focus mode</span></div>
+                        <div class="shortcut-item"><kbd>2</kbd><span>Short break</span></div>
+                        <div class="shortcut-item"><kbd>3</kbd><span>Long break</span></div>
+                        <div class="shortcut-item"><kbd>4</kbd><span>Custom timer</span></div>
+                    </div>
+                    <div class="shortcut-group">
+                        <h4>App</h4>
+                        <div class="shortcut-item"><kbd>N</kbd><span>New task</span></div>
+                        <div class="shortcut-item"><kbd>D</kbd><span>Toggle dark mode</span></div>
+                        <div class="shortcut-item"><kbd>A</kbd><span>Analytics</span></div>
+                        <div class="shortcut-item"><kbd>S</kbd><span>Settings</span></div>
+                        <div class="shortcut-item"><kbd>?</kbd><span>Shortcuts</span></div>
+                        <div class="shortcut-item"><kbd>Esc</kbd><span>Close modal</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl Z</kbd><span>Undo</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl Y</kbd><span>Redo</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
     <script src="script.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+      }
+    </script>
 </body>
 </html>
