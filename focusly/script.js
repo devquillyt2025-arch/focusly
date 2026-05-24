@@ -137,7 +137,11 @@ function updateStartButton() {
         startBtn.classList.remove('primary-btn');
         startBtn.classList.add('pause-btn');
     } else {
-        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+        if (state.timeLeft < MODES[currentMode].time) {
+            startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
+        } else {
+            startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+        }
         startBtn.classList.remove('pause-btn');
         startBtn.classList.add('primary-btn');
     }
