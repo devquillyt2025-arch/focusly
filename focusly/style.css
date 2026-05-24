@@ -224,6 +224,17 @@ header p {
     transform: translateY(0);
 }
 
+.pause-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.pause-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.3);
+}
+
 .secondary-btn {
     background: transparent;
     border: 1px solid var(--glass-border);

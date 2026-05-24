@@ -34,7 +34,33 @@ Object.keys(MODES).forEach(mode => {
     document.getElementById(MODES[mode].id).addEventListener('click', () => switchMode(mode));
 });
 
+let audioCtx = null;
+
+function initAudio() {
+    try {
+        if (!audioCtx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    } catch (e) {
+        console.error("Audio init error:", e);
+    }
+}
+
+function requestNotification() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
+}
+
 startBtn.addEventListener('click', () => {
+    initAudio();
+    requestNotification();
     if (timerStates[currentMode].isRunning) {
         pauseTimer(currentMode);
     } else {
@@ -109,13 +135,11 @@ function updateStartButton() {
     if (state.isRunning) {
         startBtn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
         startBtn.classList.remove('primary-btn');
-        startBtn.style.background = 'rgba(255,255,255,0.2)';
-        startBtn.style.color = 'white';
+        startBtn.classList.add('pause-btn');
     } else {
         startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+        startBtn.classList.remove('pause-btn');
         startBtn.classList.add('primary-btn');
-        startBtn.style.background = '';
-        startBtn.style.color = '';
     }
 }
 
@@ -185,26 +209,31 @@ function setProgress(percent) {
 
 function playAlarm(mode) {
     // Simple beep using Web Audio API
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    try {
+        if (audioCtx) {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+    } catch (e) {
+        console.error("Audio playback error:", e);
+    }
     
-    // Notification if permitted
-    if (Notification.permission === 'granted') {
+    // Notification if permitted and supported
+    if ('Notification' in window && Notification.permission === 'granted') {
         let modeName = 'Focus';
         if (mode === 'shortBreak') modeName = 'Short Break';
         if (mode === 'longBreak') modeName = 'Long Break';
         if (mode === 'custom') modeName = 'Custom';
-        new Notification('Focusly Timer', {
-            body: `${modeName} session complete!`,
-            icon: 'favicon.ico'
-        });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
+        try {
+            new Notification('Focusly Timer', {
+                body: `${modeName} session complete!`,
+                icon: 'favicon.ico'
+            });
+        } catch (e) {}
     }
 }
 
@@ -281,7 +310,7 @@ function renderTasks() {
                 </div>
                 <span class="task-text">${escapeHtml(task.text)}</span>
             </div>
-            <button class="delete-btn" onclick="deleteTask('${task.id}')">
+            <button class="delete-btn" aria-label="Delete Task" onclick="deleteTask('${task.id}')">
                 <i class="fa-solid fa-trash"></i>
             </button>
         `;
