@@ -18,7 +18,7 @@ const timeDisplay = document.getElementById('time-left');
 const startBtn = document.getElementById('start-btn');
 const resetBtn = document.getElementById('reset-btn');
 const circle = document.querySelector('.progress-ring__circle');
-const radius = circle.r.baseVal.value;
+const radius = parseFloat(circle.getAttribute('r')) || 110;
 const circumference = radius * 2 * Math.PI;
 
 circle.style.strokeDasharray = `${circumference} ${circumference}`;
@@ -49,10 +49,6 @@ timeDisplay.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
         timeDisplay.blur();
-    } else if (!['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^[0-9:]$/.test(e.key)) {
-        if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-        }
     }
 });
 
@@ -117,8 +113,9 @@ function updateStartButton() {
         startBtn.style.color = 'white';
     } else {
         startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
-        startBtn.style.background = 'white';
-        startBtn.style.color = 'var(--bg-gradient-start)';
+        startBtn.classList.add('primary-btn');
+        startBtn.style.background = '';
+        startBtn.style.color = '';
     }
 }
 

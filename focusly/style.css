@@ -31,19 +31,19 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     position: relative;
+    padding: 24px 0;
 }
 
 /* Dynamic background */
 .background-animation {
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
+    position: fixed;
+    top: -50vh;
+    left: -50vw;
+    width: 200vw;
+    height: 200vh;
     background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
                 radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 30%);
     background-position: 0 0, 50% 50%;
@@ -59,16 +59,12 @@ body {
 .app-container {
     width: 90%;
     max-width: 480px;
+    margin: auto;
     z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 24px;
-    max-height: 90vh;
-    overflow-y: auto;
-    /* Hide scrollbar */
-    scrollbar-width: none; 
 }
-.app-container::-webkit-scrollbar { display: none; }
 
 .glass-panel {
     background: var(--glass-bg);

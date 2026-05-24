@@ -21,5 +21,8 @@
   "homepage": "https://github.com/devquillyt2025-arch/focusly#readme",
   "devDependencies": {
     "vite": "^8.0.14"
+  },
+  "dependencies": {
+    "jsdom": "^29.1.1"
   }
 }
