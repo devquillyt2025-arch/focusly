@@ -50,12 +50,18 @@ body {
 
 .app-container {
     width: 90%;
-    max-width: 500px;
+    max-width: 900px;
     margin: auto;
     z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 24px;
+}
+
+main {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
 }
 
 .glass-panel {
@@ -131,7 +137,7 @@ header p {
 .streak-badge.hidden { display: none; }
 
 /* ── Timer ── */
-.timer-section { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.timer-section { display: flex; flex-direction: column; align-items: center; gap: 20px; flex: 0 0 auto; min-width: 280px; }
 
 .timer-nav {
     display: flex;
@@ -241,7 +247,7 @@ header p {
 .secondary-btn:hover { background: rgba(255,255,255,0.1); }
 
 /* ── Tasks ── */
-.tasks-section { margin-top: 8px; }
+.tasks-section { flex: 1; min-width: 0; }
 
 .tasks-header {
     display: flex;
@@ -725,6 +731,15 @@ kbd {
 .theme-light .filter-chip { background: rgba(0,0,0,0.05); }
 
 /* ── Responsive ── */
+@media (max-width: 720px) {
+    main {
+        flex-direction: column;
+        gap: 24px;
+    }
+    .timer-section { min-width: unset; width: 100%; }
+    .tasks-section { margin-top: 0; }
+}
+
 @media (max-width: 480px) {
     .glass-panel { padding: 20px 16px; }
     header h1 { font-size: 2rem; }
