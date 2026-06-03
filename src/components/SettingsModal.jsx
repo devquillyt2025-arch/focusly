@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const PRESETS = [
   { label: 'Standard',  sub: '25/5/15',  vals: { focusDuration: 25, shortDuration: 5,  longDuration: 15 } },
@@ -9,12 +9,6 @@ const PRESETS = [
 
 export default function SettingsModal({ settings, onSave, onClose }) {
   const [form, setForm] = useState(settings);
-
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -79,9 +73,8 @@ export default function SettingsModal({ settings, onSave, onClose }) {
           </div>
 
           <div className="form-grp toggles-grp">
-            <label className="toggle-row">
-              <div className="toggle-track" data-on={form.autoSwitch ? 'true' : 'false'}
-                onClick={() => set('autoSwitch', !form.autoSwitch)}>
+            <label className="toggle-row" onClick={() => set('autoSwitch', !form.autoSwitch)}>
+              <div className="toggle-track" data-on={form.autoSwitch ? 'true' : 'false'}>
                 <div className="toggle-thumb" />
               </div>
               <div>
@@ -89,9 +82,8 @@ export default function SettingsModal({ settings, onSave, onClose }) {
                 <div className="toggle-sub">Automatically start break when focus timer ends</div>
               </div>
             </label>
-            <label className="toggle-row">
-              <div className="toggle-track" data-on={form.sound ? 'true' : 'false'}
-                onClick={() => set('sound', !form.sound)}>
+            <label className="toggle-row" onClick={() => set('sound', !form.sound)}>
+              <div className="toggle-track" data-on={form.sound ? 'true' : 'false'}>
                 <div className="toggle-thumb" />
               </div>
               <div>

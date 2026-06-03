@@ -85,7 +85,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             <div
               key={task.id}
               className={`task-item${isActive ? ' task-active' : ''}${task.completed ? ' task-done' : ''}`}
-              onClick={() => !timerRunning && onSelect(task.id)}
+              onClick={() => onSelect(task.id)}
               title={timerRunning && !isActive ? 'Pause timer to switch tasks' : undefined}
             >
               <button

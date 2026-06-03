@@ -17,11 +17,6 @@ export default function AddTaskModal({ onAdd, onClose }) {
   const nameRef = useRef(null);
 
   useEffect(() => { nameRef.current?.focus(); }, []);
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 

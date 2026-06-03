@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx playwright *)",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(node -e ' *)",
+      "Bash(npx playwright@latest --version)",
+      "Bash(node -e \"require\\('@playwright/test'\\)\")",
+      "Bash(npx vite *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\My Projects\\\\focusly\\\\src\\\\components\" -Force)"
+    ]
+  }
+}

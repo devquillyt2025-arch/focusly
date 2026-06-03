@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { CAT_META } from './TaskList';
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-
 function weekStart() {
   const d = new Date();
   d.setDate(d.getDate() - d.getDay());
@@ -20,10 +18,8 @@ function fmtDur(s) {
 export default function Stats({ tasks, pomodoroLog, settings }) {
   const stats = useMemo(() => {
     const ws  = weekStart();
-    const tod = todayStr();
 
     const weekPomos    = pomodoroLog.filter(ts => new Date(ts) >= ws).length;
-    const todayPomos   = pomodoroLog.filter(ts => ts.startsWith(tod)).length;
     const weekDone     = tasks.filter(t => t.completedAt && new Date(t.completedAt) >= ws).length;
     const totalLogged  = tasks.reduce((s, t) => s + t.timeLogged, 0);
 
@@ -38,7 +34,7 @@ export default function Stats({ tasks, pomodoroLog, settings }) {
       byCategory[t.category] = (byCategory[t.category] ?? 0) + t.timeLogged;
     }
 
-    return { weekPomos, todayPomos, weekDone, totalLogged, activeDays, byCategory };
+    return { weekPomos, weekDone, totalLogged, activeDays, byCategory };
   }, [tasks, pomodoroLog]);
 
   const catEntries = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1]);

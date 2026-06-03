@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 const GROUPS = [
   {
     title: 'Timer',
@@ -26,12 +24,6 @@ const GROUPS = [
 ];
 
 export default function ShortcutsModal({ onClose }) {
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">

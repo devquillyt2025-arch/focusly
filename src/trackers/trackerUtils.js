@@ -1,0 +1,297 @@
+// ─── Storage ──────────────────────────────────────────────────────
+const SK = 'focusly-trackers';
+
+export function loadTrackers() {
+  try { return JSON.parse(localStorage.getItem(SK) || '[]'); } catch { return []; }
+}
+export function saveTrackers(list) {
+  try { localStorage.setItem(SK, JSON.stringify(list)); } catch {}
+}
+
+// ─── Meta ──────────────────────────────────────────────────────────
+export const TRACKER_CATS = {
+  health:   { label: 'Health',   color: '#10b981' },
+  work:     { label: 'Work',     color: '#3b82f6' },
+  finance:  { label: 'Finance',  color: '#f59e0b' },
+  personal: { label: 'Personal', color: '#ec4899' },
+};
+
+export const TRACKER_TYPES = {
+  habit:   { label: 'Habit',   icon: '🔄', desc: 'Track yes/no on a schedule' },
+  target:  { label: 'Target',  icon: '🎯', desc: 'Hit a numeric goal by a date' },
+  average: { label: 'Average', icon: '📊', desc: 'Maintain a rolling average' },
+  project: { label: 'Project', icon: '📋', desc: 'Complete milestone-based goal' },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────
+export function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+export function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+export function dateStrOf(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  return dt.toISOString().split('T')[0];
+}
+
+export function defaultConfig(type) {
+  switch (type) {
+    case 'habit':   return { schedule: 'daily', timeTag: null };
+    case 'target':  return { targetValue: 100, unit: '', startValue: 0, targetDate: '' };
+    case 'average': return { unit: '', targetAverage: 0, schedule: 'daily', timeTag: null };
+    case 'project': return { milestones: [], targetDate: '' };
+    default: return {};
+  }
+}
+
+// ─── Schedule ─────────────────────────────────────────────────────
+export function isScheduledOn(tracker, date = new Date()) {
+  const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : date;
+  const dow = d.getDay(); // 0 = Sun
+
+  if (tracker.type === 'target' || tracker.type === 'project') return true;
+
+  const { schedule = 'daily' } = tracker.config || {};
+  if (schedule === 'daily') return true;
+  if (schedule === 'weekdays') return dow >= 1 && dow <= 5;
+  if (schedule === 'weekends') return dow === 0 || dow === 6;
+  if (Array.isArray(schedule)) return schedule.includes(dow);
+  return true;
+}
+
+export function isScheduledToday(tracker) {
+  return isScheduledOn(tracker, new Date());
+}
+
+// ─── Logs ─────────────────────────────────────────────────────────
+export function getLogForDate(tracker, date = todayStr()) {
+  return (tracker.logs || []).find(l => l.date === date) ?? null;
+}
+
+export function upsertLog(tracker, value, date = todayStr()) {
+  const logs = (tracker.logs || []).filter(l => l.date !== date);
+  return {
+    ...tracker,
+    logs: [...logs, { date, value }].sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+export function toggleMilestone(tracker, milestoneId) {
+  const milestones = (tracker.config.milestones || []).map(m =>
+    m.id === milestoneId
+      ? { ...m, done: !m.done, doneAt: !m.done ? new Date().toISOString() : null }
+      : m
+  );
+  return { ...tracker, config: { ...tracker.config, milestones } };
+}
+
+export function isLoggedToday(tracker) {
+  const today = todayStr();
+  if (tracker.type === 'project') {
+    const { milestones = [] } = tracker.config;
+    return milestones.length > 0 && milestones.every(m => m.done);
+  }
+  return (tracker.logs || []).some(l => l.date === today);
+}
+
+// ─── Habit streaks ────────────────────────────────────────────────
+export function computeHabitStreaks(tracker) {
+  const logs = tracker.logs || [];
+  const logMap = {};
+  for (const l of logs) logMap[l.date] = l.value;
+
+  const today = todayStr();
+  const todayVal = logMap[today];
+
+  // Current streak: walk backwards; skips are neutral, missed scheduled = break
+  let current = 0;
+  const now = new Date();
+  const startOffset = todayVal === true ? 0 : 1; // if done today, include today
+
+  for (let i = startOffset; i < 365; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ds = dateStrOf(d);
+    if (ds > today) continue;
+    if (!isScheduledOn(tracker, d)) continue; // non-scheduled: neutral
+
+    const val = logMap[ds];
+    if (val === true) {
+      current++;
+    } else if (val === false) {
+      // explicit skip: neutral, keep going
+    } else {
+      break; // missed
+    }
+  }
+  if (todayVal === true) current++; // re-add today if it was the startOffset
+
+  // Clamp: avoid double-count if startOffset was 0 (today was done)
+  if (startOffset === 0) current = Math.max(0, current - 1 + 1); // no-op but explicit
+
+  // Recalculate cleanly
+  current = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ds = dateStrOf(d);
+    if (ds > today) continue;
+    if (!isScheduledOn(tracker, d)) continue;
+
+    const val = logMap[ds];
+    if (val === true) {
+      current++;
+    } else if (val === false) {
+      // skip: neutral
+    } else {
+      if (i === 0) { /* today not logged yet: don't break */ } else break;
+    }
+  }
+
+  // Longest streak: scan all dates from creation
+  let longest = 0;
+  let run = 0;
+  const createdDate = new Date(tracker.createdAt);
+  for (let d = new Date(createdDate); d <= now; d.setDate(d.getDate() + 1)) {
+    const ds = dateStrOf(d);
+    if (!isScheduledOn(tracker, d)) continue;
+    const val = logMap[ds];
+    if (val === true) { run++; if (run > longest) longest = run; }
+    else if (val !== false && ds < today) run = 0; // missed past day
+  }
+  longest = Math.max(longest, current);
+
+  const doneCount = logs.filter(l => l.value === true).length;
+  const logged = logs.filter(l => l.value === true || l.value === false).length;
+  const successRate = logged > 0 ? Math.round((doneCount / logged) * 100) : 0;
+
+  return { current, longest, successRate, doneCount, logged };
+}
+
+// ─── Target stats ─────────────────────────────────────────────────
+export function computeTargetStats(tracker) {
+  const { targetValue = 100, startValue = 0, unit = '', targetDate = '' } = tracker.config;
+  const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
+  const currentValue = logs.length > 0 ? logs[logs.length - 1].value : startValue;
+  const range = targetValue - startValue;
+  const progress = range > 0
+    ? Math.min(100, Math.max(0, ((currentValue - startValue) / range) * 100))
+    : currentValue >= targetValue ? 100 : 0;
+
+  let pace = 'on-track';
+  if (targetDate && range > 0) {
+    const now = Date.now();
+    const s = new Date(tracker.createdAt).getTime();
+    const e = new Date(targetDate).getTime();
+    const expectedPct = (e - s) > 0 ? Math.min(100, ((now - s) / (e - s)) * 100) : 0;
+    if (progress < expectedPct - 10) pace = 'behind';
+    else if (progress > expectedPct + 10) pace = 'ahead';
+  }
+
+  return { currentValue, targetValue, startValue, unit, progress: Math.round(progress), pace };
+}
+
+// ─── Average stats ────────────────────────────────────────────────
+export function computeAverageStats(tracker) {
+  const { targetAverage = 0, unit = '' } = tracker.config;
+  const today = todayStr();
+  const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
+  const avg = list => list.length
+    ? Math.round((list.reduce((s, l) => s + (l.value || 0), 0) / list.length) * 10) / 10
+    : null;
+
+  const cutoff = (days) => { const d = new Date(); d.setDate(d.getDate() - (days - 1)); return dateStrOf(d); };
+  const last7  = logs.filter(l => l.date >= cutoff(7));
+  const last30 = logs.filter(l => l.date >= cutoff(30));
+
+  return {
+    todayValue: logs.find(l => l.date === today)?.value ?? null,
+    avg7:  avg(last7),
+    avg30: avg(last30),
+    targetAverage,
+    unit,
+  };
+}
+
+// ─── Project stats ────────────────────────────────────────────────
+export function computeProjectStats(tracker) {
+  const { milestones = [], targetDate = '' } = tracker.config;
+  const done = milestones.filter(m => m.done).length;
+  const total = milestones.length;
+  const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  let pace = 'on-track';
+  if (targetDate && total > 0) {
+    const now = Date.now();
+    const s = new Date(tracker.createdAt).getTime();
+    const e = new Date(targetDate).getTime();
+    const expectedPct = (e - s) > 0 ? Math.min(100, ((now - s) / (e - s)) * 100) : 0;
+    if (progress >= 100) pace = 'complete';
+    else if (progress < expectedPct - 10) pace = 'behind';
+  }
+  return { done, total, progress, pace };
+}
+
+// ─── Global stats ─────────────────────────────────────────────────
+export function computeGlobalStats(trackers) {
+  const today = todayStr();
+  const now = new Date();
+
+  const scheduled = trackers.filter(t => isScheduledToday(t));
+  const logged    = scheduled.filter(t => isLoggedToday(t));
+  const isPerfect = scheduled.length > 0 && logged.length === scheduled.length;
+
+  // Perfect days this month
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  let perfectDaysMonth = 0;
+  for (let d = new Date(monthStart); d <= now; d.setDate(d.getDate() + 1)) {
+    const ds = dateStrOf(d);
+    if (ds > today) break;
+    const sched = trackers.filter(t => isScheduledOn(t, d) && t.type !== 'project');
+    if (!sched.length) continue;
+    if (sched.every(t => (t.logs || []).some(l => l.date === ds))) perfectDaysMonth++;
+  }
+
+  // Best habit streak
+  let bestStreak = 0;
+  for (const t of trackers) {
+    if (t.type === 'habit') {
+      const { current } = computeHabitStreaks(t);
+      if (current > bestStreak) bestStreak = current;
+    }
+  }
+
+  return {
+    activeTrackers: trackers.length,
+    scheduledCount: scheduled.length,
+    loggedCount:    logged.length,
+    isPerfect,
+    perfectDaysMonth,
+    bestStreak,
+  };
+}
+
+// ─── Sparkline data ────────────────────────────────────────────────
+export function getSparklineData(tracker) {
+  const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+  if (tracker.type === 'habit') return logs.map(l => l.value === true ? 1 : 0);
+  return logs.map(l => typeof l.value === 'number' ? l.value : 0);
+}
+
+// ─── Data export ──────────────────────────────────────────────────
+export function exportTrackerData() {
+  const trackers = loadTrackers();
+  const json = JSON.stringify({ trackers, exportedAt: new Date().toISOString() }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `focusly-trackers-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

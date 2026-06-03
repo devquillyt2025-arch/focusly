@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { CAT_META } from './TaskList';
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -29,12 +29,6 @@ function getStreak(pomodoroLog, tasks) {
 }
 
 export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }) {
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
-
   const data = useMemo(() => {
     const tod = todayStr();
     const today = new Date();
