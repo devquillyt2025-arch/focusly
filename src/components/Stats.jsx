@@ -1,13 +1,6 @@
 import { useMemo } from 'react';
 import { CAT_META } from './TaskList';
 
-function weekStart() {
-  const d = new Date();
-  d.setDate(d.getDate() - d.getDay());
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 function fmtDur(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
@@ -17,14 +10,16 @@ function fmtDur(s) {
 
 export default function Stats({ tasks, pomodoroLog, settings }) {
   const stats = useMemo(() => {
-    const ws  = weekStart();
+    // Use a UTC-based 7-day rolling window so pomo ISO timestamps and task
+    // completedAt ISO strings are compared on a consistent UTC baseline.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const weekPomos    = pomodoroLog.filter(ts => new Date(ts) >= ws).length;
-    const weekDone     = tasks.filter(t => t.completedAt && new Date(t.completedAt) >= ws).length;
+    const weekPomos    = pomodoroLog.filter(ts => new Date(ts) >= sevenDaysAgo).length;
+    const weekDone     = tasks.filter(t => t.completedAt && new Date(t.completedAt) >= sevenDaysAgo).length;
     const totalLogged  = tasks.reduce((s, t) => s + t.timeLogged, 0);
 
     const activeDays = new Set(
-      tasks.filter(t => t.completedAt && new Date(t.completedAt) >= ws)
+      tasks.filter(t => t.completedAt && new Date(t.completedAt) >= sevenDaysAgo)
         .map(t => t.completedAt.split('T')[0])
     ).size;
 

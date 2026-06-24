@@ -52,13 +52,17 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
 
   return (
     <div className="streak-panel">
-      {streak > 0 && (
-        <div className="streak-count-row">
-          <span className="streak-flame">🔥</span>
-          <span className="streak-num">{streak}</span>
-          <span className="streak-lbl">{streak === 1 ? 'day streak' : 'day streak'}</span>
-        </div>
-      )}
+      <div className="streak-panel-header">
+        <span className="streak-panel-title">Weekly Streak</span>
+        {streak > 0 && (
+          <span className="streak-count-inline">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none" style={{ flexShrink: 0 }}>
+              <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
+            </svg>
+            {streak}d
+          </span>
+        )}
+      </div>
       <div className="streak-week-row">
         {weekDays.map(day => (
           <div key={day.dateStr} className="streak-day-col">
@@ -75,6 +79,7 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
           </div>
         ))}
       </div>
+      <div className="streak-subtitle">Activity — last 7 days</div>
     </div>
   );
 }

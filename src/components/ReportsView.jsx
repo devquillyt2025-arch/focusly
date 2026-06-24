@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
-  getLogForDate, todayStr, dateStrOf, isScheduledOn, computeGlobalStats, getSparklineData
+  getLogForDate, todayStr, dateStrOf, isScheduledOn, computeGlobalStats, getSparklineData,
+  upsertLog, toggleMilestone
 } from '../trackers/trackerUtils';
 import { HabitStreakChart, HabitDayOfWeekChart, TargetProgressChart, TargetVelocityChart, AverageRollingChart, ProjectBurndownChart } from './TrackerCharts';
 import { calculateTrends } from '../trackers/analyticsUtils';
@@ -10,12 +11,32 @@ import AnalyticsDashboard from './AnalyticsDashboard';
 import html2canvas from 'html2canvas';
 
 // ─── Reports view ──────────────────────────────────────────────────
-export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker }) {
+export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker }) {
   const [catFilter,  setCatFilter]  = useState('all');
   const [viewMode,   setViewMode]   = useState('trackers'); // 'trackers' | 'analytics'
   const [detail,     setDetail]     = useState(null); // tracker shown in detail
 
   const global = computeGlobalStats(trackers);
+  const daysInMonthSoFar = new Date().getDate();
+
+  // Overall success rate: logged / scheduled across all days this month
+  const successRate = (() => {
+    let sched = 0, logged = 0;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    for (let d = new Date(monthStart); d <= now; d.setDate(d.getDate() + 1)) {
+      const ds = dateStrOf(d);
+      trackers.forEach(t => {
+        if (t.type === 'project') return;
+        if (isScheduledOn(t, d)) {
+          sched++;
+          if ((t.logs || []).some(l => l.date === ds && (l.value === true || typeof l.value === 'number'))) logged++;
+        }
+      });
+    }
+    return sched > 0 ? Math.round((logged / sched) * 100) : 0;
+  })();
+
   const trackersWithTrends = calculateTrends(trackers);
   
   let filtered = catFilter === 'all'
@@ -38,9 +59,9 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
 
   return (
     <div className="reports-view">
-      <div className="view-mode-tabs" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button className={`nav-btn ${viewMode === 'trackers' ? 'active' : ''}`} onClick={() => setViewMode('trackers')}>Trackers</button>
-        <button className={`nav-btn ${viewMode === 'analytics' ? 'active' : ''}`} onClick={() => setViewMode('analytics')}>Analytics</button>
+      <div className="view-mode-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', width: 'max-content', margin: '0 auto 24px' }}>
+        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'trackers' ? '#6366f1' : 'transparent', color: viewMode === 'trackers' ? '#fff' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('trackers')}>Trackers</button>
+        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'analytics' ? '#6366f1' : 'transparent', color: viewMode === 'analytics' ? '#fff' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('analytics')}>Analytics</button>
       </div>
 
       {viewMode === 'analytics' ? (
@@ -55,11 +76,22 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
             </div>
             <div className="rgs-card">
               <div className="rgs-val">{global.perfectDaysMonth}</div>
-              <div className="rgs-lbl">Perfect Days (month)</div>
+              <div className="rgs-lbl">Perfect Days</div>
+              <div className="rgs-sub">{global.perfectDaysMonth} of {daysInMonthSoFar} days</div>
             </div>
             <div className="rgs-card">
-              <div className="rgs-val">{global.bestStreak > 0 ? `${global.bestStreak}d` : '—'}</div>
+              <div className="rgs-val">{global.longestStreak > 0 ? `${global.longestStreak}d` : '—'}</div>
               <div className="rgs-lbl">Best Streak</div>
+              {global.longestStreak !== global.bestStreak && (
+                <div className="rgs-sub">current: {global.bestStreak}d</div>
+              )}
+            </div>
+            <div className="rgs-card">
+              <div className="rgs-val">{successRate}%</div>
+              <div className="rgs-lbl">Success Rate</div>
+              <div className="rgs-progress-bar">
+                <div className="rgs-progress-fill" style={{ width: `${successRate}%` }} />
+              </div>
             </div>
           </div>
 
@@ -84,13 +116,25 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
           {filtered.length === 0 ? (
             <div className="empty-state">
               <span>📊</span>
-              <p>{trackers.length === 0 ? 'No trackers yet.\nAdd one from the Daily Goals tab.' : 'No trackers in this category.'}</p>
+              <p>{trackers.length === 0 ? 'No trackers yet.' : 'No trackers in this category.'}</p>
+              {trackers.length === 0 && onAddTracker && (
+                <button className="tracker-add-cta" onClick={onAddTracker}>
+                  <IconPlusCircle />
+                  <span>Track a new habit</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="report-list">
               {filtered.map(t => (
                 <TrackerReportRow key={t.id} tracker={t} onClick={() => openDetail(t)} />
               ))}
+              {trackers.length < 3 && onAddTracker && (
+                <button className="tracker-add-cta" onClick={onAddTracker}>
+                  <IconPlusCircle />
+                  <span>Track a new habit</span>
+                </button>
+              )}
             </div>
           )}
         </>
@@ -116,24 +160,32 @@ function TrackerReportRow({ tracker, onClick }) {
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
   const spark    = getSparklineData(tracker);
 
-  let statA = '—', statB = '—';
+  let statA = '—', statB = '—', pct = 0;
   if (tracker.type === 'habit') {
     const s = computeHabitStreaks(tracker);
     statA = `${s.current}d`;
     statB = `${s.successRate}%`;
+    pct   = s.successRate;
   } else if (tracker.type === 'target') {
     const s = computeTargetStats(tracker);
     statA = `${s.progress}%`;
     statB = s.pace;
+    pct   = s.progress;
   } else if (tracker.type === 'average') {
     const s = computeAverageStats(tracker);
     statA = s.avg7 != null ? `${s.avg7}${s.unit}` : '—';
     statB = '7d avg';
+    pct   = s.avg7 != null && s.targetAverage > 0
+      ? Math.min(100, Math.round((s.avg7 / s.targetAverage) * 100))
+      : s.avg7 != null ? 75 : 0;
   } else if (tracker.type === 'project') {
     const s = computeProjectStats(tracker);
     statA = `${s.progress}%`;
     statB = s.pace;
+    pct   = s.progress;
   }
+
+  const dotColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
     <button className="report-row" onClick={onClick}>
@@ -144,7 +196,6 @@ function TrackerReportRow({ tracker, onClick }) {
           {tracker.name}
           {tracker.trend === 'improving' && <span title="Improving" style={{ color: '#10b981', fontSize: '0.8rem' }}>↑</span>}
           {tracker.trend === 'declining' && <span title="Declining" style={{ color: '#ef4444', fontSize: '0.8rem' }}>↓</span>}
-          {tracker.trend === 'steady' && <span title="Steady" style={{ color: '#94a3b8', fontSize: '0.8rem' }}>→</span>}
         </div>
         <div className="report-row-sub">
           <span className="mini-cat-badge"
@@ -155,7 +206,10 @@ function TrackerReportRow({ tracker, onClick }) {
         </div>
       </div>
       <div className="report-row-stats">
-        <span className="rrs-val">{statA}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="rrs-status-dot" style={{ background: dotColor }} />
+          <span className="rrs-val">{statA}</span>
+        </div>
         <span className="rrs-lbl">{statB}</span>
       </div>
       <div className="report-row-spark">
@@ -206,7 +260,7 @@ function TrackerDetail({ tracker, onClose, onDelete, onEdit, onUpdateTracker }) 
   const catMeta  = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
   
-  const detailRef = React.useRef(null);
+  const detailRef = useRef(null);
 
   const log = (value) => onUpdateTracker(upsertLog(tracker, value));
   const toggleMs = (id) => onUpdateTracker(toggleMilestone(tracker, id));
@@ -460,7 +514,8 @@ function AverageDetail({ tracker, onLog }) {
 
 // ─── Project detail ────────────────────────────────────────────────
 function ProjectDetail({ tracker, onToggle }) {
-  const { done, total, progress, pace, milestones, targetDate } = computeProjectStats(tracker);
+  const { done, total, progress, pace } = computeProjectStats(tracker);
+  const { milestones = [], targetDate = '' } = tracker.config;
   const catColor = TRACKER_CATS[tracker.category]?.color ?? '#6366f1';
   const PACE_COLOR = { behind: '#ef4444', 'on-track': '#10b981', complete: '#6366f1' };
 
@@ -578,5 +633,16 @@ function StatCard({ val, lbl, color }) {
       <div className="stat-val" style={color ? { color } : {}}>{val}</div>
       <div className="stat-lbl">{lbl}</div>
     </div>
+  );
+}
+
+// ─── Icons ─────────────────────────────────────────────────────────
+function IconPlusCircle() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2d2d44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
   );
 }

@@ -7,7 +7,7 @@ const CATS  = Object.entries(TRACKER_CATS);
 const TYPES = Object.entries(TRACKER_TYPES);
 
 // ─── Main modal ───────────────────────────────────────────────────
-export default function AddTrackerModal({ onSave, onClose, editTracker = null }) {
+export default function AddTrackerModal({ onSave, onClose, editTracker = null, existingTrackers = [] }) {
   const isEdit = !!editTracker;
   const [step, setStep] = useState(isEdit ? 2 : 1);
   const [type, setType] = useState(editTracker?.type ?? null);
@@ -16,6 +16,7 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null })
       ? { name: editTracker.name, category: editTracker.category, description: editTracker.description || '', config: editTracker.config }
       : { name: '', category: 'health', description: '', config: {} }
   );
+  const [nameError, setNameError] = useState('');
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setC = (k, v) => setForm(f => ({ ...f, config: { ...f.config, [k]: v } }));
@@ -28,6 +29,11 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null })
 
   const save = () => {
     if (!form.name.trim()) return;
+    if (!isEdit) {
+      const key = form.name.trim().toLowerCase();
+      const dupe = existingTrackers.some(t => t.name.trim().toLowerCase() === key);
+      if (dupe) { setNameError('A tracker with this name already exists'); return; }
+    }
     const base = {
       name:        form.name.trim(),
       category:    form.category,
@@ -84,10 +90,10 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null })
               <label>Name <span className="req">*</span></label>
               <input
                 autoFocus
-                className="form-inp"
+                className={`form-inp${nameError ? ' form-inp-error' : ''}`}
                 type="text"
                 value={form.name}
-                onChange={e => setF('name', e.target.value)}
+                onChange={e => { setF('name', e.target.value); if (nameError) setNameError(''); }}
                 placeholder={
                   type === 'habit'   ? 'e.g. Exercise daily' :
                   type === 'target'  ? 'e.g. Save ₹50,000' :
@@ -95,6 +101,7 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null })
                                        'e.g. Launch website'
                 }
               />
+              {nameError && <span className="form-error">{nameError}</span>}
             </div>
 
             <div className="form-grp">

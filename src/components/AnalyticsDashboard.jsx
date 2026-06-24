@@ -43,6 +43,9 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
   // Productivity Score
   const currentScore = calculateDailyScore(trackers, tasks, pomodoroLog, todayStr);
   const scoreHistory = getScoreHistory(trackers, tasks, pomodoroLog, 30);
+  const yesterdayScore = scoreHistory.length > 1 ? scoreHistory[scoreHistory.length - 2].score : 0;
+  const weekAvg = Math.round(scoreHistory.slice(-7).reduce((sum, h) => sum + h.score, 0) / Math.max(1, Math.min(scoreHistory.length, 7)));
+  const bestScore = scoreHistory.length > 0 ? Math.max(...scoreHistory.map(h => h.score)) : 0;
   
   const scoreDoughnutData = {
     datasets: [{
@@ -55,15 +58,32 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
     }]
   };
 
+  // FIX 3: auto-scale Y from actual data range
+  const scores = scoreHistory.map(h => h.score);
+  const dataMin = scores.length ? Math.min(...scores) : 0;
+  const dataMax = scores.length ? Math.max(...scores) : 100;
+  const yMin    = Math.max(0, Math.floor(dataMin - 10));
+  const yMax    = Math.ceil(dataMax + 10);
+  const yRange  = yMax - yMin;
+  const yStep   = yRange <= 20 ? 5 : yRange <= 50 ? 10 : 25;
+
+  // FIX 4: pre-format X labels so Chart.js uses them directly (avoids val/index mismatch)
+  const scoreLabels = scoreHistory.map(h => {
+    const d = new Date(h.date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+
   const scoreLineData = {
-    labels: scoreHistory.map(h => h.date),
+    labels: scoreLabels,
     datasets: [{
       label: 'Productivity Score',
       data: scoreHistory.map(h => h.score),
       borderColor: '#10b981',
       backgroundColor: 'rgba(16, 185, 129, 0.2)',
       fill: true,
-      tension: 0.3
+      tension: 0.3,
+      pointRadius: 3,
+      pointHoverRadius: 5,
     }]
   };
 
@@ -75,8 +95,20 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
       tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
     },
     scales: {
-      x: { display: false },
-      y: { min: 0, max: 100, display: false }
+      x: {
+        display: true,
+        ticks: { color: '#64748b', maxTicksLimit: 7, font: { size: 11 } },
+        grid:   { color: 'rgba(255,255,255,0.05)' },
+        border: { color: 'rgba(255,255,255,0.05)' }
+      },
+      y: {
+        min: yMin,
+        max: yMax,
+        display: true,
+        ticks: { color: '#64748b', stepSize: yStep, font: { size: 11 } },
+        grid:   { color: 'rgba(255,255,255,0.05)' },
+        border: { color: 'rgba(255,255,255,0.05)' }
+      }
     }
   };
 
@@ -127,112 +159,212 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
   };
 
   return (
-    <div className="analytics-dashboard" id="export-dashboard-area">
-      <div className="analytics-header">
-        <h2 style={{ fontSize: '1.2rem', marginBottom: 16 }}>Global Analytics</h2>
-        <div className="header-actions no-print" style={{ display: 'flex', gap: 8 }}>
-          <button className="hdr-btn" onClick={printDashboard} title="Export PDF">🖨 PDF</button>
-          <button className="hdr-btn" onClick={exportJSON} title="Export JSON">💾 JSON</button>
+    <div className="analytics-dashboard" id="export-dashboard-area" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      
+      <div className="analytics-section">
+        <div className="analytics-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 className="analytics-section-title" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', margin: 0 }}>Global Analytics</h2>
+          <div className="header-actions no-print" style={{ display: 'flex', gap: 12 }}>
+            <button onClick={printDashboard} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/></svg>
+              Export PDF
+            </button>
+            <button onClick={exportJSON} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
+              Export JSON
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Overview Cards */}
-      <div className="overview-cards">
-        <div className="overview-card">
-          <div className="oc-val">{global.activeTrackers}</div>
-          <div className="oc-lbl">Active Trackers</div>
-        </div>
-        <div className="overview-card">
-          <div className="oc-val">{global.perfectDaysMonth}</div>
-          <div className="oc-lbl">Perfect Days (This Month)</div>
-        </div>
-        <div className="overview-card">
-          <div className="oc-val">{global.bestStreak}d</div>
-          <div className="oc-lbl">Best Streak</div>
-        </div>
-        <div className="overview-card">
-          <div className="oc-val">{successRate}%</div>
-          <div className="oc-lbl">Overall Success Rate</div>
+        {/* Overview Cards 2x2 Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 20 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#6366f1', marginBottom: 12}}><path d="M3 12h4l3 -9l5 18l3 -9h6"/></svg>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>{global.activeTrackers}</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8' }}>Active Trackers</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 20 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#10b981', marginBottom: 12}}><path d="M5 12l5 5l10 -10"/></svg>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>{global.perfectDaysMonth}</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8' }}>Perfect Days (This Month)</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 20 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#f59e0b', marginBottom: 12}}><path d="M12 12c2 -2.96 0 -7 -1 -8c0 3.038 -1.773 4.741 -3 6c-1.226 1.26 -2 3.24 -2 5a6 6 0 1 0 12 0c0 -1.532 -1.056 -3.94 -2 -5c-1.786 3 -2.791 3 -4 2z"/></svg>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>{global.bestStreak}d</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8' }}>Best Streak</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 20 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#8b5cf6', marginBottom: 12}}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>{successRate}%</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8' }}>Overall Success Rate</div>
+          </div>
         </div>
       </div>
+      
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
 
       {/* Productivity Score Engine */}
-      <div className="dashboard-row">
-        <div className="dashboard-card score-card">
-          <h3>Daily Productivity Score</h3>
-          <div className="score-gauge-container" style={{ position: 'relative', height: 180, display: 'flex', justifyContent: 'center' }}>
-            <Doughnut data={scoreDoughnutData} options={{ maintainAspectRatio: false, plugins: { tooltip: { enabled: false } } }} />
-            <div className="score-gauge-text" style={{ position: 'absolute', top: '55%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-              <span style={{ fontSize: '2.5rem', fontWeight: 700, color: '#f8fafc' }}>{currentScore}</span>
-              <span style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8' }}>/ 100</span>
+      <div className="analytics-section">
+        <h2 className="analytics-section-title" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 24 }}>Daily Productivity Score</h2>
+        <div className="dashboard-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+          <div className="dashboard-card score-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="score-gauge-container" style={{ position: 'relative', height: 200, width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <Doughnut data={scoreDoughnutData} options={{ maintainAspectRatio: false, plugins: { tooltip: { enabled: false } } }} />
+              <div className="score-gauge-text" style={{ position: 'absolute', top: '55%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                <span style={{ fontSize: '3rem', fontWeight: 700, color: '#f8fafc' }}>{currentScore}</span>
+                <span style={{ display: 'block', fontSize: '0.9rem', color: '#94a3b8' }}>Today's Score</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', marginTop: 24, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#e2e8f0' }}>{yesterdayScore}</div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>Yesterday</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#e2e8f0' }}>{weekAvg}</div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>7d Avg</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#e2e8f0' }}>{bestScore}</div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>Best</div>
+              </div>
             </div>
           </div>
-          <div style={{ height: 100, marginTop: 10 }}>
-            <Line data={scoreLineData} options={chartOptions} />
+
+          <div className="dashboard-card category-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 24 }}>
+            <h3 style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: 16, fontWeight: 600 }}>Category Breakdown (Completions)</h3>
+            {catLabels.length > 0 ? (
+              <div style={{ height: 240, position: 'relative' }}>
+                <Doughnut data={catData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 13 } } } } }} />
+              </div>
+            ) : (
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 20 }}>No completions this month yet.</p>
+            )}
           </div>
         </div>
+        
+        <div style={{ height: 220, marginTop: 24, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: '16px 16px 8px 8px' }}>
+          <Line data={scoreLineData} options={chartOptions} />
+        </div>
+      </div>
 
-        <div className="dashboard-card category-card">
-          <h3>Category Breakdown (Completions)</h3>
-          {catLabels.length > 0 ? (
-            <div style={{ height: 220, position: 'relative', marginTop: 20 }}>
-              <Doughnut data={catData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8' } } } }} />
-            </div>
-          ) : (
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 20 }}>No completions this month yet.</p>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
+
+      {/* Global Weekly Heatmap */}
+      <div className="analytics-section">
+        <h2 className="analytics-section-title" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 16 }}>Consistency Heatmap (Last 12 Weeks)</h2>
+        <div className="dashboard-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 24 }}>
+          {heatmapData.length > 0 ? (() => {
+            const WEEK_COUNT = 12;
+            const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const CELL_H = 16, GAP = 3;
+
+            // Base dates from first tracker row (84 entries, Sun→Sat per week)
+            const baseData = heatmapData[0].data;
+
+            // FIX 1 aggregate: for each of 84 positions, compute completion rate
+            const agg = baseData.map((cell, i) => {
+              if (cell.isFuture) return { date: cell.date, isFuture: true, rate: null, scheduled: 0 };
+              const scheduled = heatmapData.filter(row => row.data[i]?.status !== 'none' && !row.data[i]?.isFuture);
+              const done      = heatmapData.filter(row => row.data[i]?.status === 'done');
+              return { date: cell.date, isFuture: false, scheduled: scheduled.length, rate: scheduled.length > 0 ? done.length / scheduled.length : null };
+            });
+
+            // FIX 2: purple intensity scale
+            const cellColor = (c) => {
+              if (!c || c.isFuture || c.scheduled === 0) return '#1e1e2e';
+              const r = c.rate ?? 0;
+              if (r <= 0)    return '#1e1e2e';
+              if (r <= 0.25) return '#4a1942';
+              if (r <= 0.50) return '#7b2d8b';
+              if (r <= 0.75) return '#a855f7';
+              return '#c084fc';
+            };
+
+            const fmtWk = (ds) => {
+              if (!ds) return '';
+              const d = new Date(ds + 'T00:00:00');
+              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            };
+
+            // FIX 1: use CSS grid so columns expand to fill full card width
+            const gridCols = `repeat(${WEEK_COUNT}, 1fr)`;
+            const DAY_LABEL_W = 32;
+
+            return (
+              <div style={{ width: '100%' }}>
+                <div style={{ display: 'flex', gap: 0 }}>
+                  {/* Day-of-week label column */}
+                  <div style={{ width: DAY_LABEL_W, flexShrink: 0, paddingTop: 22, marginRight: 8 }}>
+                    {DAY_LABELS.map(dl => (
+                      <div key={dl} style={{ height: CELL_H, marginBottom: GAP, fontSize: 10, color: '#64748b', display: 'flex', alignItems: 'center' }}>{dl}</div>
+                    ))}
+                  </div>
+
+                  {/* Grid area — takes all remaining width */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Week-date headers (every 2nd week, positioned via grid) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: GAP, marginBottom: 4, height: 18 }}>
+                      {Array.from({ length: WEEK_COUNT }, (_, w) => (
+                        <div key={w} style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap', overflow: 'visible' }}>
+                          {w % 2 === 0 ? fmtWk(baseData[w * 7]?.date) : ''}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 7 day rows × 12 week columns */}
+                    {Array.from({ length: 7 }, (_, day) => (
+                      <div key={day} style={{ display: 'grid', gridTemplateColumns: gridCols, gap: GAP, marginBottom: GAP }}>
+                        {Array.from({ length: WEEK_COUNT }, (_, week) => {
+                          const idx = week * 7 + day;
+                          const c   = agg[idx];
+                          const pct = c?.scheduled > 0 ? Math.round((c.rate ?? 0) * 100) : null;
+                          return (
+                            <div key={week}
+                              title={c ? `${c.date}${pct !== null ? ` — ${pct}%` : ''}` : ''}
+                              style={{ height: CELL_H, borderRadius: 3, backgroundColor: cellColor(c) }}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })() : (
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No data to display.</p>
           )}
         </div>
       </div>
 
-      {/* Global Weekly Heatmap */}
-      <div className="dashboard-card">
-        <h3>Consistency Heatmap (Last 12 Weeks)</h3>
-        {heatmapData.length > 0 ? (
-          <div className="global-heatmap" style={{ marginTop: 16, overflowX: 'auto' }}>
-            {heatmapData.map(row => (
-              <div key={row.id} className="gh-row" style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ width: 100, fontSize: '0.8rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: 8 }}>{row.name}</span>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  {row.data.map((d, i) => (
-                    <div key={i} title={d.date} style={{
-                      width: 12, height: 12, borderRadius: 2,
-                      backgroundColor: d.isFuture ? 'rgba(255,255,255,0.05)' : 
-                                       d.status === 'done' ? (TRACKER_CATS[row.category]?.color || '#10b981') :
-                                       d.status === 'skip' ? '#64748b' :
-                                       d.status === 'missed' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.1)'
-                    }} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 20 }}>No data to display.</p>
-        )}
-      </div>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
 
       {/* Journal Section */}
-      <div className="dashboard-card">
-        <h3>Weekly Review Journal</h3>
-        {reviews.length > 0 ? (
-          <div className="journal-list" style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {reviews.map(r => (
-              <div key={r.date} className="journal-entry" style={{ background: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <strong>{new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
-                  <span style={{ color: '#f59e0b' }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+      <div className="analytics-section">
+        <h2 className="analytics-section-title" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 16 }}>Weekly Review Journal</h2>
+        <div className="dashboard-card" style={{ background: 'transparent' }}>
+          {reviews.length > 0 ? (
+            <div className="journal-list" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {reviews.map(r => (
+                <div key={r.date} className="journal-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 20, borderRadius: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <strong style={{ color: '#f8fafc', fontSize: '1rem' }}>{new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                    <span style={{ color: '#f59e0b', fontSize: '1.1rem', letterSpacing: '0.1em' }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: 1.6 }}>
+                    <p style={{ marginBottom: 8 }}><strong style={{ color: '#94a3b8' }}>Went well:</strong> {r.wentWell}</p>
+                    <p style={{ marginBottom: 8 }}><strong style={{ color: '#94a3b8' }}>Hard:</strong> {r.wasHard}</p>
+                    <p><strong style={{ color: '#94a3b8' }}>Next Focus:</strong> {r.nextFocus}</p>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
-                  <p><strong>Went well:</strong> {r.wentWell}</p>
-                  <p><strong>Hard:</strong> {r.wasHard}</p>
-                  <p><strong>Next Focus:</strong> {r.nextFocus}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 20 }}>No weekly reviews completed yet.</p>
-        )}
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No weekly reviews completed yet.</p>
+          )}
+        </div>
       </div>
 
     </div>

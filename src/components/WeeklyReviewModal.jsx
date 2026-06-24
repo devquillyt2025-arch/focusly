@@ -61,14 +61,14 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box modal-box-wide">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-wide" onClick={e => e.stopPropagation()}>
         <div className="modal-hdr">
           <h3>Weekly Review</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         
-        <div className="modal-body" style={{ minHeight: 400 }}>
+        <div className="modal-body" style={{ minHeight: 400, padding: 24 }}>
           {/* Step 1: Summary */}
           {step === 1 && (
             <div className="review-step">
@@ -149,7 +149,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
                 <label>Pick 3 habits to prioritize ({selectedHabits.length}/3)</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 150, overflowY: 'auto', padding: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
                   {trackers.filter(t => t.type === 'habit').map(t => (
-                    <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <label key={t.id} className="custom-checkbox-wrapper">
                       <input type="checkbox" checked={selectedHabits.includes(t.id)} onChange={() => toggleHabit(t.id)} disabled={!selectedHabits.includes(t.id) && selectedHabits.length >= 3} />
                       {t.name}
                     </label>
@@ -172,15 +172,15 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
           )}
         </div>
 
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
           {step > 1 ? (
-            <button className="secondary-btn" onClick={() => setStep(step - 1)}>Back</button>
+            <button className="secondary-btn" style={{ minWidth: 80, height: 40, borderRadius: 8, background: 'transparent' }} onClick={() => setStep(step - 1)}>Back</button>
           ) : <div></div>}
           
           {step < 3 ? (
-            <button className="primary-btn" onClick={() => setStep(step + 1)}>Next</button>
+            <button className="primary-btn" style={{ minWidth: 80, height: 40, borderRadius: 8 }} onClick={() => setStep(step + 1)}>Next</button>
           ) : (
-            <button className="primary-btn" onClick={handleSave}>Finish Review</button>
+            <button className="primary-btn" style={{ minWidth: 80, height: 40, borderRadius: 8 }} onClick={handleSave}>Finish Review</button>
           )}
         </div>
       </div>

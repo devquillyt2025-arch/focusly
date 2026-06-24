@@ -1,3 +1,14 @@
+// AUDIT LOG - 2026-06-04
+// Bug 1: ReportsView — React.useRef used without React default imported → Fixed: useRef named import
+// Bug 2: ReportsView — upsertLog/toggleMilestone not imported → Fixed: added to trackerUtils import block
+// Bug 3: ReportsView ProjectDetail — milestones/targetDate destructured from computeProjectStats return (not returned) → Fixed: pull from tracker.config
+// Bug 4: computeGlobalStats — project trackers inflated scheduledCount but isLoggedToday always false for incomplete projects → Fixed: exclude type==='project' from daily counts
+// Bug 5: App midnight reset fired at local midnight but todayStr() uses UTC date → Fixed: use UTC midnight for timeout
+// Bug 6: insightsEngine — explicit skips (val===false) counted as misses in "missed 3 days" insight → Fixed: only count val==null
+// Bug 7: WeeklyReviewModal — backdrop click didn't close modal (no onClick handler on overlay) → Fixed: added onClick={onClose} + stopPropagation
+// Bug 8: computeHabitStreaks — first loop (lines ~111-130) wrote into `current` which was immediately reset to 0, dead code → Fixed: removed dead loop
+// Bug 9: Timer setInterval-only countdown drifts in throttled background tabs → Fixed: record timerEndAt on start/resume, derive remaining from Date.now() delta
+
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import TaskList, { CAT_META } from './components/TaskList';
 import Timer from './components/Timer';
@@ -10,12 +21,19 @@ import ShortcutsModal from './components/ShortcutsModal';
 import WeeklyReviewModal from './components/WeeklyReviewModal';
 import DailyGoalsView from './components/DailyGoalsView';
 import ReportsView from './components/ReportsView';
+import JournalView from './components/JournalView';
+import GoalsView from './components/GoalsView';
+import HabitsView from './components/HabitsView';
 import AddTrackerModal from './components/AddTrackerModal';
+import {
+  loadHabits, saveHabits, migrateFromTrackers, toggleCompletion,
+} from './habitsStore';
 import {
   loadTrackers, saveTrackers,
   isScheduledToday, isLoggedToday, computeHabitStreaks
 } from './trackers/trackerUtils';
 import { sendNotification } from './utils/notificationUtils';
+import { handleAuthCallback, syncTasks, pushSyncQueue } from './utils/googleTasksSync';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -143,15 +161,50 @@ export function getSecsForMode(mode, sett) {
 
 function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 
+// Compute next due date string (YYYY-MM-DD) for a recurring task
+function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const toISO   = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const base    = dueDateStr ? new Date(dueDateStr + 'T00:00:00') : new Date();
+  if (recurrence === 'daily')    return toISO(addDays(base, 1));
+  if (recurrence === 'weekly')   return toISO(addDays(base, 7));
+  if (recurrence === 'weekdays') {
+    let next = addDays(base, 1);
+    while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
+    return toISO(next);
+  }
+  if (recurrence === 'custom' && recurrenceDays?.length) {
+    let next = addDays(base, 1);
+    for (let i = 0; i < 7; i++, next = addDays(next, 1))
+      if (recurrenceDays.includes(next.getDay())) return toISO(next);
+  }
+  return '';
+}
+
 // ─── App ─────────────────────────────────────────────────────────
 export default function App() {
   const initSettings = useMemo(loadSettings, []); // eslint-disable-line
 
   // ── Existing state ──
   const [tasks,       setTasks]       = useState(loadTasks);
+  const [syncStatus,  setSyncStatus]  = useState(() => localStorage.getItem('focusly_sync_enabled') === 'true' ? 'Synced' : 'Not connected');
+
   const [theme,       setTheme]       = useState(() => { try { return JSON.parse(localStorage.getItem(SK.theme))||'dark'; } catch { return 'dark'; } });
   const [settings,    setSettings]    = useState(initSettings);
   const [pomodoroLog, setPomodoroLog] = useState(loadPomoLog);
+
+  // ── OAuth Callback & Initial Sync ──
+  useEffect(() => {
+    handleAuthCallback().then(success => {
+      if (success) {
+        showToast('Connected to Google Tasks!', 'success');
+        setSyncStatus('Syncing...');
+        syncTasks(tasks, setTasks, setSyncStatus);
+      } else if (localStorage.getItem('focusly_sync_enabled') === 'true') {
+        syncTasks(tasks, setTasks, setSyncStatus);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [timerMode,    setTimerMode]    = useState('focus');
   const [timerState,   setTimerState]   = useState('idle');
@@ -168,6 +221,8 @@ export default function App() {
   const [intentions,     setIntentions]     = useState(loadIntentions);
   const [editingTracker, setEditingTracker] = useState(null);
   const [showAddTracker, setShowAddTracker] = useState(false);
+  const [editingTask,    setEditingTask]    = useState(null);
+  const [habits,         setHabits]         = useState(() => loadHabits() ?? []);
 
   // ── PWA Install State ──
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -201,6 +256,8 @@ export default function App() {
   const toastTimerRef  = useRef(null);
   const activeTaskRef  = useRef(activeTaskId);
   const timerModeRef   = useRef(timerMode);
+  const timerSecsRef   = useRef(timerSeconds);
+  const timerEndAtRef  = useRef(null); // wall-clock ms when current session should complete
   const settingsRef    = useRef(settings);
   const pomoLogRef     = useRef(pomodoroLog);
   const switchModeRef  = useRef(null);
@@ -208,6 +265,7 @@ export default function App() {
 
   useEffect(() => { activeTaskRef.current  = activeTaskId;   }, [activeTaskId]);
   useEffect(() => { timerModeRef.current   = timerMode;      }, [timerMode]);
+  useEffect(() => { timerSecsRef.current   = timerSeconds;   }, [timerSeconds]);
   useEffect(() => { settingsRef.current    = settings;       }, [settings]);
   useEffect(() => { pomoLogRef.current     = pomodoroLog;    }, [pomodoroLog]);
 
@@ -217,6 +275,12 @@ export default function App() {
   useEffect(() => { persist(SK.pomoLog,    pomodoroLog); }, [pomodoroLog]);
   useEffect(() => { persist(SK.intentions, intentions); }, [intentions]);
   useEffect(() => { saveTrackers(trackers);              }, [trackers]);
+  useEffect(() => { saveHabits(habits);                  }, [habits]);
+  useEffect(() => {
+    // One-time migration: copy type='habit' trackers into the habits store
+    const migrated = migrateFromTrackers(trackers);
+    if (migrated !== null) setHabits(migrated);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     persist(SK.theme, theme);
     document.documentElement.setAttribute('data-theme', theme);
@@ -225,7 +289,8 @@ export default function App() {
   // ── Midnight reset ──
   useEffect(() => {
     const now = new Date();
-    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
+    // Use UTC midnight so the reset fires exactly when todayStr() (UTC-based) rolls over.
+    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
     const t = setTimeout(() => {
       setIntentions(prev => {
         const today = todayStr();
@@ -400,19 +465,28 @@ export default function App() {
   useEffect(() => {
     if (timerState!=='running') { clearInterval(intervalRef.current); return; }
     intervalRef.current = setInterval(() => {
-      setTimerSeconds(prev => {
-        if (timerModeRef.current==='focus' && activeTaskRef.current) {
-          setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,timeLogged:t.timeLogged+1}:t));
-        }
-        const next = prev-1;
-        if (next<=0) { clearInterval(intervalRef.current); setTimerState('idle'); setTimeout(()=>onCompleteRef.current(),0); return 0; }
-        return next;
-      });
+      // Use wall-clock delta so the timer stays accurate in throttled background tabs.
+      const remaining = Math.ceil((timerEndAtRef.current - Date.now()) / 1000);
+      if (timerModeRef.current==='focus' && activeTaskRef.current) {
+        setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,timeLogged:t.timeLogged+1}:t));
+      }
+      if (remaining <= 0) {
+        clearInterval(intervalRef.current);
+        setTimerSeconds(0);
+        setTimerState('idle');
+        setTimeout(() => onCompleteRef.current(), 0);
+      } else {
+        setTimerSeconds(remaining);
+      }
     }, 1000);
     return () => clearInterval(intervalRef.current);
   }, [timerState]);
 
-  const startTimer  = useCallback(() => { initAudio(); setTimerState('running'); }, []);
+  const startTimer  = useCallback(() => {
+    initAudio();
+    timerEndAtRef.current = Date.now() + timerSecsRef.current * 1000;
+    setTimerState('running');
+  }, []);
   const pauseTimer  = useCallback(() => setTimerState('paused'), []);
   const resetTimer  = useCallback(() => {
     clearInterval(intervalRef.current); setTimerState('idle');
@@ -431,22 +505,93 @@ export default function App() {
       timeEstimate:Math.max(1,Math.min(480,Number(data.timeEstimate)||25)),
       notes:data.notes.trim(), dueDate:data.dueDate, completed:false,
       timeLogged:0, pomodorosCompleted:0, createdAt:new Date().toISOString(), completedAt:null,
+      recurrence: data.recurrence || null,
+      recurrenceDays: data.recurrenceDays || [],
+      googleTaskId: null,
+      lastSyncedAt: null,
+      updatedAt: new Date().toISOString(),
+      syncConflict: null
     };
-    setTasks(prev=>[t,...prev]); setOpenModal(null);
+    setTasks(prev => {
+      const next = [t, ...prev];
+      pushSyncQueue({ type: 'CREATE', taskId: t.id });
+      setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      return next;
+    });
+    setOpenModal(null);
     showToast(`"${t.name}" added ✓`,'success');
   }, [showToast]);
 
+  const updateTaskData = useCallback((updated) => {
+    const nextUpdated = { ...updated, name: updated.name.trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
+    setTasks(prev => {
+      const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
+      pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
+      setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      return next;
+    });
+    setEditingTask(null);
+    showToast(`"${updated.name.trim()}" updated ✓`, 'success');
+  }, [showToast]);
+
+  // Silent update for detail-panel auto-saves (no toast, no modal side-effects)
+  const quickUpdateTask = useCallback((updated) => {
+    const nextUpdated = { ...updated, name: (updated.name||'').trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
+    setTasks(prev => {
+      const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
+      pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
+      setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      return next;
+    });
+  }, []);
+
+  // ── Habit callbacks ──
+  const addHabit    = useCallback((h) => setHabits(prev => [h, ...prev]), []);
+  const updateHabit = useCallback((h) => setHabits(prev => prev.map(x => x.id === h.id ? h : x)), []);
+  const deleteHabit = useCallback((id) => setHabits(prev => prev.filter(h => h.id !== id)), []);
+  const markHabitDone = useCallback((id) => {
+    setHabits(prev => prev.map(h => h.id === id ? toggleCompletion(h) : h));
+  }, []);
+
   const toggleComplete = useCallback((id) => {
-    setTasks(prev=>prev.map(t=>{
-      if(t.id!==id) return t;
-      const done=!t.completed;
-      return {...t,completed:done,completedAt:done?new Date().toISOString():null};
-    }));
+    setTasks(prev => {
+      const task   = prev.find(t => t.id === id);
+      const done   = task ? !task.completed : false;
+      const mapped = prev.map(t => {
+        if (t.id !== id) return t;
+        return { ...t, completed: done, completedAt: done ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
+      });
+      let finalTasks = mapped;
+      // Auto-create next occurrence when completing a recurring task
+      if (done && task?.recurrence) {
+        const due  = nextDueDate(task.dueDate, task.recurrence, task.recurrenceDays);
+        const next = {
+          ...task,
+          id: genId(), completed: false, completedAt: null,
+          dueDate: due, timeLogged: 0, pomodorosCompleted: 0,
+          createdAt: new Date().toISOString(),
+          googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
+        };
+        finalTasks = [...mapped, next];
+        pushSyncQueue({ type: 'CREATE', taskId: next.id });
+      }
+      pushSyncQueue({ type: 'UPDATE', taskId: id });
+      setTimeout(() => syncTasks(finalTasks, setTasks, setSyncStatus), 500);
+      return finalTasks;
+    });
     if (id===activeTaskId && timerState==='running') pauseTimer();
   }, [activeTaskId, timerState, pauseTimer]);
 
   const deleteTask = useCallback((id) => {
-    setTasks(prev=>prev.filter(t=>t.id!==id));
+    setTasks(prev => {
+      const task = prev.find(t => t.id === id);
+      if (task && task.googleTaskId) {
+        pushSyncQueue({ type: 'DELETE', googleTaskId: task.googleTaskId, taskId: id });
+      }
+      const next = prev.filter(t => t.id !== id);
+      setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      return next;
+    });
     if (activeTaskId===id) { setActiveTaskId(null); if(timerState==='running') pauseTimer(); }
   }, [activeTaskId, timerState, pauseTimer]);
 
@@ -583,38 +728,68 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="app-logo">
-          <span>🌱</span>
+          <IconFocusly />
           <h1>Focusly</h1>
         </div>
         <div className="header-right">
           <div className="header-actions">
             <button className="hdr-btn" onClick={()=>setOpenModal('analytics')} title="Analytics (A)"><IconChart /></button>
             <button className="hdr-btn" onClick={()=>setOpenModal('shortcuts')} title="Shortcuts (?)"><IconKeyboard /></button>
-            <button className={`hdr-btn ${activeTab==='settings'?'active':''}`} onClick={()=>setActiveTab('settings')} title="Settings (S)"><IconSettings /></button>
             <button className="hdr-btn" onClick={()=>setTheme(t=>t==='dark'?'light':'dark')} title="Theme (D)">
-              {theme==='dark'?'☀️':'🌙'}
+              {theme==='dark' ? <IconSun /> : <IconMoon />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── Main navigation ── */}
+      {/* ── Body: sidebar nav + content ── */}
+      <div className="app-body">
+
       <nav className="main-nav">
+        {/* ── Section: Daily ── */}
+        <span className="nav-section-label">Daily</span>
         {[
-          { id:'daily',   label:'Daily Goals', icon:'🎯', badge: unloggedToday.length || 0 },
-          { id:'reports', label:'Reports',     icon:'📊' },
-          { id:'timer',   label:'Timer',       icon:'🍅' },
-          { id:'tasks',   label:'Tasks',       icon:'✓',  badge: tasks.filter(t=>!t.completed).length || 0 },
+          { id:'daily',   label:'Daily Goals', Icon: NavIcoSun,          badge: unloggedToday.length || 0 },
+          { id:'habits',  label:'Habits',      Icon: NavIcoRepeat },
+          { id:'tasks',   label:'Tasks',       Icon: NavIcoCheckSquare,  badge: tasks.filter(t=>!t.completed).length || 0 },
+          { id:'timer',   label:'Focus',       Icon: NavIcoTimerIcon },
+          { id:'journal', label:'Journal',     Icon: NavIcoBookOpen },
         ].map(tab => (
           <button key={tab.id}
             className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="nav-icon">{tab.icon}</span>
+            <span className="nav-icon"><tab.Icon /></span>
             <span className="nav-label">{tab.label}</span>
             {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
           </button>
         ))}
+
+        {/* ── Section: Planning ── */}
+        <div className="nav-divider" />
+        <span className="nav-section-label">Planning</span>
+        {[
+          { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
+          { id:'reports', label:'Reports', Icon: NavIcoBarChart },
+        ].map(tab => (
+          <button key={tab.id}
+            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className="nav-icon"><tab.Icon /></span>
+            <span className="nav-label">{tab.label}</span>
+          </button>
+        ))}
+
+        {/* ── Settings pinned to bottom ── */}
+        <div className="nav-spacer" />
+        <button
+          className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          <span className="nav-icon"><NavIcoSettings /></span>
+          <span className="nav-label">Settings</span>
+        </button>
       </nav>
 
       {/* ── Tab content ── */}
@@ -630,6 +805,8 @@ export default function App() {
             pomodoroLog={pomodoroLog}
             tasks={tasks}
             onTriggerWeeklyReview={() => setOpenModal('weekly-review')}
+            habits={habits}
+            onMarkHabitDone={markHabitDone}
           />
         )}
 
@@ -641,6 +818,7 @@ export default function App() {
             onUpdateTracker={updateTracker}
             onDeleteTracker={deleteTracker}
             onEditTracker={openEditTracker}
+            onAddTracker={openAddTracker}
           />
         )}
 
@@ -652,6 +830,20 @@ export default function App() {
             onSetTheme={setTheme}
             onClearData={handleClearData}
             onImportData={handleImportData}
+            syncStatus={syncStatus}
+            onSyncToggle={(enabled) => {
+              if (enabled) {
+                localStorage.setItem('focusly_sync_enabled', 'true');
+                setSyncStatus('Syncing...');
+                syncTasks(tasks, setTasks, setSyncStatus);
+              } else {
+                localStorage.setItem('focusly_sync_enabled', 'false');
+                setSyncStatus('Not connected');
+              }
+            }}
+            onDisconnect={() => {
+              setSyncStatus('Not connected');
+            }}
           />
         )}
 
@@ -674,6 +866,17 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === 'habits'  && (
+          <HabitsView
+            habits={habits}
+            onAddHabit={addHabit}
+            onUpdateHabit={updateHabit}
+            onDeleteHabit={deleteHabit}
+          />
+        )}
+        {activeTab === 'journal' && <JournalView />}
+        {activeTab === 'goals'   && <GoalsView />}
+
         {activeTab === 'tasks' && (
           <div className="tasks-tab">
             <TaskList
@@ -685,6 +888,11 @@ export default function App() {
               onDelete={deleteTask}
               onClearCompleted={clearCompleted}
               onAdd={()=>setOpenModal('add')}
+              onEdit={task => setEditingTask(task)}
+              onUpdate={updateTaskData}
+              onQuickUpdate={quickUpdateTask}
+              syncStatus={syncStatus}
+              onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
             />
           </div>
         )}
@@ -710,12 +918,14 @@ export default function App() {
           </div>
         )}
       </div>
+      </div>{/* end app-body */}
 
       {/* ── Toast ── */}
       {toast && <div key={toast.key} className={`app-toast toast-${toast.type}`}>{toast.msg}</div>}
 
       {/* ── Modals ── */}
-      {openModal==='add'       && <AddTaskModal  onAdd={addTask}     onClose={()=>setOpenModal(null)} />}
+      {openModal==='add'       && <AddTaskModal  onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
+      {editingTask             && <AddTaskModal  onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
       {openModal==='analytics' && <AnalyticsModal tasks={tasks}      pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} />}
       {openModal==='shortcuts' && <ShortcutsModal onClose={()=>setOpenModal(null)} />}
       {openModal==='weekly-review' && (
@@ -735,6 +945,7 @@ export default function App() {
           onSave={handleTrackerSave}
           onClose={() => { setShowAddTracker(false); setEditingTracker(null); }}
           editTracker={editingTracker}
+          existingTrackers={trackers}
         />
       )}
     </div>
@@ -767,7 +978,66 @@ function TodayBreakdown({ tasks }) {
   );
 }
 
+// ─── Placeholder page ────────────────────────────────────────────
+function PlaceholderPage({ title }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', height: '100%', gap: 10,
+    }}>
+      <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{title}</span>
+      <span style={{ fontSize: '0.85rem', color: '#475569' }}>Coming soon</span>
+    </div>
+  );
+}
+
 // ─── Inline SVG icons ─────────────────────────────────────────────
-function IconChart()    { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
-function IconKeyboard() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>; }
-function IconSettings() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>; }
+const S = { fill:'none', stroke:'currentColor', strokeWidth:'1.75', strokeLinecap:'round', strokeLinejoin:'round' };
+
+// App logo — crosshair/focus mark
+function IconFocusly() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...S} style={{ color: 'var(--accent)' }}>
+      <circle cx="12" cy="12" r="9"/>
+      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+      <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+      <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+    </svg>
+  );
+}
+
+// Header action icons (16px)
+function IconChart()    { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
+function IconKeyboard() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>; }
+function IconSettings() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>; }
+function IconSun()      { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>; }
+function IconMoon()     { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>; }
+
+// ─── Sidebar nav icons (18px) ─────────────────────────────────────
+// Section 1 — Daily
+function NavIcoSun() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+}
+function NavIcoRepeat() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>;
+}
+function NavIcoCheckSquare() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+}
+function NavIcoTimerIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 16"/><line x1="9" y1="2" x2="15" y2="2"/><line x1="12" y1="2" x2="12" y2="5"/></svg>;
+}
+function NavIcoBookOpen() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+}
+// Section 2 — Planning
+function NavIcoGoalTarget() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+}
+function NavIcoBarChart() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
+}
+// Bottom
+function NavIcoSettings() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+}

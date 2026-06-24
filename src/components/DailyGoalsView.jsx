@@ -8,17 +8,23 @@ import {
   computeProjectStats, computeGlobalStats, todayStr,
 } from '../trackers/trackerUtils';
 import { getDailyInsight } from '../trackers/insightsEngine';
+import {
+  HABIT_CATS, isScheduledToday as isHabitScheduledToday,
+  isCompletedToday as isHabitCompletedToday, calcStreak as habitStreak, fmtFrequency,
+} from '../habitsStore';
 
 // ─── Main view ─────────────────────────────────────────────────────
 export default function DailyGoalsView({
   trackers, onUpdateTracker, onAddTracker,
   intentions, onIntentionUpdate, onIntentionToggle,
-  pomodoroLog, tasks, onTriggerWeeklyReview
+  pomodoroLog, tasks, onTriggerWeeklyReview,
+  habits = [], onMarkHabitDone,
 }) {
   const today = new Date();
   const dateLabel = today.toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  const scheduled = trackers.filter(t => isScheduledToday(t));
+  // Exclude habit-type trackers from this view (they're shown via the habits store below)
+  const scheduled = trackers.filter(t => isScheduledToday(t) && t.type !== 'habit');
   const global = computeGlobalStats(trackers);
   
   const todayDateStr = todayStr();
@@ -51,35 +57,54 @@ export default function DailyGoalsView({
     onUpdateTracker(toggleMilestone(t, msId));
   };
 
-  const GROUP_LABELS = { morning: '🌅 Morning', afternoon: '☀️ Afternoon', evening: '🌙 Evening', anytime: '📌 Today' };
+  const GROUP_LABELS = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', anytime: 'Today' };
 
   return (
     <div className="daily-view">
       {/* Date header */}
       <div className="daily-header">
         <div className="daily-date">{dateLabel}</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="hdr-btn" onClick={onTriggerWeeklyReview} title="Weekly Review" style={{ fontSize: '0.8rem', padding: '4px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: 6 }}>
-            📝 Review
+        <div className="daily-header-actions" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap-reverse', justifyContent: 'flex-end' }}>
+          <button onClick={onTriggerWeeklyReview} title="Weekly Review" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px', padding: '4px 12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+            </svg>
+            Review
           </button>
           {global.scheduledCount > 0 && (
             <div className="daily-progress-pill">
               {global.loggedCount}/{global.scheduledCount} done
-              {global.isPerfect && <span className="perfect-star">⭐</span>}
+              {global.isPerfect && (
+                <svg className="perfect-star" width="13" height="13" viewBox="0 0 24 24" fill="#fbbf24" stroke="none">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {global.isPerfect && global.scheduledCount > 0 && (
-        <div className="perfect-day-banner">🌟 Perfect day! All trackers logged.</div>
+        <div className="perfect-day-banner">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="9 12 11 14 15 10"/>
+          </svg>
+          Perfect day! All trackers logged.
+        </div>
       )}
 
       {/* Insights Banner */}
       {dailyInsight && (
         <div className="daily-insight-banner" style={{ background: 'linear-gradient(to right, rgba(99, 102, 241, 0.1), rgba(16, 185, 129, 0.1))', padding: '12px 16px', borderRadius: 8, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: '1.2rem' }}>💡</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
             <span style={{ fontSize: '0.9rem', color: '#e2e8f0', lineHeight: 1.4 }}>{dailyInsight}</span>
           </div>
           <button onClick={dismissInsight} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', padding: 4 }}>×</button>
@@ -100,8 +125,18 @@ export default function DailyGoalsView({
         intentions={intentions}
       />
 
-      {/* Tracker groups */}
-      {scheduled.length === 0 ? (
+      {/* Habits section (from habits store) */}
+      {habits.filter(isHabitScheduledToday).length > 0 && (
+        <section className="tracker-group">
+          <div className="tracker-group-label">Habits</div>
+          {habits.filter(isHabitScheduledToday).map(h => (
+            <DailyHabitCard key={h.id} habit={h} onToggle={() => onMarkHabitDone?.(h.id)} />
+          ))}
+        </section>
+      )}
+
+      {/* Tracker groups (non-habit: target, average, project) */}
+      {scheduled.length === 0 && habits.filter(isHabitScheduledToday).length === 0 ? (
         <div className="daily-empty">
           <span>🎯</span>
           <p>No trackers scheduled for today.</p>
@@ -140,9 +175,13 @@ function DailyTrackerCard({ tracker, onLog, onMilestoneToggle }) {
   const catMeta  = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
   const logged   = isLoggedToday(tracker);
+  // Habits look "handled" (dimmed) for both Done and Skip so the card stops
+  // prompting action, even though only Done counts toward the progress pill.
+  const todayLog = getLogForDate(tracker, todayStr());
+  const handled  = tracker.type === 'habit' ? todayLog !== null : logged;
 
   return (
-    <div className={`daily-card${logged ? ' daily-card-done' : ''}`}
+    <div className={`daily-card${handled ? ' daily-card-done' : ''}`}
       style={{ '--cat-color': catMeta.color }}>
       <div className="daily-card-bar" />
       <div className="daily-card-body">
@@ -267,6 +306,43 @@ function InlineLogInput({ tracker, todayLog, onLog }) {
         min="0"
       />
       <button className="inline-log-btn" onClick={submit} disabled={!val}>Log</button>
+    </div>
+  );
+}
+
+// ─── Daily habit card (synced from habits store) ───────────────────
+function DailyHabitCard({ habit, onToggle }) {
+  const cat    = HABIT_CATS[habit.category] ?? HABIT_CATS.health;
+  const done   = isHabitCompletedToday(habit);
+  const streak = habitStreak(habit);
+
+  return (
+    <div className={`daily-card${done ? ' daily-card-done' : ''}`}
+      style={{ '--cat-color': cat.color }}>
+      <div className="daily-card-bar" />
+      <div className="daily-card-body">
+        <div className="daily-card-top">
+          <span className="daily-type-icon">🔄</span>
+          <div className="daily-card-info">
+            <div className="daily-card-name">{habit.name}</div>
+            <div className="daily-card-meta">
+              <span className="mini-cat-badge"
+                style={{ background: cat.color+'22', color: cat.color, border: `1px solid ${cat.color}44` }}>
+                {cat.label}
+              </span>
+              <span className="daily-meta-text">{fmtFrequency(habit.frequency)}</span>
+              {streak > 0 && <span className="daily-meta-text">🔥 {streak}d streak</span>}
+            </div>
+          </div>
+          <div className="daily-card-actions">
+            {done ? (
+              <div className="habit-logged-badge" onClick={onToggle} style={{ cursor: 'pointer' }}>✓ Done</div>
+            ) : (
+              <button className="habit-done-btn" onClick={onToggle}>✓ Done</button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

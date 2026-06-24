@@ -2,7 +2,19 @@
 const SK = 'focusly-trackers';
 
 export function loadTrackers() {
-  try { return JSON.parse(localStorage.getItem(SK) || '[]'); } catch { return []; }
+  try {
+    const list = JSON.parse(localStorage.getItem(SK) || '[]');
+    const seenId = new Set();
+    const seenName = new Set();
+    return list.filter(t => {
+      if (seenId.has(t.id)) return false;
+      seenId.add(t.id);
+      const nameKey = (t.name || '').trim().toLowerCase();
+      if (seenName.has(nameKey)) return false;
+      seenName.add(nameKey);
+      return true;
+    });
+  } catch { return []; }
 }
 export function saveTrackers(list) {
   try { localStorage.setItem(SK, JSON.stringify(list)); } catch {}
@@ -94,6 +106,10 @@ export function isLoggedToday(tracker) {
     const { milestones = [] } = tracker.config;
     return milestones.length > 0 && milestones.every(m => m.done);
   }
+  if (tracker.type === 'habit') {
+    // Only Done (true) counts for progress pill and perfect-day; Skip (false) is excluded
+    return (tracker.logs || []).some(l => l.date === today && l.value === true);
+  }
   return (tracker.logs || []).some(l => l.date === today);
 }
 
@@ -106,34 +122,9 @@ export function computeHabitStreaks(tracker) {
   const today = todayStr();
   const todayVal = logMap[today];
 
-  // Current streak: walk backwards; skips are neutral, missed scheduled = break
+  // Current streak: walk backwards; skips are neutral, missed scheduled day = break
   let current = 0;
   const now = new Date();
-  const startOffset = todayVal === true ? 0 : 1; // if done today, include today
-
-  for (let i = startOffset; i < 365; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const ds = dateStrOf(d);
-    if (ds > today) continue;
-    if (!isScheduledOn(tracker, d)) continue; // non-scheduled: neutral
-
-    const val = logMap[ds];
-    if (val === true) {
-      current++;
-    } else if (val === false) {
-      // explicit skip: neutral, keep going
-    } else {
-      break; // missed
-    }
-  }
-  if (todayVal === true) current++; // re-add today if it was the startOffset
-
-  // Clamp: avoid double-count if startOffset was 0 (today was done)
-  if (startOffset === 0) current = Math.max(0, current - 1 + 1); // no-op but explicit
-
-  // Recalculate cleanly
-  current = 0;
   for (let i = 0; i < 365; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
@@ -240,7 +231,9 @@ export function computeGlobalStats(trackers) {
   const today = todayStr();
   const now = new Date();
 
-  const scheduled = trackers.filter(t => isScheduledToday(t));
+  // Projects can't be "logged" daily (they use milestones), so exclude them from
+  // the daily progress pill and perfect-day calculation to avoid permanent inflation.
+  const scheduled = trackers.filter(t => isScheduledToday(t) && t.type !== 'project');
   const logged    = scheduled.filter(t => isLoggedToday(t));
   const isPerfect = scheduled.length > 0 && logged.length === scheduled.length;
 
@@ -255,12 +248,13 @@ export function computeGlobalStats(trackers) {
     if (sched.every(t => (t.logs || []).some(l => l.date === ds))) perfectDaysMonth++;
   }
 
-  // Best habit streak
-  let bestStreak = 0;
+  // Best habit streak (current) and longest historical streak
+  let bestStreak = 0, longestStreak = 0;
   for (const t of trackers) {
     if (t.type === 'habit') {
-      const { current } = computeHabitStreaks(t);
+      const { current, longest } = computeHabitStreaks(t);
       if (current > bestStreak) bestStreak = current;
+      if (longest > longestStreak) longestStreak = longest;
     }
   }
 
@@ -271,6 +265,7 @@ export function computeGlobalStats(trackers) {
     isPerfect,
     perfectDaysMonth,
     bestStreak,
+    longestStreak,
   };
 }
 

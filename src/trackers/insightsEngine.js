@@ -111,7 +111,7 @@ export function generateInsights(trackers, tasks, pomodoroLog) {
         if (isScheduledOn(tracker, d)) {
           const ds = dateStrOf(d);
           const val = logs.find(l => l.date === ds)?.value;
-          if (val == null || val === false) missedDays++;
+          if (val == null) missedDays++; // val===false is an explicit skip, not a miss
           else break;
         }
       }

@@ -10,20 +10,50 @@ const PRIORITIES = [
 
 const PRI_COLOR = { none: '#8b949e', low: '#3b82f6', medium: '#f59e0b', high: '#ef4444' };
 
-const DEFAULT = { name: '', category: 'work', priority: 'none', timeEstimate: 25, notes: '', dueDate: '' };
+const RECURRENCE_OPTIONS = [
+  { value: null,       label: 'None'     },
+  { value: 'daily',    label: 'Daily'    },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly',   label: 'Weekly'   },
+  { value: 'custom',   label: 'Custom'   },
+];
 
-export default function AddTaskModal({ onAdd, onClose }) {
-  const [form, setForm] = useState(DEFAULT);
+const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+const DEFAULT = { name: '', category: 'work', priority: 'medium', timeEstimate: 25, notes: '', dueDate: '', recurrence: null, recurrenceDays: [] };
+
+export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existingTasks = [] }) {
+  const isEditing = Boolean(editTask);
+  const [form, setForm] = useState(() => isEditing ? {
+    name: editTask.name ?? '',
+    category: editTask.category ?? 'work',
+    priority: editTask.priority ?? 'none',
+    timeEstimate: editTask.timeEstimate ?? 25,
+    notes: editTask.notes ?? '',
+    dueDate: editTask.dueDate ?? '',
+    recurrence: editTask.recurrence ?? null,
+    recurrenceDays: editTask.recurrenceDays ?? [],
+  } : DEFAULT);
+  const [nameError, setNameError] = useState('');
   const nameRef = useRef(null);
 
   useEffect(() => { nameRef.current?.focus(); }, []);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (k === 'name' && nameError) setNameError('');
+  };
 
   const submit = e => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onAdd(form);
+    if (!isEditing) {
+      const key = form.name.trim().toLowerCase();
+      const dupe = existingTasks.some(t => t.name.trim().toLowerCase() === key);
+      if (dupe) { setNameError('A task with this name already exists'); return; }
+    }
+    if (isEditing) onEdit({ ...editTask, ...form, timeEstimate: Math.max(1, Math.min(480, Number(form.timeEstimate) || 25)) });
+    else onAdd(form);
   };
 
   const selectedCat = CAT_META[form.category];
@@ -32,15 +62,16 @@ export default function AddTaskModal({ onAdd, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-hdr">
-          <h3>New Task</h3>
+          <h3>{isEditing ? 'Edit Task' : 'New Task'}</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={submit} className="modal-form" noValidate>
           <div className="form-grp">
             <label>Name <span className="req">*</span></label>
-            <input ref={nameRef} type="text" className="form-inp" value={form.name}
+            <input ref={nameRef} type="text" className={`form-inp${nameError ? ' form-inp-error' : ''}`} value={form.name}
               onChange={e => set('name', e.target.value)} placeholder="What are you working on?" required />
+            {nameError && <span className="form-error">{nameError}</span>}
           </div>
 
           <div className="form-grp">
@@ -87,6 +118,37 @@ export default function AddTaskModal({ onAdd, onClose }) {
           </div>
 
           <div className="form-grp">
+            <label>Repeat</label>
+            <div className="recur-picker">
+              {RECURRENCE_OPTIONS.map(opt => (
+                <button key={String(opt.value)} type="button"
+                  className={`recur-btn${form.recurrence === opt.value ? ' recur-btn-active' : ''}`}
+                  onClick={() => set('recurrence', opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {form.recurrence === 'custom' && (
+              <div className="recur-days">
+                {DOW.map((lbl, i) => (
+                  <button key={i} type="button"
+                    className={`recur-day${form.recurrenceDays.includes(i) ? ' recur-day-active' : ''}`}
+                    onClick={() => {
+                      const days = form.recurrenceDays.includes(i)
+                        ? form.recurrenceDays.filter(d => d !== i)
+                        : [...form.recurrenceDays, i].sort((a, b) => a - b);
+                      set('recurrenceDays', days);
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-grp">
             <label>Notes</label>
             <textarea className="form-inp form-textarea" value={form.notes}
               onChange={e => set('notes', e.target.value)} placeholder="Optional…" rows={3} />
@@ -97,7 +159,7 @@ export default function AddTaskModal({ onAdd, onClose }) {
             <button type="submit" className="btn-submit"
               style={{ '--submit-c': selectedCat?.color ?? '#6366f1' }}
               disabled={!form.name.trim()}>
-              Add Task
+              {isEditing ? 'Save Changes' : 'Add Task'}
             </button>
           </div>
         </form>
