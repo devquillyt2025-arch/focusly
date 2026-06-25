@@ -246,51 +246,43 @@ export function pushSyncQueue(action) {
 
 // ─── Two-Way Sync Engine ────────────────────────────────────────────────────────────────
 let syncInProgress = false;
+let lastSyncTimestamp = 0; // For debouncing window focus triggers
 
-export async function syncTasks(tasks, setTasks, onStatusChange) {
-  if (localStorage.getItem('focusly_sync_enabled') !== 'true') {
-    if (onStatusChange) onStatusChange('Not connected');
-    return;
-  }
-  if (!navigator.onLine) {
-    if (onStatusChange) onStatusChange('Sync failed — retry');
-    return;
-  }
-  if (syncInProgress) {
-    console.log('[Google Tasks Sync] Sync already in progress, skipping...');
-    return;
-  }
-  syncInProgress = true;
-  if (onStatusChange) onStatusChange('Syncing...');
-  console.log('[Google Tasks Sync] Starting syncTasks...');
+export async function pushLocalChangesToGoogle(tasks, token) {
+  const qStr = localStorage.getItem('focusly_sync_queue');
+  let q = [];
+  try { q = qStr ? JSON.parse(qStr) : []; } catch {}
+  if (!q.length) return tasks;
 
-  const token = await getValidAccessToken(onStatusChange);
-  if (!token) {
-    console.error('[Google Tasks Sync] Could not get valid access token.');
-    syncInProgress = false;
-    return;
-  }
-
+  console.log(`[Google Tasks Sync] Pushing local changes (${q.length} items)...`);
   let updatedTasks = [...tasks];
-  let taskStateChanged = false;
+  const remainingQ = [];
 
-  try {
-    // 1. PROCESS LOCAL QUEUE (PUSH SYNC WITH RATE LIMITING / BATCHING)
-    const qStr = localStorage.getItem('focusly_sync_queue');
-    let q = [];
-    try { q = qStr ? JSON.parse(qStr) : []; } catch {}
+  // Fetch all existing Google Tasks once to match child subtasks easily
+  const allRes = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showDeleted=true', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  let existingGTasks = [];
+  if (allRes.ok) {
+    const d = await allRes.json();
+    existingGTasks = d.items || [];
+  }
 
-    console.log(`[Google Tasks Sync] Processing local queue (${q.length} items)...`);
+  const delStr = localStorage.getItem('focusly_deleted_tasks');
+  let deletedIds = [];
+  try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
 
-    const remainingQ = [];
-    for (const op of q) {
-      // Small delay between requests to respect Google Tasks API usage limits
-      await new Promise(r => setTimeout(r, 100));
+  for (const op of q) {
+    // Small delay between requests to respect Google Tasks API usage limits
+    await new Promise(r => setTimeout(r, 100));
 
-      if (op.type === 'CREATE') {
-        const localTask = updatedTasks.find(t => t.id === op.taskId);
-        if (!localTask) continue; // task was deleted before sync
+    if (op.type === 'CREATE' || op.type === 'UPDATE') {
+      let localTask = updatedTasks.find(t => t.id === op.taskId);
+      if (!localTask) continue; // task was deleted before sync
 
+      let parentGoogleTaskId = localTask.googleTaskId;
+
+      if (op.type === 'CREATE' || !parentGoogleTaskId) {
         console.log('[Google Tasks Sync] POSTing new task to Google Tasks:', localTask.name);
         const res = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks', {
           method: 'POST',
@@ -301,204 +293,350 @@ export async function syncTasks(tasks, setTasks, onStatusChange) {
         if (res.ok) {
           const data = await res.json();
           const nowIso = new Date().toISOString();
+          parentGoogleTaskId = data.id;
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, googleTaskId: data.id, lastSyncedAt: nowIso } : t);
-          taskStateChanged = true;
+          localTask = updatedTasks.find(t => t.id === op.taskId);
           console.log('[Google Tasks Sync] Successfully created Google Task ID:', data.id);
         } else if (res.status === 429) {
           remainingQ.push(op); // Rate limited, keep in queue
+          continue;
         } else {
           const errText = await res.text();
           console.error('[Google Tasks Sync] POST task failed:', errText);
           if (res.status === 403) {
             alert(`Google Tasks API Error (403 Forbidden).\n\nPlease ensure the Google Tasks API is ENABLED in your Google Cloud Console for project 505104249489.\n\nDetails: ${errText}`);
           }
+          continue;
         }
-      } else if (op.type === 'UPDATE') {
-        const localTask = updatedTasks.find(t => t.id === op.taskId);
-        if (!localTask || !localTask.googleTaskId) continue;
-
+      } else {
         console.log('[Google Tasks Sync] PATCHing task on Google Tasks:', localTask.name);
-        const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${localTask.googleTaskId}`, {
+        const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${parentGoogleTaskId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(focuslyToGoogleTask(localTask))
         });
 
         if (res.ok) {
-          const data = await res.json();
           const nowIso = new Date().toISOString();
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, lastSyncedAt: nowIso } : t);
-          taskStateChanged = true;
-          console.log('[Google Tasks Sync] Successfully updated Google Task ID:', localTask.googleTaskId);
+          localTask = updatedTasks.find(t => t.id === op.taskId);
+          console.log('[Google Tasks Sync] Successfully updated Google Task ID:', parentGoogleTaskId);
         } else if (res.status === 429) {
           remainingQ.push(op);
+          continue;
         } else if (res.status === 404) {
-          // Task deleted on Google Tasks but updated locally! Conflict!
           console.warn('[Google Tasks Sync] Conflict: Task deleted on Google Tasks but updated locally.');
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, syncConflict: 'Deleted on Google Tasks, edited locally', googleTaskId: null } : t);
-          taskStateChanged = true;
+          continue;
         } else {
           const errText = await res.text();
           console.error('[Google Tasks Sync] PATCH task failed:', errText);
           if (res.status === 403) {
             alert(`Google Tasks API Error (403 Forbidden).\n\nPlease ensure the Google Tasks API is ENABLED in your Google Cloud Console for project 505104249489.\n\nDetails: ${errText}`);
           }
-        }
-      } else if (op.type === 'DELETE') {
-        if (!op.googleTaskId) continue;
-        console.log('[Google Tasks Sync] DELETing task on Google Tasks ID:', op.googleTaskId);
-        const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${op.googleTaskId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok && res.status === 429) {
-          remainingQ.push(op);
-        } else if (!res.ok) {
-          console.error('[Google Tasks Sync] DELETE task failed:', await res.text());
+          continue;
         }
       }
-    }
 
-    localStorage.setItem('focusly_sync_queue', JSON.stringify(remainingQ));
+      // ─── Sync Subtasks for this Parent Task ───
+      if (parentGoogleTaskId) {
+        const currentGChildren = existingGTasks.filter(gt => gt.parent === parentGoogleTaskId && !gt.deleted);
+        let updatedSubtasks = [...(localTask.subtasks || [])];
+        let subtasksChanged = false;
 
-    // 2. PULL SYNC & CONFLICT HANDLING
-    const lastPull = localStorage.getItem('focusly_last_pull_sync');
-    let url = 'https://www.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showDeleted=true';
-    if (lastPull) {
-      url += `&updatedMin=${encodeURIComponent(lastPull)}`;
-    }
-
-    console.log('[Google Tasks Sync] Pulling updates from Google Tasks URL:', url);
-    const pullRes = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (pullRes.ok) {
-      const pullData = await pullRes.json();
-      const gTasks = pullData.items || [];
-      const nowIso = new Date().toISOString();
-
-      console.log(`[Google Tasks Sync] Pulled ${gTasks.length} tasks from Google Tasks.`);
-
-      const delStr = localStorage.getItem('focusly_deleted_tasks');
-      let deletedIds = [];
-      try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
-
-      for (const gTask of gTasks) {
-        const localTask = updatedTasks.find(t => t.googleTaskId === gTask.id);
-
-        if (!localTask) {
-          if (gTask.deleted) continue;
-          
-          // Check if deleted locally but updated on Google Tasks (conflict)
-          if (deletedIds.includes(gTask.id)) {
-            console.warn('[Google Tasks Sync] Conflict: Task deleted locally but updated on Google Tasks:', gTask.title);
-            const restoredTask = {
-              id: String(Date.now() + Math.random()),
-              name: gTask.title || 'Untitled',
-              category: 'work',
-              priority: 'none',
-              timeEstimate: 25,
-              notes: gTask.notes || '',
-              dueDate: gTask.due ? gTask.due.split('T')[0] : '',
-              completed: gTask.status === 'completed',
-              timeLogged: 0,
-              pomodorosCompleted: 0,
-              createdAt: gTask.updated || new Date().toISOString(),
-              completedAt: gTask.status === 'completed' ? (gTask.completed || new Date().toISOString()) : null,
-              recurrence: null,
-              recurrenceDays: [],
-              googleTaskId: gTask.id,
-              lastSyncedAt: nowIso,
-              updatedAt: gTask.updated || new Date().toISOString(),
-              syncConflict: 'Deleted locally, updated on Google Tasks'
-            };
-            updatedTasks.push(restoredTask);
-            taskStateChanged = true;
-          } else {
-            console.log('[Google Tasks Sync] Adding new task from Google Tasks to Focusly:', gTask.title);
-            const newTask = {
-              id: String(Date.now() + Math.random()),
-              name: gTask.title || 'Untitled',
-              category: 'work',
-              priority: 'none',
-              timeEstimate: 25,
-              notes: gTask.notes || '',
-              dueDate: gTask.due ? gTask.due.split('T')[0] : '',
-              completed: gTask.status === 'completed',
-              timeLogged: 0,
-              pomodorosCompleted: 0,
-              createdAt: gTask.updated || new Date().toISOString(),
-              completedAt: gTask.status === 'completed' ? (gTask.completed || new Date().toISOString()) : null,
-              recurrence: null,
-              recurrenceDays: [],
-              googleTaskId: gTask.id,
-              lastSyncedAt: nowIso,
-              updatedAt: gTask.updated || new Date().toISOString(),
-              syncConflict: null
-            };
-            updatedTasks.push(newTask);
-            taskStateChanged = true;
+        // 1. Check for deleted subtasks
+        for (const gChild of currentGChildren) {
+          if (deletedIds.includes(gChild.id)) {
+            console.log('[Google Tasks Sync] DELETing subtask on Google Tasks ID:', gChild.id);
+            await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${gChild.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
           }
-        } else {
-          // Matching local task found
-          if (gTask.deleted) {
-            const localUpdated = new Date(localTask.updatedAt || localTask.createdAt).getTime();
-            const localSynced = new Date(localTask.lastSyncedAt || 0).getTime();
-            if (localUpdated > localSynced) {
-              console.warn('[Google Tasks Sync] Conflict: Task deleted on Google Tasks, but edited locally:', localTask.name);
-              updatedTasks = updatedTasks.map(t => t.id === localTask.id ? { ...t, syncConflict: 'Deleted on Google Tasks, edited locally', googleTaskId: null } : t);
-              taskStateChanged = true;
-            } else {
-              console.log('[Google Tasks Sync] Removing local task cleanly deleted on Google Tasks:', localTask.name);
-              updatedTasks = updatedTasks.filter(t => t.id !== localTask.id);
-              taskStateChanged = true;
-            }
-          } else {
-            // Compare timestamps (last-write-wins)
-            const gUpdated = new Date(gTask.updated).getTime();
-            const localUpdated = new Date(localTask.updatedAt || localTask.createdAt).getTime();
-            const localSynced = new Date(localTask.lastSyncedAt || 0).getTime();
+        }
 
-            // If Google Task is newer than our last sync AND newer than local update
-            if (gUpdated > localSynced && gUpdated > localUpdated) {
-              console.log('[Google Tasks Sync] Updating local task with newer Google Tasks data:', gTask.title);
-              updatedTasks = updatedTasks.map(t => t.id === localTask.id ? {
-                ...t,
-                name: gTask.title || 'Untitled',
-                notes: gTask.notes || '',
-                dueDate: gTask.due ? gTask.due.split('T')[0] : '',
-                completed: gTask.status === 'completed',
-                completedAt: gTask.status === 'completed' ? (gTask.completed || t.completedAt || new Date().toISOString()) : null,
-                lastSyncedAt: nowIso,
-                updatedAt: gTask.updated
-              } : t);
-              taskStateChanged = true;
+        // 2. Create or update active subtasks
+        for (let i = 0; i < updatedSubtasks.length; i++) {
+          const sub = updatedSubtasks[i];
+          let match = currentGChildren.find(gt => gt.id === sub.googleTaskId || gt.title === sub.text);
+
+          if (!match || !sub.googleTaskId) {
+            console.log('[Google Tasks Sync] POSTing new subtask to Google Tasks:', sub.text);
+            const subRes = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks?parent=${parentGoogleTaskId}`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: sub.text || 'Untitled subtask',
+                status: sub.completed ? 'completed' : 'needsAction'
+              })
+            });
+            if (subRes.ok) {
+              const subData = await subRes.json();
+              updatedSubtasks[i] = { ...sub, googleTaskId: subData.id };
+              subtasksChanged = true;
+              existingGTasks.push(subData);
+            }
+          } else if (match) {
+            if (match.title !== sub.text || (match.status === 'completed') !== !!sub.completed) {
+              console.log('[Google Tasks Sync] PATCHing subtask on Google Tasks:', sub.text);
+              const subRes = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${match.id}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: sub.text || 'Untitled subtask',
+                  status: sub.completed ? 'completed' : 'needsAction'
+                })
+              });
+              if (subRes.ok) {
+                const subData = await subRes.json();
+                updatedSubtasks[i] = { ...sub, googleTaskId: subData.id };
+                subtasksChanged = true;
+              }
+            } else if (!sub.googleTaskId) {
+              updatedSubtasks[i] = { ...sub, googleTaskId: match.id };
+              subtasksChanged = true;
             }
           }
         }
+
+        if (subtasksChanged) {
+          updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, subtasks: updatedSubtasks } : t);
+        }
       }
 
-      localStorage.setItem('focusly_last_pull_sync', nowIso);
-      if (taskStateChanged) {
-        setTasks(updatedTasks);
-      }
-      if (onStatusChange) onStatusChange('Synced');
-      console.log('[Google Tasks Sync] Sync completed successfully!');
-    } else {
-      const errText = await pullRes.text();
-      console.error('[Google Tasks Sync] Pull sync failed:', pullRes.status, errText);
-      if (onStatusChange) onStatusChange('Sync failed — retry');
-      if (pullRes.status === 403) {
-        alert(`Google Tasks API Error (403 Forbidden).\n\nPlease ensure the Google Tasks API is ENABLED in your Google Cloud Console for project 505104249489.\n\nDetails: ${errText}`);
-      } else {
-        alert(`Google Tasks sync failed (${pullRes.status}): ${errText}`);
+    } else if (op.type === 'DELETE') {
+      if (!op.googleTaskId) continue;
+      console.log('[Google Tasks Sync] DELETing task on Google Tasks ID:', op.googleTaskId);
+      const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${op.googleTaskId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok && res.status === 429) {
+        remainingQ.push(op);
+      } else if (!res.ok) {
+        console.error('[Google Tasks Sync] DELETE task failed:', await res.text());
       }
     }
-  } catch (err) {
-    console.error('[Google Tasks Sync] Sync error:', err);
+  }
+
+  localStorage.setItem('focusly_sync_queue', JSON.stringify(remainingQ));
+  return updatedTasks;
+}
+
+export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange) {
+  // Always fetch full list to ensure parent/child relationships resolve correctly
+  const url = 'https://www.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showDeleted=true';
+
+  console.log('[Google Tasks Sync] Pulling updates from Google Tasks URL:', url);
+  const pullRes = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+
+  if (!pullRes.ok) {
+    const errText = await pullRes.text();
+    console.error('[Google Tasks Sync] Pull sync failed:', pullRes.status, errText);
     if (onStatusChange) onStatusChange('Sync failed — retry');
-    alert(`Google Tasks sync exception: ${err.message}`);
+    if (pullRes.status === 403) {
+      alert(`Google Tasks API Error (403 Forbidden).\n\nPlease ensure the Google Tasks API is ENABLED in your Google Cloud Console for project 505104249489.\n\nDetails: ${errText}`);
+    } else {
+      alert(`Google Tasks sync failed (${pullRes.status}): ${errText}`);
+    }
+    throw new Error(`Pull sync failed: ${pullRes.status}`);
+  }
+
+  const pullData = await pullRes.json();
+  const gTasks = pullData.items || [];
+  const nowIso = new Date().toISOString();
+
+  console.log(`[Google Tasks Sync] Pulled ${gTasks.length} tasks from Google Tasks.`);
+
+  let updatedTasks = [...tasks];
+  let taskStateChanged = false;
+
+  const delStr = localStorage.getItem('focusly_deleted_tasks');
+  let deletedIds = [];
+  try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
+
+  // Separate top-level parent tasks and subtasks
+  const gParentTasks = gTasks.filter(t => !t.parent);
+  const gSubtasks = gTasks.filter(t => t.parent);
+
+  for (const gTask of gParentTasks) {
+    const localTask = updatedTasks.find(t => t.googleTaskId === gTask.id);
+
+    if (!localTask) {
+      if (gTask.deleted) continue;
+      
+      // Check if deleted locally but updated on Google Tasks (conflict)
+      if (deletedIds.includes(gTask.id)) {
+        console.warn(`[Google Tasks Sync] Conflict logged: Task "${gTask.title}" was deleted locally but updated on Google Tasks.`);
+      } else {
+        console.log('[Google Tasks Sync] Adding new task from Google Tasks to Focusly:', gTask.title);
+        const newTask = {
+          id: String(Date.now() + Math.random()),
+          name: gTask.title || 'Untitled',
+          category: 'work',
+          priority: 'none',
+          timeEstimate: 25,
+          notes: gTask.notes || '',
+          dueDate: gTask.due ? gTask.due.split('T')[0] : '',
+          completed: gTask.status === 'completed',
+          timeLogged: 0,
+          pomodorosCompleted: 0,
+          createdAt: gTask.updated || new Date().toISOString(),
+          completedAt: gTask.status === 'completed' ? (gTask.completed || new Date().toISOString()) : null,
+          recurrence: null,
+          recurrenceDays: [],
+          subtasks: [],
+          googleTaskId: gTask.id,
+          lastSyncedAt: nowIso,
+          updatedAt: gTask.updated || new Date().toISOString(),
+          syncConflict: null
+        };
+        updatedTasks.push(newTask);
+        taskStateChanged = true;
+      }
+    } else {
+      // Matching local task found
+      if (gTask.deleted) {
+        const localUpdated = new Date(localTask.updatedAt || localTask.createdAt).getTime();
+        const localSynced = new Date(localTask.lastSyncedAt || 0).getTime();
+        if (localUpdated > localSynced) {
+          console.warn(`[Google Tasks Sync] Conflict logged: Task "${localTask.name}" deleted on Google Tasks, but edited locally.`);
+        } else {
+          console.log('[Google Tasks Sync] Removing local task cleanly deleted on Google Tasks:', localTask.name);
+          updatedTasks = updatedTasks.filter(t => t.id !== localTask.id);
+          taskStateChanged = true;
+        }
+      } else {
+        // Compare timestamps (last-write-wins)
+        const gUpdated = new Date(gTask.updated).getTime();
+        const localUpdated = new Date(localTask.updatedAt || localTask.createdAt).getTime();
+        const localSynced = new Date(localTask.lastSyncedAt || 0).getTime();
+
+        // If Google Task is newer than our last sync AND newer than local update
+        if (gUpdated > localSynced && gUpdated > localUpdated) {
+          console.log('[Google Tasks Sync] Updating local task with newer Google Tasks data:', gTask.title);
+          updatedTasks = updatedTasks.map(t => t.id === localTask.id ? {
+            ...t,
+            name: gTask.title || 'Untitled',
+            notes: gTask.notes || '',
+            dueDate: gTask.due ? gTask.due.split('T')[0] : '',
+            completed: gTask.status === 'completed',
+            completedAt: gTask.status === 'completed' ? (gTask.completed || t.completedAt || new Date().toISOString()) : null,
+            lastSyncedAt: nowIso,
+            updatedAt: gTask.updated
+          } : t);
+          taskStateChanged = true;
+        } else if (localUpdated > gUpdated) {
+          console.log(`[Google Tasks Sync] Local copy of "${localTask.name}" is newer (${localUpdated} > ${gUpdated}), keeping local.`);
+        }
+      }
+    }
+  }
+
+  // ─── Process Subtasks ───
+  for (const gSub of gSubtasks) {
+    const parentTask = updatedTasks.find(t => t.googleTaskId === gSub.parent);
+    if (!parentTask) continue;
+
+    const localSub = (parentTask.subtasks || []).find(s => s.googleTaskId === gSub.id || s.text === gSub.title);
+
+    if (!localSub) {
+      if (gSub.deleted) continue;
+      if (deletedIds.includes(gSub.id)) continue;
+
+      console.log('[Google Tasks Sync] Pulling new subtask from Google Tasks:', gSub.title);
+      const newSub = {
+        id: String(Date.now() + Math.random()),
+        text: gSub.title || 'Untitled subtask',
+        completed: gSub.status === 'completed',
+        googleTaskId: gSub.id,
+        updatedAt: gSub.updated
+      };
+      const nextSubs = [...(parentTask.subtasks || []), newSub];
+      updatedTasks = updatedTasks.map(t => t.id === parentTask.id ? { ...t, subtasks: nextSubs } : t);
+      taskStateChanged = true;
+    } else {
+      if (gSub.deleted) {
+        console.log('[Google Tasks Sync] Removing local subtask deleted on Google Tasks:', localSub.text);
+        const nextSubs = (parentTask.subtasks || []).filter(s => s.id !== localSub.id);
+        updatedTasks = updatedTasks.map(t => t.id === parentTask.id ? { ...t, subtasks: nextSubs } : t);
+        taskStateChanged = true;
+      } else {
+        const gUpdated = new Date(gSub.updated).getTime();
+        const localUpdated = new Date(localSub.updatedAt || parentTask.updatedAt || parentTask.createdAt).getTime();
+        const localSynced = new Date(parentTask.lastSyncedAt || 0).getTime();
+
+        if (gUpdated > localSynced && gUpdated > localUpdated) {
+          console.log('[Google Tasks Sync] Updating local subtask with newer Google Tasks data:', gSub.title);
+          const nextSubs = (parentTask.subtasks || []).map(s => s.id === localSub.id ? {
+            ...s,
+            text: gSub.title || 'Untitled subtask',
+            completed: gSub.status === 'completed',
+            googleTaskId: gSub.id,
+            updatedAt: gSub.updated
+          } : s);
+          updatedTasks = updatedTasks.map(t => t.id === parentTask.id ? { ...t, subtasks: nextSubs } : t);
+          taskStateChanged = true;
+        } else if (!localSub.googleTaskId) {
+          const nextSubs = (parentTask.subtasks || []).map(s => s.id === localSub.id ? { ...s, googleTaskId: gSub.id } : s);
+          updatedTasks = updatedTasks.map(t => t.id === parentTask.id ? { ...t, subtasks: nextSubs } : t);
+          taskStateChanged = true;
+        }
+      }
+    }
+  }
+
+  localStorage.setItem('focusly_last_pull_sync', nowIso);
+  if (taskStateChanged) {
+    setTasks(updatedTasks);
+  }
+}
+
+export async function syncTasks(tasks, setTasks, onStatusChange, isFocusTrigger = false) {
+  if (localStorage.getItem('focusly_sync_enabled') !== 'true') {
+    if (onStatusChange) onStatusChange('Not connected');
+    return;
+  }
+  if (!navigator.onLine) {
+    if (onStatusChange) onStatusChange('Sync failed — retry');
+    return;
+  }
+  // Debounce window focus trigger by 30 seconds
+  if (isFocusTrigger && Date.now() - lastSyncTimestamp < 30000) {
+    console.log('[Google Tasks Sync] Focus sync debounced (last sync was <30s ago).');
+    return;
+  }
+  if (syncInProgress) {
+    console.log('[Google Tasks Sync] Sync already in progress, skipping...');
+    return;
+  }
+  syncInProgress = true;
+  if (onStatusChange) onStatusChange('Syncing...');
+  console.log('[Google Tasks Sync] Starting syncTasks orchestrator...');
+
+  const token = await getValidAccessToken(onStatusChange);
+  if (!token) {
+    console.error('[Google Tasks Sync] Could not get valid access token.');
+    syncInProgress = false;
+    return;
+  }
+
+  try {
+    // 1. Push local changes to Google Tasks first
+    const updatedTasks = await pushLocalChangesToGoogle(tasks, token);
+
+    // 2. Pull remote changes from Google Tasks second
+    await pullTasksFromGoogle(updatedTasks, setTasks, token, onStatusChange);
+
+    lastSyncTimestamp = Date.now();
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (onStatusChange) onStatusChange(`Synced (${nowStr})`);
+    console.log('[Google Tasks Sync] Sync completed successfully!');
+  } catch (err) {
+    console.error('[Google Tasks Sync] syncTasks orchestrator error:', err);
+    if (onStatusChange) onStatusChange('Sync failed — retry');
   } finally {
     syncInProgress = false;
   }

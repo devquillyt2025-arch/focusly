@@ -206,6 +206,17 @@ export default function App() {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Window Focus Sync Trigger ──
+  useEffect(() => {
+    const handleFocus = () => {
+      if (localStorage.getItem('focusly_sync_enabled') === 'true') {
+        syncTasks(tasks, setTasks, setSyncStatus, true);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [tasks]);
+
   const [timerMode,    setTimerMode]    = useState('focus');
   const [timerState,   setTimerState]   = useState('idle');
   const [timerSeconds, setTimerSeconds] = useState(() => getSecsForMode('focus',initSettings));
@@ -844,6 +855,7 @@ export default function App() {
             onDisconnect={() => {
               setSyncStatus('Not connected');
             }}
+            onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
           />
         )}
 
@@ -888,6 +900,7 @@ export default function App() {
               onDelete={deleteTask}
               onClearCompleted={clearCompleted}
               onAdd={()=>setOpenModal('add')}
+              onAddTask={addTask}
               onEdit={task => setEditingTask(task)}
               onUpdate={updateTaskData}
               onQuickUpdate={quickUpdateTask}

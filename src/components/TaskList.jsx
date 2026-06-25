@@ -52,15 +52,33 @@ function todayISO() {
 
 // FIX 5: normalise display name — fixes "GEn AI" → "Gen AI", preserves acronyms like "AI", "HTML"
 function displayName(name) {
-  return name.replace(/\b(\w+)\b/g, w => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\b(\w+)\b/g, (w, match, offset) => {
     if (w.length > 1 && w === w.toUpperCase()) return w; // keep all-caps acronyms intact
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    if (offset === 0) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }
+    if (w.length > 1 && w.slice(1) !== w.slice(1).toLowerCase()) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }
+    return w;
   });
 }
 
-const ALL_CATS = Object.keys(CAT_META);
+const ALL_CATS_STATIC = Object.keys(CAT_META);
 
-export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
+export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
+  const [customCats, setCustomCats] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('focusly_custom_categories') || '{}');
+      Object.assign(CAT_META, saved);
+      return saved;
+    } catch (e) { return {}; }
+  });
+  const ALL_CATS = useMemo(() => Object.keys(CAT_META), [customCats]);
+  const [kebabOpenId,     setKebabOpenId]     = useState(null);
   const [catFilter,       setCatFilter]       = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showCompleted,   setShowCompleted]   = useState(false);
@@ -71,6 +89,8 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const [local,           setLocal]           = useState(null); // editable copy
   const [savedFeedback,   setSavedFeedback]   = useState(false);
   const [catOpen,         setCatOpen]         = useState(false);
+  const [inlineAddCat,    setInlineAddCat]    = useState(null);
+  const [inlineAddText,   setInlineAddText]   = useState('');
   const sortRef      = useRef(null);
   const searchRef    = useRef(null);
   const savedTimerRef = useRef(null);
@@ -78,6 +98,33 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const notesRef     = useRef(null);
   const catMenuRef   = useRef(null);
   const dateInputRef = useRef(null);
+
+  const handleNewList = (taskToMove) => {
+    const name = prompt('Enter new list name:');
+    if (!name || !name.trim()) return;
+    const label = name.trim();
+    const key = label.toLowerCase().replace(/\s+/g, '_');
+    if (!CAT_META[key]) {
+      const colors = ['#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#6366f1', '#ec4899'];
+      const color = colors[Object.keys(CAT_META).length % colors.length];
+      CAT_META[key] = { label, color };
+      const updatedCustom = { ...customCats, [key]: { label, color } };
+      localStorage.setItem('focusly_custom_categories', JSON.stringify(updatedCustom));
+      setCustomCats(updatedCustom);
+    }
+    if (taskToMove) {
+      (onQuickUpdate || onUpdate)({ ...taskToMove, category: key });
+    }
+    setKebabOpenId(null);
+  };
+
+  // Close kebab dropdown on outside click
+  useEffect(() => {
+    if (!kebabOpenId) return;
+    const h = () => setKebabOpenId(null);
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [kebabOpenId]);
 
   // Close sort dropdown on outside click
   useEffect(() => {
@@ -158,6 +205,27 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   };
 
   const setLocalField = (k, v) => setLocal(prev => ({ ...prev, [k]: v }));
+
+  const handleInlineAdd = (cat) => {
+    if (inlineAddText.trim()) {
+      if (onAddTask) {
+        onAddTask({
+          name: inlineAddText.trim(),
+          category: cat,
+          priority: 'none',
+          timeEstimate: 25,
+          notes: '',
+          dueDate: '',
+          recurrence: null,
+          recurrenceDays: []
+        });
+      } else {
+        onAdd();
+      }
+    }
+    setInlineAddCat(null);
+    setInlineAddText('');
+  };
 
   const _today = todayISO();
   const overdueFront = t => (t.dueDate && t.dueDate < _today) ? -1 : PRI_ORDER[t.priority] ?? 3;
@@ -254,6 +322,18 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                   </svg>
                 )}
+                {task.subtasks?.length > 0 && (
+                  <span className="info-badge" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+                    {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                  </span>
+                )}
+                {task.attachments?.length > 0 && (
+                  <span className="info-badge" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    {task.attachments.length}
+                  </span>
+                )}
                 {task.timeLogged > 0 && <span className="info-badge">⏱ {fmtTime(task.timeLogged)}</span>}
                 {task.pomodorosCompleted > 0 && <span className="info-badge">🍅 {task.pomodorosCompleted}</span>}
                 {due && (
@@ -272,21 +352,124 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               </div>
             </div>
 
-            <div className="task-actions">
-              <button className="task-action-btn" onClick={e => { e.stopPropagation(); onEdit(task); }} aria-label="Edit">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <div className="task-actions" style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
+              {/* Kebab Menu Button */}
+              <button
+                className="task-action-btn kebab-btn"
+                style={{ background: kebabOpenId === task.id ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
+                aria-label="More actions"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
                 </svg>
               </button>
-              <button className="task-action-btn task-del-btn" onClick={e => { e.stopPropagation(); setConfirmDeleteId(task.id); }} aria-label="Delete">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6"/><path d="M14 11v6"/>
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+
+              {/* Star Button */}
+              <button
+                className="task-action-btn star-btn"
+                style={{ background: 'transparent', border: 'none', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: task.starred ? '#f59e0b' : 'var(--text-secondary)' }}
+                onClick={e => { e.stopPropagation(); (onQuickUpdate || onUpdate)({ ...task, starred: !task.starred }); }}
+                aria-label={task.starred ? 'Unstar task' : 'Star task'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={task.starred ? '#f59e0b' : 'none'} stroke={task.starred ? '#f59e0b' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
               </button>
+
+              {/* Dropdown Menu */}
+              {kebabOpenId === task.id && (
+                <div
+                  className="kebab-dropdown-menu"
+                  style={{
+                    position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
+                    background: '#202124', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', padding: '8px 0',
+                    display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
+                    color: '#e8eaed', fontSize: '0.9rem'
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="kebab-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click(), 100); }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Add deadline
+                  </button>
+                  <button
+                    type="button"
+                    className="kebab-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+                    Add a subtask
+                  </button>
+                  <button
+                    type="button"
+                    className="kebab-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    Add attachment
+                  </button>
+                  <button
+                    type="button"
+                    className="kebab-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Delete
+                  </button>
+
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
+
+                  {/* List selection */}
+                  {ALL_CATS.map(catKey => {
+                    const isCur = task.category === catKey;
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        className="kebab-menu-item"
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                        onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {isCur && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                        </span>
+                        {CAT_META[catKey]?.label}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    className="kebab-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    onClick={e => { e.stopPropagation(); handleNewList(task); }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    New list
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -297,18 +480,26 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   return (
     <div className="task-list-panel">
       <div className="tl-header">
-        <div className="tl-title-row">
+        <div className="tl-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
           <h2>Tasks <span className="task-count-badge">{pendingCount}</span></h2>
-          <div className="tl-header-actions">
+          <div className="tl-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             {/* Sync status indicator */}
             <div className="sync-status-indicator" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'var(--c-bg-card)', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: 4,
-                background: syncStatus === 'Synced' ? '#10b981' : syncStatus === 'Syncing...' ? '#f59e0b' : syncStatus === 'Sync failed — retry' ? '#ef4444' : '#64748b',
-                boxShadow: syncStatus === 'Synced' ? '0 0 8px #10b981' : syncStatus === 'Syncing...' ? '0 0 8px #f59e0b' : syncStatus === 'Sync failed — retry' ? '0 0 8px #ef4444' : 'none'
-              }} />
+              {syncStatus === 'Syncing...' ? (
+                <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
+                  <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <span style={{
+                  width: 8, height: 8, borderRadius: 4,
+                  background: syncStatus.startsWith('Synced') ? '#10b981' : syncStatus === 'Sync failed — retry' ? '#ef4444' : '#64748b',
+                  boxShadow: syncStatus.startsWith('Synced') ? '0 0 8px #10b981' : syncStatus === 'Sync failed — retry' ? '0 0 8px #ef4444' : 'none'
+                }} />
+              )}
               <span>{syncStatus}</span>
-              {syncStatus !== 'Not connected' && (
+              {syncStatus !== 'Not connected' && syncStatus !== 'Syncing...' && (
                 <button
                   type="button"
                   onClick={onSyncNow}
@@ -322,7 +513,6 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             {/* Sort dropdown */}
             <div className="sort-dropdown" ref={sortRef}>
               <button className="sort-btn" onClick={() => setSortOpen(o => !o)}>
-                {/* ArrowUpDown icon */}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 8h10M3 12h7M3 16h4M17 8v8M14 5l3-3 3 3M14 19l3 3 3-3"/>
                 </svg>
@@ -359,7 +549,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         </div>
 
         {/* Search bar */}
-        <div className="task-search-wrap">
+        <div className="task-search-wrap" style={{ marginBottom: 24 }}>
           <svg className="task-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
@@ -380,89 +570,130 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             </button>
           )}
         </div>
+      </div>
 
-        {/* Category filter pills — hidden while search is active */}
-        {!query && (
-        <div className="cat-filter-row">
+      {/* Scrollable Body Area */}
+      <div className="task-list-scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Category Filter Pills */}
+        <div className="task-cat-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <button
-            className={`cat-chip${catFilter === 'all' ? ' cat-chip-active' : ''}`}
+            type="button"
+            className={`cat-filter-btn${catFilter === 'all' ? ' active' : ''}`}
             onClick={() => setCatFilter('all')}
+            style={{
+              padding: '6px 16px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+              background: catFilter === 'all' ? '#6366f1' : 'var(--c-bg-card, #1e1e2d)',
+              color: catFilter === 'all' ? '#fff' : 'var(--text-secondary, #94a3b8)',
+              border: '1px solid ' + (catFilter === 'all' ? '#6366f1' : 'rgba(255,255,255,0.1)'),
+              transition: 'all 0.15s ease'
+            }}
           >
-            All ({pendingCount})
+            All ({tasks.filter(t => !t.completed).length})
           </button>
           {ALL_CATS.map(cat => {
+            const meta = CAT_META[cat];
             const count = catCounts[cat] || 0;
+            const isActive = catFilter === cat;
             return (
               <button
                 key={cat}
-                className={`cat-chip${catFilter === cat ? ' cat-chip-active' : ''}`}
-                style={{
-                  ...(catFilter === cat ? { background: CAT_META[cat].color, borderColor: CAT_META[cat].color, color: '#fff' } : {}),
-                  opacity: count === 0 ? 0.5 : 1,
-                }}
+                type="button"
+                className={`cat-filter-btn${isActive ? ' active' : ''}`}
                 onClick={() => setCatFilter(cat)}
+                style={{
+                  padding: '6px 16px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+                  background: isActive ? meta.color : 'var(--c-bg-card, #1e1e2d)',
+                  color: isActive ? '#fff' : 'var(--text-secondary, #94a3b8)',
+                  border: '1px solid ' + (isActive ? meta.color : 'rgba(255,255,255,0.1)'),
+                  transition: 'all 0.15s ease'
+                }}
               >
-                {CAT_META[cat].label} ({count})
+                {meta.label} ({count})
               </button>
             );
           })}
         </div>
-        )}
-      </div>
 
-      <div className="task-items">
-        {pending.length === 0 && completed.length === 0 && (
-          <div className="empty-state">
-            {query.trim() ? (
-              /* Search empty state */
-              <>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-                  No tasks match "{query}"
-                </p>
-              </>
-            ) : catFilter !== 'all' ? (
-              /* Category empty state */
-              <>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2d2d44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 11 12 14 22 4"/>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                </svg>
-                <p className="empty-state-title">No {CAT_META[catFilter]?.label} tasks</p>
-                <p className="empty-state-sub">Add one with the + button above</p>
-              </>
-            ) : (
-              /* All-tasks empty state */
-              <>
-                <span>🌱</span>
-                <p>No tasks yet.{'\n'}Add one to start!</p>
-              </>
-            )}
-          </div>
-        )}
+        {/* ONE single "+ Add a task" inline action at the top of the list */}
+        <div className="inline-add-container" style={{ width: '100%' }}>
+          {inlineAddCat === 'top' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.25)', padding: '10px 16px', borderRadius: 12, border: '1px solid #6366f1' }}>
+              <input
+                autoFocus
+                type="text"
+                value={inlineAddText}
+                onChange={e => setInlineAddText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleInlineAdd(catFilter === 'all' ? 'work' : catFilter);
+                  } else if (e.key === 'Escape') {
+                    setInlineAddCat(null);
+                    setInlineAddText('');
+                  }
+                }}
+                onBlur={() => handleInlineAdd(catFilter === 'all' ? 'work' : catFilter)}
+                placeholder={`Add a task to ${catFilter === 'all' ? 'Work' : CAT_META[catFilter]?.label}...`}
+                style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.95rem' }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, background: 'var(--c-bg-card, #1e1e2d)',
+                border: '1px solid rgba(255,255,255,0.08)', color: '#6366f1', fontSize: '0.95rem', fontWeight: 600,
+                cursor: 'pointer', padding: '10px 16px', borderRadius: 12, width: '100%',
+                textAlign: 'left', transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              Add a task {catFilter !== 'all' ? `to ${CAT_META[catFilter]?.label}` : ''}
+            </button>
+          )}
+        </div>
 
-        {pending.map(task => renderTask(task, false))}
+        {/* ONE single list container, full width, no separate cards */}
+        <div className="task-items-container" style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+          {pending.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)', background: 'var(--c-bg-card, #1e1e2d)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+              No tasks found. Click "+ Add a task" above to create one!
+            </div>
+          ) : (
+            pending.map(task => renderTask(task, false))
+          )}
+        </div>
 
+        {/* Completed Section */}
         {completed.length > 0 && (
-          <div className="completed-section">
-            <div className="completed-section-hdr" onClick={() => setShowCompleted(s => !s)}>
-              <span className="completed-chevron">
-                {showCompleted
-                  ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                }
-              </span>
-              <span className="completed-label">Completed ({completed.length})</span>
+          <div className="completed-section" style={{ background: 'var(--c-bg-card, #1e1e2d)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', padding: 20 }}>
+            <div className="completed-section-hdr" onClick={() => setShowCompleted(s => !s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="completed-chevron">
+                  {showCompleted
+                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  }
+                </span>
+                <span className="completed-label" style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>Completed ({completed.length})</span>
+              </div>
               <button
                 className="clear-all-link"
                 onClick={e => { e.stopPropagation(); onClearCompleted(); }}
+                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 Clear all
               </button>
             </div>
-            {showCompleted && completed.map(task => renderTask(task, true))}
+            {showCompleted && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 16 }}>
+                {completed.map(task => renderTask(task, true))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -517,7 +748,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   ref={titleRef}
                   className="tdp-title-input"
                   value={local.name || ''}
-                  onChange={e => setLocalField('name', e.target.value)}
+                  onChange={e => saveField('name', e.target.value)}
                   onBlur={() => {
                     if ((local.name || '').trim() && local.name !== detailTask.name) {
                       (onQuickUpdate || onUpdate)(local);
@@ -583,14 +814,30 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 <div className="tdp-date-wrap">
                   <div
                     className="tdp-date-display"
-                    onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}
+                    onClick={() => { try { dateInputRef.current?.showPicker?.(); } catch {} }}
                   >
                     <span>
                       {local.dueDate
                         ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : 'No due date'}
                     </span>
-                    <TdpIconCalendar />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {local.dueDate && (
+                        <button
+                          type="button"
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px', fontSize: '1.1rem', position: 'relative', zIndex: 10 }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            saveField('dueDate', '');
+                          }}
+                          title="Clear due date"
+                        >
+                          ×
+                        </button>
+                      )}
+                      <TdpIconCalendar />
+                    </div>
                   </div>
                   <input
                     ref={dateInputRef}
@@ -602,6 +849,116 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </div>
               </div>
 
+              {/* Subtasks */}
+              <div className="tdp-field">
+                <label className="tdp-label">Subtasks</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                  {(local.subtasks || []).map(sub => (
+                    <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <button
+                        type="button"
+                        style={{ background: 'transparent', border: '1px solid ' + (sub.completed ? '#10b981' : '#64748b'), width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#10b981', padding: 0 }}
+                        onClick={() => {
+                          const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, completed: !s.completed, updatedAt: new Date().toISOString() } : s);
+                          saveField('subtasks', nextSubs);
+                        }}
+                      >
+                        {sub.completed && <TdpIconCheck />}
+                      </button>
+                      <input
+                        type="text"
+                        value={sub.text}
+                        onChange={e => {
+                          const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, text: e.target.value, updatedAt: new Date().toISOString() } : s);
+                          saveField('subtasks', nextSubs);
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.85rem' }}
+                      />
+                      <button
+                        type="button"
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                        onClick={() => {
+                          if (sub.googleTaskId) {
+                            const delStr = localStorage.getItem('focusly_deleted_tasks');
+                            let deletedIds = delStr ? JSON.parse(delStr) : [];
+                            if (!deletedIds.includes(sub.googleTaskId)) {
+                              deletedIds.push(sub.googleTaskId);
+                              localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds));
+                            }
+                          }
+                          const nextSubs = (local.subtasks || []).filter(s => s.id !== sub.id);
+                          saveField('subtasks', nextSubs);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <input
+                    id="subtask-input"
+                    type="text"
+                    placeholder="Add a subtask..."
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        const newSub = { id: Date.now().toString(), text: e.target.value.trim(), completed: false, updatedAt: new Date().toISOString() };
+                        saveField('subtasks', [...(local.subtasks || []), newSub]);
+                        e.target.value = '';
+                      }
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Attachments */}
+              <div className="tdp-field">
+                <label className="tdp-label">Attachments</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                  {(local.attachments || []).map(att => (
+                    <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        <span style={{ color: '#e2e8f0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                        onClick={() => {
+                          const nextAtts = (local.attachments || []).filter(a => a.id !== att.id);
+                          saveField('attachments', nextAtts);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8', transition: 'all 0.15s ease' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>Add attachment file...</span>
+                  <input
+                    id="attachment-input"
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const newAtt = { id: Date.now().toString(), name: file.name, size: file.size };
+                        saveField('attachments', [...(local.attachments || []), newAtt]);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
               {/* Notes — FIX 6 */}
               <div className="tdp-field">
                 <label className="tdp-label">Notes</label>
@@ -610,7 +967,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   className="tdp-notes"
                   value={local.notes || ''}
                   onChange={e => {
-                    setLocalField('notes', e.target.value);
+                    saveField('notes', e.target.value);
                     e.target.style.height = 'auto';
                     e.target.style.height = e.target.scrollHeight + 'px';
                   }}

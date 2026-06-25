@@ -10,7 +10,7 @@ const PRESETS = [
 
 const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '👻'];
 
-export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect }) {
+export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow }) {
   // Profile state
   const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || '');
   const [avatar, setAvatar] = useState(() => localStorage.getItem('focusly-profile-avatar') || '😎');
@@ -228,14 +228,32 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             <label className="toggle-row" onClick={() => onSyncToggle(localStorage.getItem('focusly_sync_enabled') !== 'true')} style={{ background: 'var(--c-bg-card)', padding: '12px 16px', borderRadius: 8, margin: 0 }}>
               <div className="toggle-track" data-on={localStorage.getItem('focusly_sync_enabled') === 'true' ? 'true' : 'false'}><div className="toggle-thumb" /></div>
               <div>
                 <div className="toggle-lbl">Sync tasks with Google Tasks</div>
-                <div className="toggle-sub">Status: {syncStatus}</div>
+                <div className="toggle-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  {syncStatus === 'Syncing...' && (
+                    <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
+                      <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>Status: {syncStatus}</span>
+                </div>
               </div>
             </label>
-            <div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ background: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                disabled={syncStatus === 'Syncing...'}
+                onClick={onSyncNow}
+              >
+                {syncStatus === 'Syncing...' ? 'Syncing...' : 'Sync Now'}
+              </button>
               <button
                 type="button"
                 className="secondary-btn"

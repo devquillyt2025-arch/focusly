@@ -406,14 +406,30 @@ function GoalModal({ onSave, onClose, editGoal = null, onDelete }) {
               <div className="tdp-date-wrap">
                 <div
                   className="tdp-date-display"
-                  onClick={() => dateRef.current?.showPicker?.() || dateRef.current?.click()}
+                  onClick={() => { try { dateRef.current?.showPicker?.(); } catch {} }}
                 >
                   <span>
                     {form.targetDate
                       ? new Date(form.targetDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'Choose a date'}
                   </span>
-                  <GIcoCalendarSm />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {form.targetDate && (
+                      <button
+                        type="button"
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px', fontSize: '1.1rem', position: 'relative', zIndex: 10 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setF('targetDate', '');
+                        }}
+                        title="Clear target date"
+                      >
+                        ×
+                      </button>
+                    )}
+                    <GIcoCalendarSm />
+                  </div>
                 </div>
                 <input
                   ref={dateRef}
