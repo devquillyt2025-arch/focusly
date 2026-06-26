@@ -189,7 +189,7 @@ export default function App() {
   const [tasks,       setTasks]       = useState(loadTasks);
   const [syncStatus,  setSyncStatus]  = useState(() => localStorage.getItem('focusly_sync_enabled') === 'true' ? 'Synced' : 'Not connected');
 
-  const [theme,       setTheme]       = useState(() => { try { return JSON.parse(localStorage.getItem(SK.theme))||'dark'; } catch { return 'dark'; } });
+  const [theme,       setTheme]       = useState(() => { try { const t = localStorage.getItem(SK.theme); return (t && t !== '"dark"') ? JSON.parse(t) : 'light'; } catch { return 'light'; } });
   const [settings,    setSettings]    = useState(initSettings);
   const [pomodoroLog, setPomodoroLog] = useState(loadPomoLog);
 
@@ -724,6 +724,9 @@ export default function App() {
   const scheduledToday = trackers.filter(t=>isScheduledToday(t));
   const unloggedToday  = scheduledToday.filter(t=>!isLoggedToday(t));
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+
   if (!onboardingComplete) {
     return (
       <OnboardingFlow onComplete={() => {
@@ -741,14 +744,49 @@ export default function App() {
         <div className="app-logo">
           <IconFocusly />
           <h1>Focusly</h1>
+          <button className="hdr-btn" onClick={() => setSidebarOpen(s => !s)} title="Toggle Sidebar" style={{ marginLeft: 8 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+        <div className="yartu-top-search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search for anything..." />
         </div>
         <div className="header-right">
-          <div className="header-actions">
-            <button className="hdr-btn" onClick={()=>setOpenModal('analytics')} title="Analytics (A)"><IconChart /></button>
-            <button className="hdr-btn" onClick={()=>setOpenModal('shortcuts')} title="Shortcuts (?)"><IconKeyboard /></button>
-            <button className="hdr-btn" onClick={()=>setTheme(t=>t==='dark'?'light':'dark')} title="Theme (D)">
-              {theme==='dark' ? <IconSun /> : <IconMoon />}
-            </button>
+          <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} />
+          </button>
+
+          <div className="yartu-top-avatar" onClick={() => setAvatarOpen(a => !a)}>
+            <div className="yartu-avatar-circle">EH</div>
+            <div className="yartu-avatar-text">
+              <span className="yartu-avatar-name">Esther Howard</span>
+              <span className="yartu-avatar-email">estherH@gmail.com</span>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+            
+            {avatarOpen && (
+              <div className="yartu-avatar-dropdown" onClick={e => e.stopPropagation()}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Preferences</div>
+                <button className="main-nav-btn" onClick={() => { setOpenModal('analytics'); setAvatarOpen(false); }}>
+                  <span className="nav-icon"><IconChart /></span>
+                  <span className="nav-label">Analytics (A)</span>
+                </button>
+                <button className="main-nav-btn" onClick={() => { setOpenModal('shortcuts'); setAvatarOpen(false); }}>
+                  <span className="nav-icon"><IconKeyboard /></span>
+                  <span className="nav-label">Shortcuts (?)</span>
+                </button>
+                <button className="main-nav-btn" onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setAvatarOpen(false); }}>
+                  <span className="nav-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
+                  <span className="nav-label">Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
+                </button>
+                <div className="nav-divider" style={{ margin: '8px 0' }} />
+                <button className="hdr-cta-btn" style={{ width: '100%' }} onClick={() => { setAvatarOpen(false); if (activeTab === 'tasks') setOpenModal('add'); else openAddTracker(); }}>
+                  {activeTab === 'tasks' ? '＋ Add Task' : '＋ Add Tracker'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -756,159 +794,183 @@ export default function App() {
       {/* ── Body: sidebar nav + content ── */}
       <div className="app-body">
 
-      <nav className="main-nav">
-        {/* ── Section: Daily ── */}
-        <span className="nav-section-label">Daily</span>
-        {[
-          { id:'daily',   label:'Daily Goals', Icon: NavIcoSun,          badge: unloggedToday.length || 0 },
-          { id:'habits',  label:'Habits',      Icon: NavIcoRepeat },
-          { id:'tasks',   label:'Tasks',       Icon: NavIcoCheckSquare,  badge: tasks.filter(t=>!t.completed).length || 0 },
-          { id:'timer',   label:'Focus',       Icon: NavIcoTimerIcon },
-          { id:'journal', label:'Journal',     Icon: NavIcoBookOpen },
-        ].map(tab => (
-          <button key={tab.id}
-            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <span className="nav-icon"><tab.Icon /></span>
-            <span className="nav-label">{tab.label}</span>
-            {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
-          </button>
-        ))}
+      {sidebarOpen && (
+        <nav className="main-nav">
+          {/* ── Section: Daily ── */}
+          <span className="nav-section-label">Daily</span>
+          {[
+            { id:'daily',   label:'Today',       Icon: NavIcoSun,          badge: unloggedToday.length || 0 },
+            { id:'habits',  label:'Habits',      Icon: NavIcoRepeat },
+            { id:'tasks',   label:'Tasks',       Icon: NavIcoCheckSquare,  badge: tasks.filter(t=>!t.completed).length || 0 },
+            { id:'timer',   label:'Focus',       Icon: NavIcoTimerIcon },
+            { id:'journal', label:'Journal',     Icon: NavIcoBookOpen },
+          ].map(tab => (
+            <button key={tab.id}
+              className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="nav-icon"><tab.Icon /></span>
+              <span className="nav-label">{tab.label}</span>
+              {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
+            </button>
+          ))}
 
-        {/* ── Section: Planning ── */}
-        <div className="nav-divider" />
-        <span className="nav-section-label">Planning</span>
-        {[
-          { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
-          { id:'reports', label:'Reports', Icon: NavIcoBarChart },
-        ].map(tab => (
-          <button key={tab.id}
-            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <span className="nav-icon"><tab.Icon /></span>
-            <span className="nav-label">{tab.label}</span>
-          </button>
-        ))}
+          {/* ── Section: Planning ── */}
+          <div className="nav-divider" />
+          <span className="nav-section-label">Planning</span>
+          {[
+            { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
+            { id:'reports', label:'Reports', Icon: NavIcoBarChart },
+          ].map(tab => (
+            <button key={tab.id}
+              className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="nav-icon"><tab.Icon /></span>
+              <span className="nav-label">{tab.label}</span>
+            </button>
+          ))}
 
-        {/* ── Settings pinned to bottom ── */}
-        <div className="nav-spacer" />
-        <button
-          className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          <span className="nav-icon"><NavIcoSettings /></span>
-          <span className="nav-label">Settings</span>
-        </button>
-      </nav>
+          {/* ── Settings pinned to bottom ── */}
+          <div className="nav-spacer" />
+          <button
+            className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <span className="nav-icon"><NavIcoSettings /></span>
+            <span className="nav-label">Settings</span>
+          </button>
+        </nav>
+      )}
 
       {/* ── Tab content ── */}
       <div className="tab-content">
-        {activeTab === 'daily' && (
-          <DailyGoalsView
-            trackers={trackers}
-            onUpdateTracker={updateTracker}
-            onAddTracker={openAddTracker}
-            intentions={intentions}
-            onIntentionUpdate={updateIntention}
-            onIntentionToggle={toggleIntention}
-            pomodoroLog={pomodoroLog}
-            tasks={tasks}
-            onTriggerWeeklyReview={() => setOpenModal('weekly-review')}
-            habits={habits}
-            onMarkHabitDone={markHabitDone}
-          />
-        )}
-
-        {activeTab === 'reports' && (
-          <ReportsView
-            trackers={trackers}
-            tasks={tasks}
-            pomodoroLog={pomodoroLog}
-            onUpdateTracker={updateTracker}
-            onDeleteTracker={deleteTracker}
-            onEditTracker={openEditTracker}
-            onAddTracker={openAddTracker}
-          />
-        )}
-
-        {activeTab === 'settings' && (
-          <SettingsView 
-            settings={settings}
-            onSaveSettings={saveSettings}
-            theme={theme}
-            onSetTheme={setTheme}
-            onClearData={handleClearData}
-            onImportData={handleImportData}
-            syncStatus={syncStatus}
-            onSyncToggle={(enabled) => {
-              if (enabled) {
-                localStorage.setItem('focusly_sync_enabled', 'true');
-                setSyncStatus('Syncing...');
-                syncTasks(tasks, setTasks, setSyncStatus);
-              } else {
-                localStorage.setItem('focusly_sync_enabled', 'false');
-                setSyncStatus('Not connected');
-              }
-            }}
-            onDisconnect={() => {
-              setSyncStatus('Not connected');
-            }}
-            onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
-          />
-        )}
-
-        {activeTab === 'timer' && (
-          <div className="timer-tab">
-            <Timer
-              task={activeTask}
-              timerMode={timerMode}
-              timerState={timerState}
-              timerSeconds={timerSeconds}
-              totalSeconds={totalSeconds}
-              pomodoroCount={pomodoroCount}
-              onSwitchMode={switchMode}
-              onStart={startTimer}
-              onPause={pauseTimer}
-              onReset={resetTimer}
-            />
-            <Stats tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} />
-            <TodayBreakdown tasks={tasks} />
-          </div>
-        )}
-
-        {activeTab === 'habits'  && (
-          <HabitsView
-            habits={habits}
-            onAddHabit={addHabit}
-            onUpdateHabit={updateHabit}
-            onDeleteHabit={deleteHabit}
-          />
-        )}
-        {activeTab === 'journal' && <JournalView />}
-        {activeTab === 'goals'   && <GoalsView />}
-
-        {activeTab === 'tasks' && (
-          <div className="tasks-tab">
-            <TaskList
+        <div key={activeTab} className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}`}>
+          {activeTab === 'daily' && (
+            <DailyGoalsView
+              trackers={trackers}
+              onUpdateTracker={updateTracker}
+              onAddTracker={openAddTracker}
+              intentions={intentions}
+              onIntentionUpdate={updateIntention}
+              onIntentionToggle={toggleIntention}
+              pomodoroLog={pomodoroLog}
               tasks={tasks}
+              onTriggerWeeklyReview={() => setOpenModal('weekly-review')}
+              habits={habits}
+              onMarkHabitDone={markHabitDone}
               activeTaskId={activeTaskId}
               timerRunning={timerState==='running'}
-              onSelect={selectTask}
-              onToggle={toggleComplete}
-              onDelete={deleteTask}
-              onClearCompleted={clearCompleted}
-              onAdd={()=>setOpenModal('add')}
-              onAddTask={addTask}
-              onEdit={task => setEditingTask(task)}
-              onUpdate={updateTaskData}
-              onQuickUpdate={quickUpdateTask}
+              selectTask={selectTask}
+              toggleComplete={toggleComplete}
+              deleteTask={deleteTask}
+              clearCompleted={clearCompleted}
+              setOpenModal={setOpenModal}
+              addTask={addTask}
+              setEditingTask={setEditingTask}
+              updateTaskData={updateTaskData}
+              quickUpdateTask={quickUpdateTask}
               syncStatus={syncStatus}
+              syncTasks={() => syncTasks(tasks, setTasks, setSyncStatus)}
+              startTimer={startTimer}
+              pauseTimer={pauseTimer}
+              resetTimer={resetTimer}
+              timerState={timerState}
+              timerSeconds={timerSeconds}
+              timerMode={timerMode}
+              setActiveTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'reports' && (
+            <ReportsView
+              trackers={trackers}
+              tasks={tasks}
+              pomodoroLog={pomodoroLog}
+              onUpdateTracker={updateTracker}
+              onDeleteTracker={deleteTracker}
+              onEditTracker={openEditTracker}
+              onAddTracker={openAddTracker}
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsView 
+              settings={settings}
+              onSaveSettings={saveSettings}
+              theme={theme}
+              onSetTheme={setTheme}
+              onClearData={handleClearData}
+              onImportData={handleImportData}
+              syncStatus={syncStatus}
+              onSyncToggle={(enabled) => {
+                if (enabled) {
+                  localStorage.setItem('focusly_sync_enabled', 'true');
+                  setSyncStatus('Syncing...');
+                  syncTasks(tasks, setTasks, setSyncStatus);
+                } else {
+                  localStorage.setItem('focusly_sync_enabled', 'false');
+                  setSyncStatus('Not connected');
+                }
+              }}
+              onDisconnect={() => {
+                setSyncStatus('Not connected');
+              }}
               onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
             />
-          </div>
-        )}
+          )}
+
+          {activeTab === 'timer' && (
+            <div className="timer-tab">
+              <Timer
+                task={activeTask}
+                timerMode={timerMode}
+                timerState={timerState}
+                timerSeconds={timerSeconds}
+                totalSeconds={totalSeconds}
+                pomodoroCount={pomodoroCount}
+                onSwitchMode={switchMode}
+                onStart={startTimer}
+                onPause={pauseTimer}
+                onReset={resetTimer}
+              />
+              <Stats tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} />
+              <TodayBreakdown tasks={tasks} />
+            </div>
+          )}
+
+          {activeTab === 'habits'  && (
+            <HabitsView
+              habits={habits}
+              onAddHabit={addHabit}
+              onUpdateHabit={updateHabit}
+              onDeleteHabit={deleteHabit}
+            />
+          )}
+          {activeTab === 'journal' && <JournalView />}
+          {activeTab === 'goals'   && <GoalsView />}
+
+          {activeTab === 'tasks' && (
+            <div className="tasks-tab">
+              <TaskList
+                tasks={tasks}
+                activeTaskId={activeTaskId}
+                timerRunning={timerState==='running'}
+                onSelect={selectTask}
+                onToggle={toggleComplete}
+                onDelete={deleteTask}
+                onClearCompleted={clearCompleted}
+                onAdd={()=>setOpenModal('add')}
+                onAddTask={addTask}
+                onEdit={task => setEditingTask(task)}
+                onUpdate={updateTaskData}
+                onQuickUpdate={quickUpdateTask}
+                syncStatus={syncStatus}
+                onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
+              />
+            </div>
+          )}
+        </div>
 
         {/* PWA Install Banner */}
         {showInstallBanner && (

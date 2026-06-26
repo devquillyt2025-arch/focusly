@@ -127,85 +127,87 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
   };
 
   return (
-    <div className="settings-view" style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 40 }}>
+    <div className="settings-view">
       
       {/* Profile Section */}
-      <section className="settings-section">
-        <h3>Profile</h3>
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 16 }}>
-          <div className="avatar-picker" style={{ textAlign: 'center' }}>
-            <div style={{ width: 80, height: 80, borderRadius: 40, background: 'var(--c-bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', overflow: 'hidden', border: '2px solid #6366f1' }}>
+      <section className="settings-card">
+        <h3 className="settings-card-title">Profile</h3>
+        <div style={{ display: 'flex', gap: 32, alignItems: 'center', marginTop: 16 }}>
+          <div className="avatar-picker" style={{ textAlign: 'center', flexShrink: 0 }}>
+            <div style={{ width: 88, height: 88, borderRadius: 44, background: 'var(--c-bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', overflow: 'hidden', border: '2px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}>
               {avatar.startsWith('data:image') ? <img src={avatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : avatar}
             </div>
-            <label style={{ display: 'block', marginTop: 8, fontSize: '0.8rem', color: '#6366f1', cursor: 'pointer' }}>
+            <label style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: '#6366f1', cursor: 'pointer' }}>
               Upload Image
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
             </label>
           </div>
           <div style={{ flex: 1 }}>
-            <label className="form-lbl">Name</label>
-            <input type="text" className="form-inp" value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="What should we call you?" />
-            
-            <label className="form-lbl" style={{ marginTop: 16 }}>Choose Emoji</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {EMOJI_AVATARS.map(em => (
-                <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? '#6366f1' : 'var(--c-bg-card)', border: 'none', borderRadius: 8, padding: 8, fontSize: '1.2rem', cursor: 'pointer' }}>
-                  {em}
-                </button>
-              ))}
-            </div>
+            <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Name</label>
+            <input type="text" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="What should we call you?" />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+          <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14, display: 'block' }}>Choose Emoji</label>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {EMOJI_AVATARS.map(em => (
+              <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? 'rgba(99,102,241,0.15)' : 'var(--c-bg-card)', border: avatar === em ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 16, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: avatar === em ? '0 4px 12px rgba(99,102,241,0.15)' : 'none' }}>
+                {em}
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Notifications Section */}
-      <section className="settings-section">
-        <h3>Notifications</h3>
+      <section className="settings-card">
+        <h3 className="settings-card-title">Notifications</h3>
         
-        <label className="toggle-row" onClick={handleMasterNotifToggle} style={{ background: 'rgba(99, 102, 241, 0.1)', padding: 16, borderRadius: 12 }}>
-          <div className="toggle-track" data-on={notifMaster ? 'true' : 'false'}>
-            <div className="toggle-thumb" />
-          </div>
+        <label className="toggle-row master-toggle" onClick={handleMasterNotifToggle} style={{ background: 'rgba(99, 102, 241, 0.08)', padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, cursor: 'pointer' }}>
           <div>
-            <div className="toggle-lbl">Enable Notifications</div>
-            <div className="toggle-sub">Master switch for all push notifications</div>
+            <div className="toggle-lbl" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Enable Notifications</div>
+            <div className="toggle-sub" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>Master switch for all push notifications</div>
+          </div>
+          <div className="toggle-track" data-on={notifMaster ? 'true' : 'false'} style={{ flexShrink: 0 }}>
+            <div className="toggle-thumb" />
           </div>
         </label>
 
-        <div style={{ opacity: notifMaster ? 1 : 0.5, pointerEvents: notifMaster ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--c-bg-card)', padding: '12px 16px', borderRadius: 8 }}>
+        <div style={{ opacity: notifMaster ? 1 : 0.5, pointerEvents: notifMaster ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 20, marginTop: 24, marginLeft: 24, paddingLeft: 20, borderLeft: '2px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)' }}>
             <div>
-              <div className="toggle-lbl">Morning Briefing</div>
-              <div className="toggle-sub">Daily summary of pending trackers</div>
+              <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Morning Briefing</div>
+              <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Daily summary of pending trackers</div>
             </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <input type="time" className="form-inp" value={morningTime} onChange={e => setMorningTime(e.target.value)} style={{ padding: '4px 8px' }} />
-              <div className="toggle-track" onClick={() => setNotifMorning(!notifMorning)} data-on={notifMorning ? 'true' : 'false'} style={{ cursor: 'pointer' }}><div className="toggle-thumb" /></div>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <input type="time" className="form-inp" value={morningTime} onChange={e => setMorningTime(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, background: 'var(--bg-surface)' }} />
+              <div className="toggle-track" onClick={() => setNotifMorning(!notifMorning)} data-on={notifMorning ? 'true' : 'false'} style={{ cursor: 'pointer', flexShrink: 0 }}><div className="toggle-thumb" /></div>
             </div>
           </div>
 
-          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--c-bg-card)', padding: '12px 16px', borderRadius: 8, margin: 0 }}>
-            <div className="toggle-track" data-on={notifStreak ? 'true' : 'false'}><div className="toggle-thumb" /></div>
+          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
             <div>
-              <div className="toggle-lbl">Streak at-risk alerts (8 PM)</div>
-              <div className="toggle-sub">Alert if you're about to lose a 3+ day streak</div>
+              <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Streak at-risk alerts (8 PM)</div>
+              <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Alert if you're about to lose a 3+ day streak</div>
             </div>
+            <div className="toggle-track" data-on={notifStreak ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
           </label>
 
-          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--c-bg-card)', padding: '12px 16px', borderRadius: 8, margin: 0 }}>
-            <div className="toggle-track" data-on={notifPomo ? 'true' : 'false'}><div className="toggle-thumb" /></div>
+          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
             <div>
-              <div className="toggle-lbl">Pomodoro timer alerts</div>
-              <div className="toggle-sub">Notify when focus/break sessions end</div>
+              <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Pomodoro timer alerts</div>
+              <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Notify when focus/break sessions end</div>
             </div>
+            <div className="toggle-track" data-on={notifPomo ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
           </label>
         </div>
       </section>
 
       {/* Google Tasks Sync Section */}
-      <section className="settings-section">
-        <h3>Google Tasks Sync</h3>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 16 }}>
+      <section className="settings-card">
+        <h3 className="settings-card-title">Google Tasks Sync</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 24 }}>
           Sync your Focusly tasks with Google Tasks. Note: This sync only works on this device/browser since sync state lives in localStorage.
         </p>
         
@@ -214,7 +216,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <button
               type="button"
               className="primary-btn"
-              style={{ background: '#4285F4', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              style={{ background: '#4285F4', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 24px', borderRadius: 14, fontWeight: 600, fontSize: '0.95rem', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(66,133,244,0.2)' }}
               onClick={connectGoogleTasks}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -227,13 +229,12 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            <label className="toggle-row" onClick={() => onSyncToggle(localStorage.getItem('focusly_sync_enabled') !== 'true')} style={{ background: 'var(--c-bg-card)', padding: '12px 16px', borderRadius: 8, margin: 0 }}>
-              <div className="toggle-track" data-on={localStorage.getItem('focusly_sync_enabled') === 'true' ? 'true' : 'false'}><div className="toggle-thumb" /></div>
+            <label className="toggle-row" onClick={() => onSyncToggle(localStorage.getItem('focusly_sync_enabled') !== 'true')} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <div>
-                <div className="toggle-lbl">Sync tasks with Google Tasks</div>
-                <div className="toggle-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Sync tasks with Google Tasks</div>
+                <div className="toggle-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                   {syncStatus === 'Syncing...' && (
                     <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
@@ -243,12 +244,13 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
                   <span>Status: {syncStatus}</span>
                 </div>
               </div>
+              <div className="toggle-track" data-on={localStorage.getItem('focusly_sync_enabled') === 'true' ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
             </label>
-            <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="primary-btn"
-                style={{ background: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                style={{ background: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 12, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}
                 disabled={syncStatus === 'Syncing...'}
                 onClick={onSyncNow}
               >
@@ -257,7 +259,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <button
                 type="button"
                 className="secondary-btn"
-                style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                style={{ color: '#ef4444', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
                 onClick={() => {
                   disconnectGoogleTasks();
                   onDisconnect();
@@ -271,88 +273,88 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       </section>
 
       {/* App Preferences */}
-      <section className="settings-section">
-        <h3>App Preferences</h3>
+      <section className="settings-card">
+        <h3 className="settings-card-title">App Preferences</h3>
         
-        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-          <div style={{ flex: 1 }}>
-            <label className="form-lbl">Theme</label>
-            <select className="form-inp" value={theme} onChange={e => onSetTheme(e.target.value)}>
+        <div style={{ display: 'flex', gap: 24, marginTop: 16, marginBottom: 28, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Theme</label>
+            <select className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={theme} onChange={e => onSetTheme(e.target.value)}>
               <option value="dark">Dark Mode</option>
               <option value="light">Light Mode</option>
             </select>
           </div>
-          <div style={{ flex: 1 }}>
-            <label className="form-lbl">Week starts on</label>
-            <select className="form-inp" value={weekStart} onChange={e => setWeekStart(e.target.value)}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Week starts on</label>
+            <select className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={weekStart} onChange={e => setWeekStart(e.target.value)}>
               <option value="monday">Monday</option>
               <option value="sunday">Sunday</option>
             </select>
           </div>
         </div>
 
-        <div className="form-grp">
-          <label>Timer Presets</label>
-          <div className="preset-grid">
+        <div className="form-grp" style={{ marginBottom: 28 }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'block' }}>Timer Presets</label>
+          <div className="preset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             {PRESETS.map(p => (
-              <button key={p.label} type="button" className="preset-btn" onClick={() => applyPreset(p)}>
-                <span>{p.label}</span>
-                <small>{p.sub}</small>
+              <button key={p.label} type="button" className="preset-btn" onClick={() => applyPreset(p)} style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--c-bg-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', transition: 'all 0.2s' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{p.label}</span>
+                <small style={{ color: '#6366f1', fontWeight: 600, fontSize: '0.78rem' }}>{p.sub}</small>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="form-grp">
-          <label>Timer Durations (minutes)</label>
-          <div className="form-row">
+        <div className="form-grp" style={{ marginBottom: 28 }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'block' }}>Timer Durations (minutes)</label>
+          <div className="form-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
             <div className="form-grp">
-              <label className="sub-label">Focus</label>
-              <input type="number" className="form-inp" value={form.focusDuration} onChange={e => set('focusDuration', e.target.value)} min="1" max="480" />
+              <label className="sub-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Focus</label>
+              <input type="number" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={form.focusDuration} onChange={e => set('focusDuration', e.target.value)} min="1" max="480" />
             </div>
             <div className="form-grp">
-              <label className="sub-label">Short Break</label>
-              <input type="number" className="form-inp" value={form.shortDuration} onChange={e => set('shortDuration', e.target.value)} min="1" max="60" />
+              <label className="sub-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Short Break</label>
+              <input type="number" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={form.shortDuration} onChange={e => set('shortDuration', e.target.value)} min="1" max="60" />
             </div>
             <div className="form-grp">
-              <label className="sub-label">Long Break</label>
-              <input type="number" className="form-inp" value={form.longDuration} onChange={e => set('longDuration', e.target.value)} min="1" max="120" />
+              <label className="sub-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontWeight: 600 }}>Long Break</label>
+              <input type="number" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={form.longDuration} onChange={e => set('longDuration', e.target.value)} min="1" max="120" />
             </div>
           </div>
         </div>
         
-        <div style={{ marginTop: 16 }}>
-          <button className="primary-btn" onClick={submitSettings}>Save Timer Preferences</button>
+        <div style={{ marginTop: 8 }}>
+          <button className="primary-btn" style={{ padding: '14px 28px', borderRadius: 14, fontWeight: 600, fontSize: '0.95rem', background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }} onClick={submitSettings}>Save Timer Preferences</button>
         </div>
       </section>
 
       {/* Data Management */}
-      <section className="settings-section">
-        <h3>Data Management</h3>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 16 }}>
+      <section className="settings-card">
+        <h3 className="settings-card-title">Data Management</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 24 }}>
           Focusly is entirely local. Your data stays in your browser ({calculateStorage()} KB used).
         </p>
         
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button className="secondary-btn" onClick={exportData}>💾 Export All Data</button>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--c-bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={exportData}>💾 Export All Data</button>
           
-          <label className="secondary-btn" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center' }}>
+          <label className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--c-bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             📥 Import Data
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
           </label>
           
-          <button className="secondary-btn" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={onClearData}>
+          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', color: '#ef4444', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={onClearData}>
             🗑 Clear All Data
           </button>
         </div>
       </section>
 
       {/* About */}
-      <section className="settings-section" style={{ textAlign: 'center', padding: '32px 0' }}>
-        <div style={{ fontSize: '2rem', marginBottom: 8 }}>🌱</div>
-        <div style={{ fontWeight: 600, fontSize: '1.2rem' }}>Focusly v3.0</div>
-        <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: 8 }}>A beautiful Pomodoro timer and task manager.</p>
-        <a href="mailto:bugs@focusly.app" style={{ color: '#6366f1', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-block', marginTop: 16 }}>Report a bug</a>
+      <section className="settings-card" style={{ textAlign: 'center', padding: '32px 24px', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+        <div style={{ fontSize: '2.2rem', marginBottom: 12 }}>🌱</div>
+        <div style={{ fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)' }}>Focusly v3.0</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: 8 }}>A beautiful Pomodoro timer and task manager.</p>
+        <a href="mailto:bugs@focusly.app" style={{ color: '#6366f1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block', marginTop: 16 }}>Report a bug</a>
       </section>
     </div>
   );

@@ -50,7 +50,7 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// FIX 5: normalise display name — fixes "GEn AI" → "Gen AI", preserves acronyms like "AI", "HTML"
+// normalise display name
 function displayName(name) {
   if (!name) return '';
   const trimmed = name.trim();
@@ -204,8 +204,6 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     setCatOpen(false);
   };
 
-  const setLocalField = (k, v) => setLocal(prev => ({ ...prev, [k]: v }));
-
   const handleInlineAdd = (cat) => {
     if (inlineAddText.trim()) {
       if (onAddTask) {
@@ -271,16 +269,14 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const renderTask = (task, isDone) => {
     const meta        = CAT_META[task.category] ?? CAT_META.work;
     const isActive    = task.id === activeTaskId;
-    const priColor    = PRI_COLOR[task.priority] ?? 'transparent';
     const isConfirming = confirmDeleteId === task.id;
     const due         = fmtDue(task.dueDate);
-
-    const isOverdue = !isDone && due?.overdue;
+    const isOverdue   = !isDone && due?.overdue;
 
     return (
       <div
         key={task.id}
-        className={`task-item${isActive ? ' task-active' : ''}${isDone ? ' task-done' : ''}${isOverdue ? ' task-overdue' : ''}`}
+        className={`sunsama-item${isActive ? ' task-active' : ''}${isDone ? ' item-completed sunsama-check-anim' : ''}${isOverdue ? ' task-overdue' : ''}`}
         onClick={() => { if (!isConfirming) openDetail(task); }}
         title={timerRunning && !isActive && !isConfirming ? 'Pause timer to switch tasks' : undefined}
       >
@@ -296,75 +292,62 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           </div>
         ) : (
           <>
-            <button
-              className={`task-check${isDone ? ' checked' : ''}`}
-              onClick={e => { e.stopPropagation(); onToggle(task.id); }}
-              aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
-            >
-              {isDone && '✓'}
-            </button>
-
-            <div className="task-body">
-              <div className="task-name-row">
-                {task.priority && task.priority !== 'none' && (
-                  <span className="pri-dot" style={{ background: PRI_COLOR[task.priority] ?? 'transparent' }} title={task.priority} />
-                )}
-                <span className="task-name">{displayName(task.name)}</span>
+            <div className="sunsama-item-left">
+              <div
+                className={`sunsama-checkbox${isDone ? ' checked' : ''}`}
+                onClick={e => { e.stopPropagation(); onToggle(task.id); }}
+                aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
+              >
+                {isDone ? '✓' : ''}
               </div>
-              <div className="task-badges">
-                <span className="cat-badge" style={{ background: meta.color + '22', color: meta.color, border: `1px solid ${meta.color}44` }}>
-                  {meta.label}
-                </span>
-                {task.recurrence && (
-                  <svg className="recur-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" title={`Repeats ${task.recurrence}`}>
-                    <polyline points="23 4 23 10 17 10"/>
-                    <polyline points="1 20 1 14 7 14"/>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                  </svg>
-                )}
-                {task.subtasks?.length > 0 && (
-                  <span className="info-badge" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
-                    {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+
+              <div className="sunsama-item-content">
+                <div className="sunsama-item-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {task.priority && task.priority !== 'none' && (
+                    <span className="pri-dot" style={{ background: PRI_COLOR[task.priority] ?? 'transparent', width: 8, height: 8, borderRadius: '50%', display: 'inline-block' }} title={task.priority} />
+                  )}
+                  <span>{displayName(task.name)}</span>
+                </div>
+                {task.notes && <div className="sunsama-item-notes">{task.notes}</div>}
+                <div className="sunsama-item-meta">
+                  <span className="sunsama-meta-tag" style={{ color: meta.color }}>
+                    {meta.label}
                   </span>
-                )}
-                {task.attachments?.length > 0 && (
-                  <span className="info-badge" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    {task.attachments.length}
-                  </span>
-                )}
-                {task.timeLogged > 0 && <span className="info-badge">⏱ {fmtTime(task.timeLogged)}</span>}
-                {task.pomodorosCompleted > 0 && <span className="info-badge">🍅 {task.pomodorosCompleted}</span>}
-                {due && (
-                  <span className="info-badge" style={{
-                    color: due.color,
-                    ...(due.overdue ? { borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)' } : {}),
-                  }}>
-                    {due.text}
-                  </span>
-                )}
-                {task.syncConflict && (
-                  <span className="info-badge" style={{ color: '#f59e0b', borderColor: '#f59e0b', background: 'rgba(245,158,11,0.1)' }} title={task.syncConflict}>
-                    ⚠️ Sync Conflict
-                  </span>
-                )}
+                  {task.recurrence && (
+                    <span className="sunsama-meta-text">
+                      🔁 {task.recurrence}
+                    </span>
+                  )}
+                  {task.subtasks?.length > 0 && (
+                    <span className="sunsama-meta-text">
+                      ☑️ {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                    </span>
+                  )}
+                  {task.attachments?.length > 0 && (
+                    <span className="sunsama-meta-text">
+                      📎 {task.attachments.length}
+                    </span>
+                  )}
+                  {task.timeLogged > 0 && <span className="sunsama-meta-text">⏱ {fmtTime(task.timeLogged)}</span>}
+                  {task.pomodorosCompleted > 0 && <span className="sunsama-meta-text">🍅 {task.pomodorosCompleted}</span>}
+                  {due && (
+                    <span className="sunsama-meta-text" style={{
+                      color: due.color,
+                      ...(due.overdue ? { color: '#ef4444', fontWeight: '600' } : {}),
+                    }}>
+                      {due.text}
+                    </span>
+                  )}
+                  {task.syncConflict && (
+                    <span className="sunsama-meta-text" style={{ color: '#f59e0b' }} title={task.syncConflict}>
+                      ⚠️ Sync Conflict
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="task-actions" style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
-              {/* Kebab Menu Button */}
-              <button
-                className="task-action-btn kebab-btn"
-                style={{ background: kebabOpenId === task.id ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-                onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
-                aria-label="More actions"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-                </svg>
-              </button>
-
+            <div className="sunsama-item-right" style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
               {/* Star Button */}
               <button
                 className="task-action-btn star-btn"
@@ -377,22 +360,34 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </svg>
               </button>
 
+              {/* Kebab Menu Button */}
+              <button
+                className="task-action-btn kebab-btn"
+                style={{ background: kebabOpenId === task.id ? 'var(--bg-surface)' : 'transparent', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
+                aria-label="More actions"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+                </svg>
+              </button>
+
               {/* Dropdown Menu */}
               {kebabOpenId === task.id && (
                 <div
                   className="kebab-dropdown-menu"
                   style={{
                     position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
-                    background: '#202124', border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', padding: '8px 0',
+                    background: '#0f172a', border: '1px solid var(--border-strong)',
+                    borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', padding: '8px 0',
                     display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
-                    color: '#e8eaed', fontSize: '0.9rem'
+                    color: '#f8fafc', fontSize: '0.9rem'
                   }}
                 >
                   <button
                     type="button"
                     className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click(), 100); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -403,7 +398,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   <button
                     type="button"
                     className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -414,7 +409,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   <button
                     type="button"
                     className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -425,7 +420,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   <button
                     type="button"
                     className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -444,7 +439,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                         key={catKey}
                         type="button"
                         className="kebab-menu-item"
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                         onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -460,7 +455,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   <button
                     type="button"
                     className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#e8eaed', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     onClick={e => { e.stopPropagation(); handleNewList(task); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -478,84 +473,95 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   };
 
   return (
-    <div className="task-list-panel">
-      <div className="tl-header">
+    <div className="task-list-panel" style={{ background: 'transparent', border: 'none' }}>
+      <div className="tl-header" style={{ padding: '0 0 24px 0', borderBottom: '1px solid var(--border)' }}>
         <div className="tl-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
-          <h2>Tasks <span className="task-count-badge">{pendingCount}</span></h2>
-          <div className="tl-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center' }}>
+            Tasks
+            <span className="task-count-badge" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700', marginLeft: '6px', verticalAlign: 'super', lineHeight: 1 }}>
+              {pendingCount}
+            </span>
+          </h2>
+          <div className="tl-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            {/* Sync status indicator */}
-            <div className="sync-status-indicator" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'var(--c-bg-card)', padding: '4px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)' }}>
+            {/* Cluster 1: Sync status indicator */}
+            <div className="sync-status-indicator" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)', background: 'var(--bg-surface)', padding: '0 12px', borderRadius: 18, border: '1px solid var(--border)', height: 36, boxSizing: 'border-box' }}>
               {syncStatus === 'Syncing...' ? (
-                <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg style={{ animation: 'customSpin 1s linear infinite', width: 12, height: 12, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
                   <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : (
                 <span style={{
-                  width: 8, height: 8, borderRadius: 4,
+                  width: 6, height: 6, borderRadius: 3,
                   background: syncStatus.startsWith('Synced') ? '#10b981' : syncStatus === 'Sync failed — retry' ? '#ef4444' : '#64748b',
                   boxShadow: syncStatus.startsWith('Synced') ? '0 0 8px #10b981' : syncStatus === 'Sync failed — retry' ? '0 0 8px #ef4444' : 'none'
                 }} />
               )}
-              <span>{syncStatus}</span>
+              <span style={{ fontWeight: 600 }}>{syncStatus}</span>
               {syncStatus !== 'Not connected' && syncStatus !== 'Syncing...' && (
                 <button
                   type="button"
                   onClick={onSyncNow}
-                  style={{ background: 'transparent', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0 4px', fontWeight: 600, fontSize: '0.8rem' }}
+                  style={{ background: 'transparent', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0 2px', fontWeight: 700, fontSize: '0.82rem', marginLeft: 4 }}
                   title="Sync Now"
                 >
                   Sync Now
                 </button>
               )}
             </div>
-            {/* Sort dropdown */}
-            <div className="sort-dropdown" ref={sortRef}>
-              <button className="sort-btn" onClick={() => setSortOpen(o => !o)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 8h10M3 12h7M3 16h4M17 8v8M14 5l3-3 3 3M14 19l3 3 3-3"/>
-                </svg>
-                Sort
-              </button>
-              {sortOpen && (
-                <div className="sort-menu">
-                  {SORT_OPTIONS.map(opt => {
-                    const isActive = sortBy === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        className={`sort-item${isActive ? ' sort-item-active' : ''}`}
-                        onClick={() => {
-                          setSortBy(opt.value);
-                          localStorage.setItem(LS_SORT_KEY, opt.value);
-                          setSortOpen(false);
-                        }}
-                      >
-                        <span>{opt.label}</span>
-                        {isActive && (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+            {/* Cluster 2: Sort dropdown + Add button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Sort dropdown */}
+              <div className="sort-dropdown" ref={sortRef} style={{ position: 'relative' }}>
+                <button className="sort-btn" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '0 16px', height: 36, borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxSizing: 'border-box' }} onClick={() => setSortOpen(o => !o)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8h10M3 12h7M3 16h4M17 8v8M14 5l3-3 3 3M14 19l3 3 3-3"/>
+                  </svg>
+                  Sort
+                </button>
+                {sortOpen && (
+                  <div className="sort-menu" style={{ position: 'absolute', top: 42, right: 0, zIndex: 100, background: '#0f172a', border: '1px solid var(--border-strong)', borderRadius: '12px', padding: '8px 0', width: '160px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                    {SORT_OPTIONS.map(opt => {
+                      const isActive = sortBy === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', width: '100%', background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none', color: '#f8fafc', fontSize: '0.9rem', cursor: 'pointer', textAlign: 'left' }}
+                          onClick={() => {
+                            setSortBy(opt.value);
+                            localStorage.setItem(LS_SORT_KEY, opt.value);
+                            setSortOpen(false);
+                          }}
+                          onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                          onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <span>{opt.label}</span>
+                          {isActive && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <button className="add-task-btn" style={{ background: '#0f172a', color: '#fff', border: 'none', padding: '0 20px', height: 36, borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, boxSizing: 'border-box' }} onClick={onAdd}>＋ Add</button>
             </div>
-            <button className="add-task-btn" onClick={onAdd}>＋ Add</button>
           </div>
         </div>
 
         {/* Search bar */}
-        <div className="task-search-wrap" style={{ marginBottom: 24 }}>
-          <svg className="task-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="task-search-wrap" style={{ position: 'relative', marginTop: 16 }}>
+          <svg className="task-search-icon" style={{ position: 'absolute', left: 14, top: 13, color: 'var(--text-secondary)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input
             ref={searchRef}
             className="task-search-input"
+            style={{ width: '100%', padding: '10px 14px 10px 40px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '0.95rem', color: 'var(--text-primary)', outline: 'none' }}
             type="text"
             placeholder="Search tasks..."
             value={query}
@@ -563,7 +569,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             aria-label="Search tasks"
           />
           {query && (
-            <button className="task-search-clear" onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
+            <button className="task-search-clear" style={{ position: 'absolute', right: 14, top: 12, background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
@@ -573,18 +579,19 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
       </div>
 
       {/* Scrollable Body Area */}
-      <div className="task-list-scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="task-list-scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '24px 0 32px', display: 'flex', flexDirection: 'column', gap: 28 }}>
         {/* Category Filter Pills */}
-        <div className="task-cat-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div className="task-cat-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
           <button
             type="button"
             className={`cat-filter-btn${catFilter === 'all' ? ' active' : ''}`}
             onClick={() => setCatFilter('all')}
             style={{
-              padding: '6px 16px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
-              background: catFilter === 'all' ? '#6366f1' : 'var(--c-bg-card, #1e1e2d)',
-              color: catFilter === 'all' ? '#fff' : 'var(--text-secondary, #94a3b8)',
-              border: '1px solid ' + (catFilter === 'all' ? '#6366f1' : 'rgba(255,255,255,0.1)'),
+              height: 32, padding: '0 16px', borderRadius: 16, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', margin: 0,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+              background: catFilter === 'all' ? '#0f172a' : 'var(--bg-surface)',
+              color: catFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+              border: '1px solid ' + (catFilter === 'all' ? '#0f172a' : 'var(--border)'),
               transition: 'all 0.15s ease'
             }}
           >
@@ -594,6 +601,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             const meta = CAT_META[cat];
             const count = catCounts[cat] || 0;
             const isActive = catFilter === cat;
+            const hasContent = count > 0;
             return (
               <button
                 key={cat}
@@ -601,10 +609,12 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 className={`cat-filter-btn${isActive ? ' active' : ''}`}
                 onClick={() => setCatFilter(cat)}
                 style={{
-                  padding: '6px 16px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
-                  background: isActive ? meta.color : 'var(--c-bg-card, #1e1e2d)',
-                  color: isActive ? '#fff' : 'var(--text-secondary, #94a3b8)',
-                  border: '1px solid ' + (isActive ? meta.color : 'rgba(255,255,255,0.1)'),
+                  height: 32, padding: '0 16px', borderRadius: 16, fontSize: '0.85rem', fontWeight: isActive || hasContent ? 600 : 500, cursor: 'pointer', margin: 0,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+                  background: isActive ? meta.color : 'var(--bg-surface)',
+                  color: isActive ? '#fff' : hasContent ? 'var(--text-primary)' : 'var(--text-muted, #94a3b8)',
+                  border: '1px solid ' + (isActive ? meta.color : hasContent ? 'var(--border-strong, #cbd5e1)' : 'var(--border-light, #e2e8f0)'),
+                  opacity: isActive || hasContent ? 1 : 0.65,
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -617,7 +627,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         {/* ONE single "+ Add a task" inline action at the top of the list */}
         <div className="inline-add-container" style={{ width: '100%' }}>
           {inlineAddCat === 'top' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.25)', padding: '10px 16px', borderRadius: 12, border: '1px solid #6366f1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-surface)', padding: '12px 18px', borderRadius: '12px', border: '1px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.1)' }}>
               <input
                 autoFocus
                 type="text"
@@ -633,7 +643,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 }}
                 onBlur={() => handleInlineAdd(catFilter === 'all' ? 'work' : catFilter)}
                 placeholder={`Add a task to ${catFilter === 'all' ? 'Work' : CAT_META[catFilter]?.label}...`}
-                style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.95rem' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none', fontSize: '0.95rem' }}
               />
             </div>
           ) : (
@@ -641,13 +651,13 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               type="button"
               onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, background: 'var(--c-bg-card, #1e1e2d)',
-                border: '1px solid rgba(255,255,255,0.08)', color: '#6366f1', fontSize: '0.95rem', fontWeight: 600,
-                cursor: 'pointer', padding: '10px 16px', borderRadius: 12, width: '100%',
+                display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-surface)',
+                border: '1px solid var(--border)', color: '#6366f1', fontSize: '0.95rem', fontWeight: 600,
+                cursor: 'pointer', padding: '12px 18px', borderRadius: '12px', width: '100%',
                 textAlign: 'left', transition: 'all 0.15s ease'
               }}
               onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
@@ -658,9 +668,9 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         </div>
 
         {/* ONE single list container, full width, no separate cards */}
-        <div className="task-items-container" style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+        <div className="sunsama-list" style={{ width: '100%' }}>
           {pending.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)', background: 'var(--c-bg-card, #1e1e2d)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-faint)', background: 'var(--bg-surface)', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.95rem' }}>
               No tasks found. Click "+ Add a task" above to create one!
             </div>
           ) : (
@@ -670,13 +680,13 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
 
         {/* Completed Section */}
         {completed.length > 0 && (
-          <div className="completed-section" style={{ background: 'var(--c-bg-card, #1e1e2d)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', padding: 20 }}>
+          <div className="completed-section" style={{ background: 'var(--bg-surface)', borderRadius: '12px', border: '1px solid var(--border)', padding: 20 }}>
             <div className="completed-section-hdr" onClick={() => setShowCompleted(s => !s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="completed-chevron">
                   {showCompleted
-                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                   }
                 </span>
                 <span className="completed-label" style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>Completed ({completed.length})</span>
@@ -684,13 +694,13 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               <button
                 className="clear-all-link"
                 onClick={e => { e.stopPropagation(); onClearCompleted(); }}
-                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
               >
                 Clear all
               </button>
             </div>
             {showCompleted && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 16 }}>
+              <div className="sunsama-list" style={{ marginTop: 16 }}>
                 {completed.map(task => renderTask(task, true))}
               </div>
             )}
@@ -741,7 +751,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </div>
               )}
 
-              {/* Title — FIX 1 */}
+              {/* Title */}
               <div className="tdp-field">
                 <label className="tdp-label">Title</label>
                 <input
@@ -760,7 +770,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 />
               </div>
 
-              {/* Priority — FIX 3 */}
+              {/* Priority */}
               <div className="tdp-field">
                 <label className="tdp-label">Priority</label>
                 <div className="tdp-pri-pills">
@@ -776,7 +786,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </div>
               </div>
 
-              {/* Category — FIX 4 */}
+              {/* Category */}
               <div className="tdp-field">
                 <label className="tdp-label">Category</label>
                 <div className="tdp-cat-select" ref={catMenuRef}>
@@ -808,7 +818,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </div>
               </div>
 
-              {/* Due Date — FIX 2 */}
+              {/* Due Date */}
               <div className="tdp-field">
                 <label className="tdp-label">Due Date</label>
                 <div className="tdp-date-wrap">
@@ -959,7 +969,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 </label>
               </div>
 
-              {/* Notes — FIX 6 */}
+              {/* Notes */}
               <div className="tdp-field">
                 <label className="tdp-label">Notes</label>
                 <textarea

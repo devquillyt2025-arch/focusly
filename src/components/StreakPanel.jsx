@@ -51,35 +51,37 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
   if (!hasAnyActivity && streak === 0) return null;
 
   return (
-    <div className="streak-panel">
-      <div className="streak-panel-header">
-        <span className="streak-panel-title">Weekly Streak</span>
-        {streak > 0 && (
-          <span className="streak-count-inline">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="none" style={{ flexShrink: 0 }}>
-              <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
-            </svg>
-            {streak}d
-          </span>
+    <div className="yartu-card">
+      <div className="yartu-card-header">
+        <div className="yartu-card-title-group">
+          <div className="yartu-badge-circle orange">🔥</div>
+          <div className="yartu-card-title">WEEKLY STREAK</div>
+        </div>
+        {streak > 0 ? (
+          <span className="yartu-affordance" style={{ color: '#f97316' }}>{streak}d active</span>
+        ) : (
+          <span className="yartu-affordance">0d</span>
         )}
       </div>
-      <div className="streak-week-row">
-        {weekDays.map(day => (
-          <div key={day.dateStr} className="streak-day-col">
-            <div
-              className={[
-                'streak-dot',
-                day.isActive  ? 's-active'  : '',
-                day.isToday   ? 's-today'   : '',
-                day.isFuture  ? 's-future'  : '',
-              ].filter(Boolean).join(' ')}
-              title={day.dateStr}
-            />
-            <span className="streak-day-name">{day.label}</span>
-          </div>
-        ))}
+      <div className="yartu-card-body" style={{ alignItems: 'center', padding: '12px 0' }}>
+        <div className="streak-week-row" style={{ width: '100%', justifyContent: 'space-around' }}>
+          {weekDays.map(day => (
+            <div key={day.dateStr} className="streak-day-col">
+              <div
+                className={[
+                  'streak-dot',
+                  day.isActive  ? 's-active'  : '',
+                  day.isToday   ? 's-today'   : '',
+                  day.isFuture  ? 's-future'  : '',
+                ].filter(Boolean).join(' ')}
+                title={day.dateStr}
+              />
+              <span className="streak-day-name">{day.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="streak-subtitle" style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '8px' }}>Activity — last 7 days</div>
       </div>
-      <div className="streak-subtitle">Activity — last 7 days</div>
     </div>
   );
 }
