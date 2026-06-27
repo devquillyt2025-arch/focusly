@@ -3142,14 +3142,18 @@ select.modal-input {
   display: flex;
   align-items: center;
   gap: 7px;
-  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
 }
 .sunsama-item-title {
   font-size: 0.925rem;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.4;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .sunsama-item.item-completed .sunsama-item-title {
   text-decoration: line-through;
@@ -3192,15 +3196,15 @@ select.modal-input {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.tc-notes-preview {
-  font-size: 0.72rem;
+.tc-notes-icon {
+  display: inline-flex;
+  align-items: center;
   color: var(--text-muted);
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 260px;
+  cursor: default;
+  opacity: 0.7;
+  transition: opacity 0.1s ease;
 }
+.tc-notes-icon:hover { opacity: 1; color: var(--accent); }
 
 .sunsama-meta-tag {
   display: inline-flex;

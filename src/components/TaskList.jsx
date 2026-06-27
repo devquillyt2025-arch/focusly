@@ -424,13 +424,23 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     return c;
   }, [tasks]);
 
+  // Border-color precedence: overdue > high-priority > none (single source of truth)
+  const cardBorderColor = (isOverdue, isHighPri) => {
+    if (isOverdue)  return '3px solid #ef4444';
+    if (isHighPri)  return '3px solid #f59e0b';
+    return undefined;
+  };
+
   const renderTask = (task, isDone) => {
-    const meta        = CAT_META[task.category] ?? CAT_META.work;
-    const isActive    = task.id === activeTaskId;
+    const meta         = CAT_META[task.category] ?? CAT_META.work;
+    const isActive     = task.id === activeTaskId;
     const isConfirming = confirmDeleteId === task.id;
-    const due         = fmtDue(task.dueDate);
-    const isOverdue   = !isDone && due?.overdue;
-    const isHighPri   = !isDone && task.priority === 'high';
+    const due          = fmtDue(task.dueDate);
+    const isOverdue    = !isDone && due?.overdue;
+    const isHighPri    = !isDone && task.priority === 'high';
+
+    // Single authoritative border rule: overdue > high-priority > none
+    const cardBorderLeft = cardBorderColor(isOverdue, isHighPri);
 
     return (
       <motion.div
@@ -443,9 +453,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         className={`sunsama-item${isActive ? ' task-active' : ''}${isDone ? ' item-completed sunsama-check-anim' : ''}${isOverdue ? ' task-overdue' : ''}`}
         onClick={() => { if (!isConfirming) openDetail(task); }}
         title={timerRunning && !isActive && !isConfirming ? 'Pause timer to switch tasks' : undefined}
-        style={{
-          borderLeft: isOverdue ? '4px solid #ef4444' : isHighPri ? '4px solid #f59e0b' : undefined,
-        }}
+        style={{ borderLeft: cardBorderLeft }}
       >
         {isConfirming ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
@@ -469,27 +477,17 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               </div>
 
               <div className="sunsama-item-content">
-                {/* Primary row: title + status badge */}
+                {/* Primary row: title + ONE status badge */}
                 <div className="tc-row-primary">
-                  <span className="sunsama-item-title">{displayName(task.name)}</span>
-                  {isOverdue && (
-                    <span className="tc-badge tc-badge-overdue">⚠️ Overdue</span>
-                  )}
-                  {isHighPri && !isOverdue && (
-                    <span className="tc-badge tc-badge-highpri">🔥 High Priority</span>
-                  )}
+                  <span className="sunsama-item-title" title={task.name}>{displayName(task.name)}</span>
+                  {isOverdue && <span className="tc-badge tc-badge-overdue">⚠️ Overdue</span>}
+                  {isHighPri && !isOverdue && <span className="tc-badge tc-badge-highpri">🔥 High Priority</span>}
                 </div>
 
-                {/* Secondary row: meta chips (left) + due date (right) */}
+                {/* Secondary row: descriptive meta only (no urgency/priority duplication) */}
                 <div className="tc-row-secondary">
                   <div className="tc-meta-left">
                     <span className="sunsama-meta-tag" style={{ color: meta.color }}>{meta.label}</span>
-                    {task.priority && task.priority !== 'none' && (
-                      <span className="sunsama-meta-tag">
-                        <span className="pri-dot" style={{ background: PRI_COLOR[task.priority] ?? 'transparent', width: 6, height: 6, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />
-                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
-                      </span>
-                    )}
                     {task.recurrence && (
                       <span className="sunsama-meta-text">🔁 {task.recurrence}</span>
                     )}
@@ -506,8 +504,14 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                       <span className="sunsama-meta-text">🍅 {task.pomodorosCompleted}</span>
                     )}
                     {task.notes && (
-                      <span className="tc-notes-preview">
-                        {task.notes.length > 55 ? task.notes.slice(0, 55) + '…' : task.notes}
+                      <span className="tc-notes-icon" title={task.notes.length > 120 ? task.notes.slice(0, 120) + '…' : task.notes} aria-label="Has notes">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                          <line x1="16" y1="13" x2="8" y2="13"/>
+                          <line x1="16" y1="17" x2="8" y2="17"/>
+                          <polyline points="10 9 9 9 8 9"/>
+                        </svg>
                       </span>
                     )}
                     {task.syncConflict && (
