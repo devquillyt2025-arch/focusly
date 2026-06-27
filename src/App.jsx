@@ -175,6 +175,7 @@ function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
   const base    = dueDateStr ? new Date(dueDateStr + 'T00:00:00') : new Date();
   if (recurrence === 'daily')    return toISO(addDays(base, 1));
   if (recurrence === 'weekly')   return toISO(addDays(base, 7));
+  if (recurrence === 'monthly')  { const r = new Date(base); r.setMonth(r.getMonth() + 1); return toISO(r); }
   if (recurrence === 'weekdays') {
     let next = addDays(base, 1);
     while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);

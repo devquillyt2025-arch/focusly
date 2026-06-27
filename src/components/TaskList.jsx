@@ -898,42 +898,96 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               {/* Due Date */}
               <div className="tdp-field">
                 <label className="tdp-label">Due Date</label>
-                <div className="tdp-date-wrap">
-                  <div
-                    className="tdp-date-display"
-                    onClick={() => { try { dateInputRef.current?.showPicker?.(); } catch {} }}
-                  >
-                    <span>
-                      {local.dueDate
-                        ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : 'No due date'}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {local.dueDate && (
-                        <button
-                          type="button"
-                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px', fontSize: '1.1rem', position: 'relative', zIndex: 10 }}
-                          onClick={e => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            saveField('dueDate', '');
-                          }}
-                          title="Clear due date"
-                        >
-                          ×
-                        </button>
-                      )}
-                      <TdpIconCalendar />
-                    </div>
-                  </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
                     ref={dateInputRef}
                     type="date"
-                    className="tdp-date-hidden"
                     value={local.dueDate || ''}
                     onChange={e => saveField('dueDate', e.target.value)}
+                    style={{
+                      flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)', padding: '9px 11px',
+                      color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none',
+                      colorScheme: 'dark', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                    onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={e => e.target.style.borderColor = 'var(--border)'}
                   />
+                  {local.dueDate && (
+                    <button
+                      type="button"
+                      onClick={() => saveField('dueDate', '')}
+                      title="Clear due date"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: 'pointer', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', lineHeight: 1, flexShrink: 0 }}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {/* Recurrence */}
+              <div className="tdp-field">
+                <label className="tdp-label">Repeat</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    { value: null,       label: 'None'     },
+                    { value: 'daily',    label: 'Daily'    },
+                    { value: 'weekdays', label: 'Weekdays' },
+                    { value: 'weekly',   label: 'Weekly'   },
+                    { value: 'monthly',  label: 'Monthly'  },
+                    { value: 'custom',   label: 'Custom'   },
+                  ].map(opt => (
+                    <button
+                      key={String(opt.value)}
+                      type="button"
+                      onClick={() => saveField('recurrence', opt.value)}
+                      style={{
+                        padding: '5px 13px', borderRadius: 20, border: '1px solid',
+                        borderColor: local.recurrence === opt.value ? 'var(--accent)' : 'var(--border)',
+                        background:  local.recurrence === opt.value ? 'var(--accent-glow)' : 'transparent',
+                        color:       local.recurrence === opt.value ? 'var(--accent)' : 'var(--text-secondary)',
+                        fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                        transition: 'all 0.13s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {local.recurrence === 'custom' && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    {['S','M','T','W','T','F','S'].map((lbl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          const days = (local.recurrenceDays || []).includes(i)
+                            ? (local.recurrenceDays || []).filter(d => d !== i)
+                            : [...(local.recurrenceDays || []), i].sort((a,b) => a-b);
+                          saveField('recurrenceDays', days);
+                        }}
+                        style={{
+                          width: 32, height: 32, borderRadius: '50%', border: '1px solid',
+                          borderColor: (local.recurrenceDays||[]).includes(i) ? 'var(--accent)' : 'var(--border)',
+                          background:  (local.recurrenceDays||[]).includes(i) ? 'var(--accent)'  : 'transparent',
+                          color:       (local.recurrenceDays||[]).includes(i) ? '#fff'           : 'var(--text-muted)',
+                          fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.13s ease',
+                        }}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {local.recurrence && local.recurrence !== null && (
+                  <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>🔁</span>
+                    <span>Repeats {local.recurrence}{local.dueDate ? ` · next: ${new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
+                  </div>
+                )}
               </div>
 
               {/* Subtasks */}

@@ -16,6 +16,7 @@ const RECURRENCE_OPTIONS = [
   { value: 'daily',    label: 'Daily'    },
   { value: 'weekdays', label: 'Weekdays' },
   { value: 'weekly',   label: 'Weekly'   },
+  { value: 'monthly',  label: 'Monthly'  },
   { value: 'custom',   label: 'Custom'   },
 ];
 
