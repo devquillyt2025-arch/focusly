@@ -1,5 +1,147 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// ── Calendar Date Picker ────────────────────────────────────────────────────
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WEEK_DAYS    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function isoToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function toISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function CalendarDatePicker({ value, onChange, onClose }) {
+  const parsed  = value ? new Date(value + 'T00:00:00') : new Date();
+  const [nav, setNav] = useState({ year: parsed.getFullYear(), month: parsed.getMonth() });
+  const today   = isoToday();
+
+  const grid = useMemo(() => {
+    const { year, month } = nav;
+    const first = new Date(year, month, 1);
+    const last  = new Date(year, month + 1, 0);
+    const cells = [];
+    const offset = first.getDay();
+    const prevLast = new Date(year, month, 0).getDate();
+    for (let i = offset - 1; i >= 0; i--) {
+      const d = new Date(year, month - 1, prevLast - i);
+      cells.push({ date: d, cur: false, iso: toISO(d) });
+    }
+    for (let i = 1; i <= last.getDate(); i++) {
+      const d = new Date(year, month, i);
+      cells.push({ date: d, cur: true, iso: toISO(d) });
+    }
+    while (cells.length % 7 !== 0) {
+      const n = cells.length - last.getDate() - offset + 1;
+      const d = new Date(year, month + 1, n);
+      cells.push({ date: d, cur: false, iso: toISO(d) });
+    }
+    return cells;
+  }, [nav]);
+
+  const prevMonth = () => setNav(n => {
+    const d = new Date(n.year, n.month - 1, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const nextMonth = () => setNav(n => {
+    const d = new Date(n.year, n.month + 1, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  const quickPick = (label) => {
+    const d = new Date();
+    if (label === 'Today')     { onChange(toISO(d)); onClose(); return; }
+    if (label === 'Tomorrow')  { d.setDate(d.getDate()+1); onChange(toISO(d)); onClose(); return; }
+    if (label === 'Next week') { d.setDate(d.getDate() + (7 - d.getDay() + 1)); onChange(toISO(d)); onClose(); return; }
+    if (label === 'In 2 weeks'){ d.setDate(d.getDate()+14); onChange(toISO(d)); onClose(); return; }
+    if (label === 'Next month') { d.setMonth(d.getMonth()+1); onChange(toISO(d)); onClose(); return; }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.97 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      style={{
+        position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 100,
+        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+        borderRadius: 16, boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+        width: 292, overflow: 'hidden',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Quick picks */}
+      <div style={{ padding: '12px 12px 8px', display: 'flex', flexWrap: 'wrap', gap: 6, borderBottom: '1px solid var(--border)' }}>
+        {['Today','Tomorrow','Next week','In 2 weeks','Next month'].map(lbl => (
+          <button key={lbl} onClick={() => quickPick(lbl)}
+            style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {/* Month nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 8px' }}>
+        <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: 8, fontSize: '1rem', lineHeight: 1 }}>‹</button>
+        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+          {MONTHS_FULL[nav.month]} {nav.year}
+        </span>
+        <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: 8, fontSize: '1rem', lineHeight: 1 }}>›</button>
+      </div>
+
+      {/* Day headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '0 10px' }}>
+        {WEEK_DAYS.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0', textTransform: 'uppercase' }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '0 10px 14px', gap: '2px 0' }}>
+        {grid.map((cell, i) => {
+          const isSelected = cell.iso === value;
+          const isToday    = cell.iso === today;
+          const isPast     = cell.iso < today;
+          return (
+            <button key={i} onClick={() => { onChange(cell.iso); onClose(); }}
+              style={{
+                width: 36, height: 36, margin: '0 auto', borderRadius: '50%', border: 'none',
+                background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-glow)' : 'transparent',
+                color: isSelected ? '#fff' : isToday ? 'var(--accent)' : !cell.cur ? 'var(--text-muted)' : isPast ? 'var(--text-secondary)' : 'var(--text-primary)',
+                fontSize: '0.82rem', fontWeight: isSelected || isToday ? 700 : 400,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                outline: isToday && !isSelected ? '1px solid var(--accent)' : 'none',
+                transition: 'all 0.1s ease',
+              }}
+              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isToday ? 'var(--accent-glow)' : 'transparent'; }}
+            >
+              {cell.date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={() => { onChange(''); onClose(); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
+          Clear date
+        </button>
+        <button onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
+          Cancel
+        </button>
+      </div>
+    </motion.div>
+  );
+}
 
 export const CAT_META = {
   learning: { label: 'Learning', color: '#6366f1' },
@@ -97,8 +239,21 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const savedTimerRef = useRef(null);
   const titleRef     = useRef(null);
   const notesRef     = useRef(null);
-  const catMenuRef   = useRef(null);
-  const dateInputRef = useRef(null);
+  const catMenuRef       = useRef(null);
+  const datePickerRef    = useRef(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Close calendar picker on outside click
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handler = (e) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDatePicker]);
 
   const handleNewList = (taskToMove) => {
     const name = prompt('Enter new list name:');
@@ -412,7 +567,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                     type="button"
                     className="kebab-menu-item"
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click(), 100); }}
+                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => setShowDatePicker(true), 120); }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
@@ -898,31 +1053,45 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               {/* Due Date */}
               <div className="tdp-field">
                 <label className="tdp-label">Due Date</label>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    value={local.dueDate || ''}
-                    onChange={e => saveField('dueDate', e.target.value)}
+                <div ref={datePickerRef} style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(p => !p)}
                     style={{
-                      flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)', padding: '9px 11px',
-                      color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none',
-                      colorScheme: 'dark', cursor: 'pointer', fontFamily: 'inherit',
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: 'var(--bg-input)', border: `1px solid ${showDatePicker ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 'var(--radius-sm)', padding: '9px 12px', cursor: 'pointer',
+                      color: local.dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                      fontSize: '0.875rem', fontWeight: local.dueDate ? 600 : 400,
+                      transition: 'border-color 0.13s ease', gap: 8,
                     }}
-                    onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-                    onBlur={e => e.target.style.borderColor = 'var(--border)'}
-                  />
-                  {local.dueDate && (
-                    <button
-                      type="button"
-                      onClick={() => saveField('dueDate', '')}
-                      title="Clear due date"
-                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: 'pointer', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', lineHeight: 1, flexShrink: 0 }}
-                    >
-                      ×
-                    </button>
-                  )}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: local.dueDate ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                      {local.dueDate
+                        ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'Pick a date'}
+                    </span>
+                    {local.dueDate && (
+                      <span
+                        role="button"
+                        onClick={e => { e.stopPropagation(); saveField('dueDate', ''); setShowDatePicker(false); }}
+                        title="Clear"
+                        style={{ color: '#ef4444', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
+                      >×</span>
+                    )}
+                  </button>
+                  <AnimatePresence>
+                    {showDatePicker && (
+                      <CalendarDatePicker
+                        value={local.dueDate || ''}
+                        onChange={v => { saveField('dueDate', v); }}
+                        onClose={() => setShowDatePicker(false)}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -1173,16 +1342,6 @@ function TdpIconChevron() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="6 9 12 15 18 9"/>
-    </svg>
-  );
-}
-function TdpIconCalendar() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-      <line x1="16" y1="2" x2="16" y2="6"/>
-      <line x1="8" y1="2" x2="8" y2="6"/>
-      <line x1="3" y1="10" x2="21" y2="10"/>
     </svg>
   );
 }
