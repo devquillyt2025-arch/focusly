@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Calendar Date Picker ────────────────────────────────────────────────────
@@ -940,10 +941,11 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
 
       </div>
 
-      {/* ── Task detail panel ── */}
-      {detailTask && <div className="task-detail-backdrop" onClick={closePanel} />}
-
-      <div className={`task-detail-panel${detailTask ? ' tdp-open' : ''}`} aria-hidden={!detailTask}>
+      {/* ── Task detail panel (portalled to body to escape framer-motion transform ancestor) ── */}
+      {createPortal(
+        <>
+          {detailTask && <div className="task-detail-backdrop" onClick={closePanel} />}
+          <div className={`task-detail-panel${detailTask ? ' tdp-open' : ''}`} aria-hidden={!detailTask}>
         {local && (
           <>
             <div className="tdp-header">
@@ -1325,7 +1327,10 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             </div>
           </>
         )}
-      </div>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
