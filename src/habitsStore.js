@@ -177,10 +177,9 @@ export function get12WeekGrid(habit) {
   const base  = new Date();
   const today = localDateStr();
   const done  = new Set(habit.completions || []);
-  // Start on the Sunday 83 days ago
+  // Align so the 12th week is the current week (ending this Saturday)
   const start = new Date(base);
-  start.setDate(start.getDate() - 83);
-  start.setDate(start.getDate() - start.getDay()); // snap to Sunday
+  start.setDate(start.getDate() - start.getDay() - 77);
 
   const weeks = [];
   let d = new Date(start);

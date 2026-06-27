@@ -315,7 +315,13 @@ function HabitDetailPanel({ habit, onClose, onEdit, onDelete, onToggle, today })
 
         {/* 12-week heatmap */}
         <div className="tdp-label" style={{ marginBottom: 8 }}>Activity (12 weeks)</div>
-        <HabitHeatmap grid={grid} color={habit.color} />
+        {total === 0 ? (
+          <div className="hv-heatmap-empty" style={{ padding: '16px 12px', textAlign: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+            No activity yet. Complete this habit to start your heatmap!
+          </div>
+        ) : (
+          <HabitHeatmap grid={grid} color={habit.color} />
+        )}
 
         {/* Recent completions */}
         {recentDates.length > 0 && (
@@ -362,11 +368,10 @@ function HabitHeatmap({ grid, color }) {
               className={[
                 'hv-hm-cell',
                 cell.isFuture   ? 'hv-hm-future'  : '',
-                !cell.isFuture && cell.scheduled && cell.done   ? 'hv-hm-done'   : '',
-                !cell.isFuture && cell.scheduled && !cell.done  ? 'hv-hm-missed' : '',
-                !cell.scheduled ? 'hv-hm-off' : '',
+                !cell.isFuture && cell.done   ? 'hv-hm-done'   : '',
+                !cell.isFuture && !cell.done  ? 'hv-hm-missed' : '',
               ].filter(Boolean).join(' ')}
-              style={!cell.isFuture && cell.scheduled && cell.done ? { background: color, borderColor: color } : {}}
+              style={!cell.isFuture && cell.done ? { background: color, borderColor: color } : {}}
               title={cell.date}
             />
           ))}

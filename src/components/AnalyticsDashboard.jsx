@@ -5,7 +5,7 @@ import { calculateDailyScore, getScoreHistory, getGlobalWeeklyHeatmap, getCatego
 
 export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
   const global = computeGlobalStats(trackers);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
   
   // Overall success rate this month
   const getSuccessRate = () => {

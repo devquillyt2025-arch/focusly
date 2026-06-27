@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   TRACKER_CATS, TRACKER_TYPES, genId, defaultConfig,
 } from '../trackers/trackerUtils';
@@ -49,8 +50,24 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null, e
   const catColor = TRACKER_CATS[form.category]?.color ?? '#6366f1';
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box modal-box-wide" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="modal-box modal-box-wide"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal-hdr">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {step === 2 && !isEdit && (
@@ -143,8 +160,8 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null, e
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

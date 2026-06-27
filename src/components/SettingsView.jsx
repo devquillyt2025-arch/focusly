@@ -10,9 +10,15 @@ const PRESETS = [
 
 const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '👻'];
 
-export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow }) {
+export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile }) {
   // Profile state
-  const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || '');
+  const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
+  const [profileEmail, setProfileEmail] = useState(() => {
+    const saved = localStorage.getItem('focusly-profile-email');
+    if (saved && saved !== 'estherH@gmail.com') return saved;
+    const name = localStorage.getItem('focusly-profile-name') || 'user';
+    return `${name.toLowerCase().replace(/\s+/g, '')}@gmail.com`;
+  });
   const [avatar, setAvatar] = useState(() => localStorage.getItem('focusly-profile-avatar') || '😎');
 
   // Notifications state
@@ -27,8 +33,12 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem('focusly-week-start') || 'monday');
 
   // Save effects
-  useEffect(() => { localStorage.setItem('focusly-profile-name', profileName); }, [profileName]);
-  useEffect(() => { localStorage.setItem('focusly-profile-avatar', avatar); }, [avatar]);
+  useEffect(() => { 
+    localStorage.setItem('focusly-profile-name', profileName); 
+    localStorage.setItem('focusly-profile-email', profileEmail);
+    localStorage.setItem('focusly-profile-avatar', avatar);
+    if (onUpdateProfile) onUpdateProfile(profileName, profileEmail, avatar);
+  }, [profileName, profileEmail, avatar, onUpdateProfile]);
   useEffect(() => { localStorage.setItem('focusly-notif-master', notifMaster); }, [notifMaster]);
   useEffect(() => { localStorage.setItem('focusly-notif-morning', notifMorning); }, [notifMorning]);
   useEffect(() => { localStorage.setItem('focusly-notif-morning-time', morningTime); }, [morningTime]);
@@ -142,9 +152,15 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
             </label>
           </div>
-          <div style={{ flex: 1 }}>
-            <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Name</label>
-            <input type="text" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="What should we call you?" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Name</label>
+              <input type="text" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="What should we call you?" />
+            </div>
+            <div>
+              <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Email</label>
+              <input type="email" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="yourname@example.com" />
+            </div>
           </div>
         </div>
 

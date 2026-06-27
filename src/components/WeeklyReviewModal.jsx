@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { computeGlobalStats, computeHabitStreaks } from '../trackers/trackerUtils';
 import { calculateDailyScore } from '../trackers/analyticsUtils';
 
@@ -36,7 +37,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
     }
   });
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
   const todayScore = calculateDailyScore(trackers, tasks, pomodoroLog, todayStr);
 
   const toggleHabit = (id) => {
@@ -61,8 +62,22 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box modal-box-wide" onClick={e => e.stopPropagation()}>
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="modal-box modal-box-wide"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="modal-hdr">
           <h3>Weekly Review</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -183,7 +198,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
             <button className="primary-btn" style={{ minWidth: 80, height: 40, borderRadius: 8 }} onClick={handleSave}>Finish Review</button>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { CAT_META } from './TaskList';
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return localDateStr(); }
 
 function fmtDur(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -14,15 +18,15 @@ function fmtDur(s) {
 
 function getStreak(pomodoroLog, tasks) {
   const days = new Set([
-    ...pomodoroLog.map(ts => ts.split('T')[0]),
-    ...tasks.filter(t => t.completedAt).map(t => t.completedAt.split('T')[0]),
+    ...pomodoroLog.map(ts => localDateStr(new Date(ts))),
+    ...tasks.filter(t => t.completedAt).map(t => localDateStr(new Date(t.completedAt))),
   ]);
   let s = 0;
   const now = new Date();
   for (let i = 0; i < 365; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    if (days.has(d.toISOString().split('T')[0])) s++;
+    if (days.has(localDateStr(d))) s++;
     else if (i > 0) break;
   }
   return s;
@@ -37,16 +41,16 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
     const chartDays = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().split('T')[0];
-      const pomos = pomodoroLog.filter(ts => ts.startsWith(key)).length;
-      const done  = tasks.filter(t => t.completedAt?.startsWith(key)).length;
+      const key = localDateStr(d);
+      const pomos = pomodoroLog.filter(ts => localDateStr(new Date(ts)) === key).length;
+      const done  = tasks.filter(t => t.completedAt && localDateStr(new Date(t.completedAt)) === key).length;
       return { key, label: DAY_LABELS[d.getDay()], pomos, done };
     });
 
     const maxVal = Math.max(1, ...chartDays.map(d => Math.max(d.pomos, d.done)));
 
-    const todayPomos = pomodoroLog.filter(ts => ts.startsWith(tod)).length;
-    const todayDone  = tasks.filter(t => t.completedAt?.startsWith(tod)).length;
+    const todayPomos = pomodoroLog.filter(ts => localDateStr(new Date(ts)) === tod).length;
+    const todayDone  = tasks.filter(t => t.completedAt && localDateStr(new Date(t.completedAt)) === tod).length;
     const weekPomos  = chartDays.reduce((s, d) => s + d.pomos, 0);
     const weekFocus  = weekPomos * (settings.focusDuration || 25) * 60;
     const streak     = getStreak(pomodoroLog, tasks);
@@ -68,8 +72,24 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
   }, [tasks, pomodoroLog, settings]);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box modal-box-wide" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="modal-box modal-box-wide"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal-hdr">
           <h3>📊 Analytics</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -148,7 +168,7 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,14 +1,17 @@
 import { useMemo } from 'react';
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return localDateStr(); }
 
 export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
   const { streak, weekDays } = useMemo(() => {
     const today = todayStr();
 
     const activeDays = new Set([
-      ...pomodoroLog.map(ts => ts.split('T')[0]),
-      ...tasks.filter(t => t.completedAt).map(t => t.completedAt.split('T')[0]),
+      ...pomodoroLog.map(ts => localDateStr(new Date(ts))),
+      ...tasks.filter(t => t.completedAt).map(t => localDateStr(new Date(t.completedAt))),
     ]);
 
     if (intentions?.history) {
@@ -25,7 +28,7 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
     for (let i = 0; i < 365; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const k = d.toISOString().split('T')[0];
+      const k = localDateStr(d);
       if (activeDays.has(k)) s++;
       else if (i > 0) break;
     }
@@ -34,7 +37,7 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateStr(d);
       weekDays.push({
         dateStr,
         label: d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 1),

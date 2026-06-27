@@ -31,6 +31,7 @@ const TEMPLATES = {
 export default function OnboardingFlow({ onComplete }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [areas, setAreas] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -40,6 +41,7 @@ export default function OnboardingFlow({ onComplete }) {
 
   const handleFinish = () => {
     localStorage.setItem('focusly-profile-name', name || 'Friend');
+    localStorage.setItem('focusly-profile-email', email || `${(name || 'friend').toLowerCase().replace(/\s+/g, '')}@gmail.com`);
     if (selectedTemplate) {
       const tracker = {
         id: genId(),
@@ -94,8 +96,9 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 2 && (
           <div className="fade-in">
             <h2 style={{ marginBottom: 12 }}>What should we call you?</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 32 }}>Let's personalize your experience.</p>
-            <input type="text" className="form-inp" style={{ textAlign: 'center', fontSize: '1.2rem', padding: '16px', marginBottom: 32 }} value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" autoFocus onKeyDown={e => e.key === 'Enter' && name.trim() && setStep(3)} />
+            <p style={{ color: '#94a3b8', marginBottom: 24 }}>Let's personalize your experience.</p>
+            <input type="text" className="form-inp" style={{ textAlign: 'center', fontSize: '1.2rem', padding: '16px', marginBottom: 16, width: '100%' }} value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" autoFocus onKeyDown={e => e.key === 'Enter' && name.trim() && setStep(3)} />
+            <input type="email" className="form-inp" style={{ textAlign: 'center', fontSize: '1.1rem', padding: '16px', marginBottom: 32, width: '100%' }} value={email} onChange={e => setEmail(e.target.value)} placeholder="yourname@gmail.com" onKeyDown={e => e.key === 'Enter' && name.trim() && setStep(3)} />
             <button className="primary-btn" style={{ width: '100%' }} disabled={!name.trim()} onClick={() => setStep(3)}>Continue</button>
           </div>
         )}

@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion';
+
 const GROUPS = [
   {
     title: 'Timer',
@@ -25,8 +27,24 @@ const GROUPS = [
 
 export default function ShortcutsModal({ onClose }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="modal-box"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal-hdr">
           <h3>⌨️ Keyboard Shortcuts</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -44,7 +62,7 @@ export default function ShortcutsModal({ onClose }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

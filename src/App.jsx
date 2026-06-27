@@ -10,6 +10,7 @@
 // Bug 9: Timer setInterval-only countdown drifts in throttled background tabs → Fixed: record timerEndAt on start/resume, derive remaining from Date.now() delta
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import TaskList, { CAT_META } from './components/TaskList';
 import Timer from './components/Timer';
 import Stats from './components/Stats';
@@ -24,6 +25,7 @@ import ReportsView from './components/ReportsView';
 import JournalView from './components/JournalView';
 import GoalsView from './components/GoalsView';
 import HabitsView from './components/HabitsView';
+import CalendarView from './components/CalendarView';
 import AddTrackerModal from './components/AddTrackerModal';
 import {
   loadHabits, saveHabits, migrateFromTrackers, toggleCompletion,
@@ -34,6 +36,7 @@ import {
 } from './trackers/trackerUtils';
 import { sendNotification } from './utils/notificationUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue } from './utils/googleTasksSync';
+import { handleCalendarAuthCallback } from './utils/googleCalendarSync';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -72,10 +75,13 @@ const SK = {
 function persist(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 
 // ─── Helpers ─────────────────────────────────────────────────────
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return localDateStr(); }
 function getWeekStart() {
   const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.toISOString().split('T')[0];
+  return localDateStr(d);
 }
 function makeItems() { return ['1','2','3'].map(id => ({ id, text: '', done: false })); }
 
@@ -195,14 +201,21 @@ export default function App() {
 
   // ── OAuth Callback & Initial Sync ──
   useEffect(() => {
-    handleAuthCallback().then(success => {
-      if (success) {
-        showToast('Connected to Google Tasks!', 'success');
-        setSyncStatus('Syncing...');
-        syncTasks(tasks, setTasks, setSyncStatus);
-      } else if (localStorage.getItem('focusly_sync_enabled') === 'true') {
-        syncTasks(tasks, setTasks, setSyncStatus);
+    // Handle Google Calendar OAuth callback first (state=gcal), then Tasks
+    handleCalendarAuthCallback().then(calSuccess => {
+      if (calSuccess) {
+        showToast('Connected to Google Calendar!', 'success');
+        return;
       }
+      handleAuthCallback().then(success => {
+        if (success) {
+          showToast('Connected to Google Tasks!', 'success');
+          setSyncStatus('Syncing...');
+          syncTasks(tasks, setTasks, setSyncStatus);
+        } else if (localStorage.getItem('focusly_sync_enabled') === 'true') {
+          syncTasks(tasks, setTasks, setSyncStatus);
+        }
+      });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -300,8 +313,8 @@ export default function App() {
   // ── Midnight reset ──
   useEffect(() => {
     const now = new Date();
-    // Use UTC midnight so the reset fires exactly when todayStr() (UTC-based) rolls over.
-    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    // Use local midnight so the reset fires when todayStr() (local-date-based) rolls over.
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const t = setTimeout(() => {
       setIntentions(prev => {
         const today = todayStr();
@@ -358,7 +371,7 @@ export default function App() {
       if (!masterEnabled) return;
 
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      const today = localDateStr(now);
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
       let notifState = { date: today, triggered: {} };
@@ -637,7 +650,7 @@ export default function App() {
     setTrackers(prev => {
       const oldTracker = prev.find(t => t.id === newTracker.id);
       if (oldTracker) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateStr();
         const oldLog = (oldTracker.logs || []).find(l => l.date === today);
         const newLog = (newTracker.logs || []).find(l => l.date === today);
 
@@ -726,6 +739,52 @@ export default function App() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
+  const [profileEmail, setProfileEmail] = useState(() => {
+    const saved = localStorage.getItem('focusly-profile-email');
+    if (saved && saved !== 'estherH@gmail.com') return saved;
+    const name = localStorage.getItem('focusly-profile-name') || 'user';
+    return `${name.toLowerCase().replace(/\s+/g, '')}@gmail.com`;
+  });
+  const [profileAvatar, setProfileAvatar] = useState(() => localStorage.getItem('focusly-profile-avatar') || '😎');
+
+  // Push notification helper
+  const triggerDesktopNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    } else if ('Notification' in window && Notification.permission !== 'denied') {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') new Notification(title, { body, icon: '/favicon.ico' });
+      });
+    }
+  };
+
+  const pendingTasksCount = tasks.filter(t => !t.completed).length;
+  const activeHabitsCount = habits.filter(h => !h.archived).length;
+  
+  const notifItems = [
+    { id: 1, title: '🎯 Tasks Reminder', desc: `You have ${pendingTasksCount} pending tasks remaining. Keep up the momentum!`, time: 'Just now', type: 'task' },
+    { id: 2, title: '⚡ Habit Tracker', desc: `You have ${activeHabitsCount || 4} habits active today. Remember to maintain your daily streaks!`, time: '10m ago', type: 'habit' },
+    { id: 3, title: '📊 Analytics Insight', desc: `Great focus! You've logged ${pomodoroLog.length} pomodoro sessions. View analytics for full stats.`, time: '1h ago', type: 'analytics' },
+  ];
+
+  // Automated trigger for notifications when enabled
+  useEffect(() => {
+    if (localStorage.getItem('focusly-notif-master') !== 'false') {
+      const timer = setTimeout(() => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          triggerDesktopNotification('Focusly Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount || 4} active habits`);
+        }
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingTasksCount, activeHabitsCount]);
+
+  const getInitials = (name) => {
+    if (!name) return 'EH';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
 
   if (!onboardingComplete) {
     return (
@@ -753,21 +812,69 @@ export default function App() {
           <input type="text" placeholder="Search for anything..." />
         </div>
         <div className="header-right">
-          <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} />
+            </button>
+
+            <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                className="yartu-avatar-dropdown"
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+                style={{ width: 340, right: 0, padding: 16, cursor: 'default' }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Notifications</div>
+                  <button style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => triggerDesktopNotification('Focusly Notification', 'Push notifications are active!')}>
+                    🔔 Push Desktop
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {notifItems.map(item => (
+                    <div key={item.id} style={{ padding: 12, background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.title}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.time}</span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{item.desc}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="nav-divider" style={{ margin: '12px 0 8px' }} />
+                <button className="main-nav-btn" style={{ justifyContent: 'center', width: '100%', padding: '8px 0' }} onClick={() => { setActiveTab('settings'); setNotifOpen(false); }}>
+                  <span className="nav-label" style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>Configure in Settings</span>
+                </button>
+              </motion.div>
+            )}
+            </AnimatePresence>
+          </div>
 
           <div className="yartu-top-avatar" onClick={() => setAvatarOpen(a => !a)}>
-            <div className="yartu-avatar-circle">EH</div>
+            <div className="yartu-avatar-circle" style={{ padding: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {profileAvatar.startsWith('data:image') ? <img src={profileAvatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : profileAvatar !== '😎' ? profileAvatar : getInitials(profileName)}
+            </div>
             <div className="yartu-avatar-text">
-              <span className="yartu-avatar-name">Esther Howard</span>
-              <span className="yartu-avatar-email">estherH@gmail.com</span>
+              <span className="yartu-avatar-name">{profileName || 'Esther Howard'}</span>
+              <span className="yartu-avatar-email">{profileEmail || 'estherH@gmail.com'}</span>
             </div>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             
+            <AnimatePresence>
             {avatarOpen && (
-              <div className="yartu-avatar-dropdown" onClick={e => e.stopPropagation()}>
+              <motion.div
+                className="yartu-avatar-dropdown"
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+                onClick={e => e.stopPropagation()}
+              >
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Preferences</div>
                 <button className="main-nav-btn" onClick={() => { setOpenModal('analytics'); setAvatarOpen(false); }}>
                   <span className="nav-icon"><IconChart /></span>
@@ -785,8 +892,9 @@ export default function App() {
                 <button className="hdr-cta-btn" style={{ width: '100%' }} onClick={() => { setAvatarOpen(false); if (activeTab === 'tasks') setOpenModal('add'); else openAddTracker(); }}>
                   {activeTab === 'tasks' ? '＋ Add Task' : '＋ Add Tracker'}
                 </button>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
@@ -794,8 +902,15 @@ export default function App() {
       {/* ── Body: sidebar nav + content ── */}
       <div className="app-body">
 
-      {sidebarOpen && (
-        <nav className="main-nav">
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.nav
+            className="main-nav"
+            initial={{ x: -240, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -240, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+          >
           {/* ── Section: Daily ── */}
           <span className="nav-section-label">Daily</span>
           {[
@@ -819,6 +934,7 @@ export default function App() {
           <div className="nav-divider" />
           <span className="nav-section-label">Planning</span>
           {[
+            { id:'calendar',label:'Calendar',Icon: NavIcoCalendar },
             { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
             { id:'reports', label:'Reports', Icon: NavIcoBarChart },
           ].map(tab => (
@@ -840,12 +956,21 @@ export default function App() {
             <span className="nav-icon"><NavIcoSettings /></span>
             <span className="nav-label">Settings</span>
           </button>
-        </nav>
-      )}
+          </motion.nav>
+        )}
+      </AnimatePresence>
 
       {/* ── Tab content ── */}
       <div className="tab-content">
-        <div key={activeTab} className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}`}>
+        <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}`}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
           {activeTab === 'daily' && (
             <DailyGoalsView
               trackers={trackers}
@@ -917,6 +1042,20 @@ export default function App() {
                 setSyncStatus('Not connected');
               }}
               onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
+              onUpdateProfile={(name, email, av) => {
+                setProfileName(name);
+                setProfileEmail(email);
+                setProfileAvatar(av);
+              }}
+            />
+          )}
+
+          {activeTab === 'calendar' && (
+            <CalendarView
+              tasks={tasks}
+              onAddTask={addTask}
+              trackers={trackers}
+              habits={habits}
             />
           )}
 
@@ -970,7 +1109,8 @@ export default function App() {
               />
             </div>
           )}
-        </div>
+        </motion.div>
+        </AnimatePresence>
 
         {/* PWA Install Banner */}
         {showInstallBanner && (
@@ -999,30 +1139,34 @@ export default function App() {
       {toast && <div key={toast.key} className={`app-toast toast-${toast.type}`}>{toast.msg}</div>}
 
       {/* ── Modals ── */}
-      {openModal==='add'       && <AddTaskModal  onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
-      {editingTask             && <AddTaskModal  onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
-      {openModal==='analytics' && <AnalyticsModal tasks={tasks}      pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} />}
-      {openModal==='shortcuts' && <ShortcutsModal onClose={()=>setOpenModal(null)} />}
-      {openModal==='weekly-review' && (
-        <WeeklyReviewModal
-          trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog}
-          onClose={() => setOpenModal(null)}
-          onSave={(reviewData) => {
-            const currentReviews = JSON.parse(localStorage.getItem('focusly-weekly-reviews') || '[]');
-            localStorage.setItem('focusly-weekly-reviews', JSON.stringify([reviewData, ...currentReviews]));
-            showToast('Weekly review saved!', 'success');
-            setOpenModal(null);
-          }}
-        />
-      )}
-      {showAddTracker && (
-        <AddTrackerModal
-          onSave={handleTrackerSave}
-          onClose={() => { setShowAddTracker(false); setEditingTracker(null); }}
-          editTracker={editingTracker}
-          existingTrackers={trackers}
-        />
-      )}
+      <AnimatePresence>
+        {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
+        {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
+        {openModal==='analytics' && <AnalyticsModal key="analytics" tasks={tasks}      pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} />}
+        {openModal==='shortcuts' && <ShortcutsModal key="shortcuts" onClose={()=>setOpenModal(null)} />}
+        {openModal==='weekly-review' && (
+          <WeeklyReviewModal
+            key="weekly-review"
+            trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog}
+            onClose={() => setOpenModal(null)}
+            onSave={(reviewData) => {
+              const currentReviews = JSON.parse(localStorage.getItem('focusly-weekly-reviews') || '[]');
+              localStorage.setItem('focusly-weekly-reviews', JSON.stringify([reviewData, ...currentReviews]));
+              showToast('Weekly review saved!', 'success');
+              setOpenModal(null);
+            }}
+          />
+        )}
+        {showAddTracker && (
+          <AddTrackerModal
+            key="add-tracker"
+            onSave={handleTrackerSave}
+            onClose={() => { setShowAddTracker(false); setEditingTracker(null); }}
+            editTracker={editingTracker}
+            existingTrackers={trackers}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1111,6 +1255,9 @@ function NavIcoGoalTarget() {
 }
 function NavIcoBarChart() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
+}
+function NavIcoCalendar() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 }
 // Bottom
 function NavIcoSettings() {

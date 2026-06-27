@@ -1,14 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
 
-// ─── Mood definitions ──────────────────────────────────────────────
-const MOODS = [
-  { id: 'energized', label: 'Energized', color: '#f59e0b' },
-  { id: 'focused',   label: 'Focused',   color: '#818cf8' },
-  { id: 'neutral',   label: 'Neutral',   color: '#64748b' },
-  { id: 'tired',     label: 'Tired',     color: '#94a3b8' },
-  { id: 'stressed',  label: 'Stressed',  color: '#ef4444' },
-];
-
 // ─── Storage helpers ───────────────────────────────────────────────
 function localDateStr(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -19,10 +10,7 @@ const jKey = d => `focusly_journal_${d}`;
 function emptyEntry(date) {
   return {
     date,
-    mood: null,
-    wins: ['', '', ''],
-    blockers: ['', ''],
-    tomorrowFocus: '',
+    content: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -54,8 +42,21 @@ function loadAllEntries() {
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+function getDocContent(e) {
+  if (!e) return '';
+  if (e.content != null) return e.content;
+  // Fallback for old structured entries if any exist
+  const parts = [
+    ...(e.wins || []).filter(Boolean),
+    ...(e.blockers || []).filter(Boolean),
+    e.tomorrowFocus || ''
+  ].filter(Boolean);
+  return parts.join('\n\n');
+}
+
 function hasContent(e) {
   if (!e) return false;
+  if (e.content != null) return e.content.trim().length > 0;
   return e.mood != null
     || (e.wins   || []).some(w => w.trim())
     || (e.blockers || []).some(b => b.trim())
@@ -79,16 +80,8 @@ function calcStreak(todayDate) {
 
 function wordCount(entry) {
   if (!entry) return 0;
-  const text = [
-    ...(entry.wins || []),
-    ...(entry.blockers || []),
-    entry.tomorrowFocus || '',
-  ].join(' ').trim();
+  const text = getDocContent(entry).trim();
   return text ? text.split(/\s+/).filter(Boolean).length : 0;
-}
-
-function moodColor(id) {
-  return MOODS.find(m => m.id === id)?.color ?? 'var(--border)';
 }
 
 function fmtHistoryDate(ds) {
@@ -123,9 +116,9 @@ export default function JournalView() {
     savedTimerRef.current = setTimeout(() => setSavedFeedback(false), 1500);
   }, []);
 
-  const updateEntry = useCallback((patch) => {
+  const updateContent = useCallback((text) => {
     setEntry(prev => {
-      const next = { ...prev, ...patch };
+      const next = { ...prev, content: text };
       persistEntry(todayDate, next);
       showSaved();
       return next;
@@ -151,10 +144,9 @@ export default function JournalView() {
           >
             <div className="jej-meta">
               <span className="jej-today-tag">Today</span>
-              <span className="jej-mood-dot" style={{ background: entry.mood ? moodColor(entry.mood) : 'var(--border)' }} />
             </div>
             <span className="jej-preview">
-              {entry.wins?.[0]?.trim() || 'No entry yet'}
+              {getDocContent(entry).trim() || 'No entry yet'}
             </span>
           </button>
 
@@ -170,9 +162,8 @@ export default function JournalView() {
               >
                 <div className="jej-meta">
                   <span className="jej-date-lbl">{fmtHistoryDate(e.date)}</span>
-                  <span className="jej-mood-dot" style={{ background: moodColor(e.mood) }} />
                 </div>
-                <span className="jej-preview">{e.wins?.[0]?.trim() || '—'}</span>
+                <span className="jej-preview">{getDocContent(e).trim() || '—'}</span>
               </button>
             ))
           )}
@@ -208,39 +199,15 @@ export default function JournalView() {
           </div>
         )}
 
-        {/* Entry cards */}
-        <div className="journal-cards">
-
-          {/* 1. Mood check-in */}
-          <MoodCard
-            mood={viewedEntry.mood}
-            onChange={isToday ? m => updateEntry({ mood: m }) : null}
+        {/* Entry doc */}
+        <div className="journal-doc-container">
+          <textarea
+            className="journal-doc-textarea"
+            value={getDocContent(viewedEntry)}
+            onChange={isToday ? e => updateContent(e.target.value) : undefined}
+            readOnly={!isToday}
+            placeholder={isToday ? "Write your thoughts, reflections, or notes for the day..." : "No content for this day."}
           />
-
-          {/* 2. Wins */}
-          <BulletCard
-            title="Wins Today"
-            subtitle="What went well?"
-            items={viewedEntry.wins?.length ? viewedEntry.wins : ['', '', '']}
-            placeholder="Something that went well..."
-            onChange={isToday ? wins => updateEntry({ wins }) : null}
-          />
-
-          {/* 3. Blockers */}
-          <BulletCard
-            title="Blockers"
-            subtitle="What got in the way?"
-            items={viewedEntry.blockers?.length ? viewedEntry.blockers : ['', '']}
-            placeholder="Something that slowed me down..."
-            onChange={isToday ? blockers => updateEntry({ blockers }) : null}
-          />
-
-          {/* 4. Tomorrow's focus */}
-          <FocusCard
-            value={viewedEntry.tomorrowFocus || ''}
-            onChange={isToday ? tf => updateEntry({ tomorrowFocus: tf }) : null}
-          />
-
         </div>
 
         {/* Footer: word count + saved badge */}
@@ -258,119 +225,7 @@ export default function JournalView() {
   );
 }
 
-// ─── Mood card ──────────────────────────────────────────────────────
-function MoodCard({ mood, onChange }) {
-  return (
-    <div className="j-card">
-      <div className="j-card-hdr">
-        <span className="j-card-title">Mood Check-In</span>
-      </div>
-      <div className="j-mood-pills">
-        {MOODS.map(m => {
-          const active = mood === m.id;
-          return (
-            <button
-              key={m.id}
-              className={`j-mood-pill${active ? ' j-mood-active' : ''}${!onChange ? ' j-readonly' : ''}`}
-              style={active ? { background: '#818cf8', color: '#fff', borderColor: '#818cf8' } : {}}
-              onClick={() => onChange?.(active ? null : m.id)}
-              disabled={!onChange}
-            >
-              <span className="j-mood-ico">
-                <JMoodIcon id={m.id} active={active} />
-              </span>
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Bullet card (wins / blockers) ─────────────────────────────────
-function BulletCard({ title, subtitle, items, placeholder, onChange }) {
-  const readOnly  = !onChange;
-  const allFilled = items.every(s => s.trim().length > 0);
-
-  const setItem = (i, val) => {
-    const next = [...items];
-    next[i] = val;
-    onChange(next);
-  };
-
-  return (
-    <div className="j-card">
-      <div className="j-card-hdr">
-        <span className="j-card-title">{title}</span>
-        <span className="j-card-sub">{subtitle}</span>
-      </div>
-      <div className="j-bullet-list">
-        {items.map((val, i) => (
-          <div key={i} className="j-bullet-row">
-            <span className="j-bullet-dot" />
-            {readOnly ? (
-              <span className="j-bullet-text">{val || '—'}</span>
-            ) : (
-              <input
-                className="j-bullet-input"
-                value={val}
-                onChange={e => setItem(i, e.target.value)}
-                placeholder={placeholder}
-              />
-            )}
-          </div>
-        ))}
-        {!readOnly && allFilled && (
-          <button className="j-add-btn" onClick={() => onChange([...items, ''])}>
-            <JIcoPlus /> Add
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tomorrow's focus card ──────────────────────────────────────────
-function FocusCard({ value, onChange }) {
-  return (
-    <div className="j-card j-card-focus">
-      <div className="j-card-hdr">
-        <span className="j-card-title">Tomorrow's Focus</span>
-      </div>
-      {onChange ? (
-        <input
-          className="j-focus-input"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="My #1 priority tomorrow is..."
-        />
-      ) : (
-        <p className="j-focus-text">{value || '—'}</p>
-      )}
-    </div>
-  );
-}
-
 // ─── Inline icons ───────────────────────────────────────────────────
-function JMoodIcon({ id, active }) {
-  const c = active ? '#fff' : (MOODS.find(m => m.id === id)?.color ?? '#64748b');
-  const p = { fill: 'none', stroke: c, strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' };
-  switch (id) {
-    case 'energized':
-      return <svg width="14" height="14" viewBox="0 0 24 24" {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
-    case 'focused':
-      return <svg width="14" height="14" viewBox="0 0 24 24" {...p}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-1.04z"/></svg>;
-    case 'neutral':
-      return <svg width="14" height="14" viewBox="0 0 24 24" {...p}><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-    case 'tired':
-      return <svg width="14" height="14" viewBox="0 0 24 24" {...p}><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/></svg>;
-    case 'stressed':
-      return <svg width="14" height="14" viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
-    default: return null;
-  }
-}
-
 function JIcoFlame() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -383,14 +238,6 @@ function JIcoCheck() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"/>
-    </svg>
-  );
-}
-
-function JIcoPlus() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
   );
 }
