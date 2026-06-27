@@ -177,14 +177,14 @@ function fmtDue(dateStr) {
   const diff  = Math.round((due - today) / 86400000);
   if (diff < 0) {
     const label = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return { text: `Overdue · ${label}`, overdue: true,  color: '#ef4444' };
+    return { text: label, overdue: true, color: '#ef4444', fontWeight: 600 };
   }
-  if (diff === 0) return { text: 'Due today',    overdue: false, color: '#f59e0b' };
-  if (diff === 1) return { text: 'Due tomorrow', overdue: false, color: '#94a3b8' };
-  if (diff <= 7)  return { text: `In ${diff} days`, overdue: false, color: '#94a3b8' };
+  if (diff === 0) return { text: 'Today',    overdue: false, color: '#f59e0b', fontWeight: 600 };
+  if (diff === 1) return { text: 'Tomorrow', overdue: false, color: '#f59e0b', fontWeight: 600 };
+  if (diff <= 7)  return { text: `In ${diff} days`, overdue: false, color: 'var(--text-secondary)', fontWeight: 500 };
   return {
     text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    overdue: false, color: '#64748b',
+    overdue: false, color: 'var(--text-secondary)', fontWeight: 500,
   };
 }
 
@@ -212,6 +212,279 @@ function displayName(name) {
 }
 
 const ALL_CATS_STATIC = Object.keys(CAT_META);
+
+function TaskRow({
+  task,
+  isDone,
+  activeTaskId,
+  timerRunning,
+  confirmDeleteId,
+  setConfirmDeleteId,
+  kebabOpenId,
+  setKebabOpenId,
+  openDetail,
+  onToggle,
+  onDelete,
+  onQuickUpdate,
+  onUpdate,
+  setShowDatePicker,
+  ALL_CATS,
+  handleNewList,
+}) {
+  const meta = CAT_META[task.category] ?? CAT_META.work;
+  const isActive = task.id === activeTaskId;
+  const isConfirming = confirmDeleteId === task.id;
+  const due = fmtDue(task.dueDate);
+  const isOverdue = !isDone && due?.overdue;
+  const isHighPri = !isDone && task.priority === 'high';
+
+  // Priority gets a clearly visible left border accent (4px) as the single glanceable signal for high priority tasks
+  const cardBorderLeft = isHighPri ? '4px solid #f59e0b' : '4px solid transparent';
+
+  return (
+    <motion.div
+      key={task.id}
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -16 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className={`linear-task-row${isActive ? ' task-active' : ''}${isDone ? ' item-completed' : ''}`}
+      onClick={() => { if (!isConfirming) openDetail(task); }}
+      title={timerRunning && !isActive && !isConfirming ? 'Pause timer to switch tasks' : undefined}
+      style={{ borderLeft: cardBorderLeft }}
+    >
+      {isConfirming ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Delete this task?</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
+              onClick={e => { e.stopPropagation(); onDelete(task.id); setConfirmDeleteId(null); }}>Yes</button>
+            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
+              onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Checkbox */}
+          <div
+            className={`linear-checkbox${isDone ? ' checked' : ''}`}
+            onClick={e => { e.stopPropagation(); onToggle(task.id); }}
+            aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
+          >
+            {isDone ? '✓' : ''}
+          </div>
+
+          {/* Task Title (Flexible width, wins layout fight) */}
+          <div className="linear-task-title-container">
+            <span className="linear-task-title" title={task.name}>{displayName(task.name)}</span>
+          </div>
+
+          {/* Inline Icons (recurrence, subtasks, attachments, notes, time logged, pomodoros, conflict) */}
+          <div className="linear-task-icons">
+            {task.recurrence && (
+              <span className="linear-inline-meta" title={`Repeats ${task.recurrence}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="17 1 21 5 17 9"/>
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                  <polyline points="7 23 3 19 7 15"/>
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+              </span>
+            )}
+            {task.subtasks?.length > 0 && (
+              <span className="linear-inline-meta" title={`Subtasks: ${task.subtasks.filter(s => s.completed).length}/${task.subtasks.length}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                </svg>
+                <span>{task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}</span>
+              </span>
+            )}
+            {task.attachments?.length > 0 && (
+              <span className="linear-inline-meta" title={`${task.attachments.length} attachment${task.attachments.length > 1 ? 's' : ''}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                </svg>
+                <span>{task.attachments.length}</span>
+              </span>
+            )}
+            {task.timeLogged > 0 && (
+              <span className="linear-inline-meta" title={`Time logged: ${fmtTime(task.timeLogged)}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span>{fmtTime(task.timeLogged)}</span>
+              </span>
+            )}
+            {task.pomodorosCompleted > 0 && (
+              <span className="linear-inline-meta" title={`Pomodoros completed: ${task.pomodorosCompleted}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/>
+                </svg>
+                <span>{task.pomodorosCompleted}</span>
+              </span>
+            )}
+            {task.notes && (
+              <span className="linear-inline-meta tc-notes-icon" title={task.notes.length > 120 ? task.notes.slice(0, 120) + '…' : task.notes} aria-label="Has notes">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+              </span>
+            )}
+            {task.syncConflict && (
+              <span className="linear-inline-meta" style={{ color: 'var(--color-amber, #f59e0b)' }} title={task.syncConflict}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span>Conflict</span>
+              </span>
+            )}
+          </div>
+
+          {/* Category (Small muted badge, lower visual weight) */}
+          <div className="linear-task-cat">
+            <span className="linear-cat-badge">
+              <span className="linear-cat-badge-dot" style={{ background: meta.color }} />
+              {meta.label}
+            </span>
+          </div>
+
+          {/* Date (Left-aligned plain text in fixed-width column with urgency coloring) */}
+          <div className="linear-task-due" style={{ color: !isDone ? due?.color : undefined, fontWeight: !isDone ? due?.fontWeight : undefined }}>
+            {due ? due.text : ''}
+          </div>
+
+          {/* Actions (Star & Kebab menu, shrunk to fit row height) */}
+          <div className="linear-task-actions">
+            {/* Star Button */}
+            <button
+              type="button"
+              className="linear-action-btn star-btn"
+              style={{ color: task.starred ? 'var(--color-amber, #f59e0b)' : 'var(--text-secondary)' }}
+              onClick={e => { e.stopPropagation(); (onQuickUpdate || onUpdate)({ ...task, starred: !task.starred }); }}
+              aria-label={task.starred ? 'Unstar task' : 'Star task'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={task.starred ? 'var(--color-amber, #f59e0b)' : 'none'} stroke={task.starred ? 'var(--color-amber, #f59e0b)' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
+
+            {/* Kebab Menu Button */}
+            <button
+              type="button"
+              className="linear-action-btn kebab-btn"
+              style={{ background: kebabOpenId === task.id ? 'var(--bg-hover)' : 'transparent', color: 'var(--text-secondary)' }}
+              onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
+              aria-label="More actions"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+              </svg>
+            </button>
+
+            {/* Dropdown Menu */}
+            {kebabOpenId === task.id && (
+              <div
+                className="kebab-dropdown-menu"
+                style={{
+                  position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
+                  background: '#0f172a', border: '1px solid var(--border-strong)',
+                  borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', padding: '8px 0',
+                  display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
+                  color: '#f8fafc', fontSize: '0.9rem'
+                }}
+              >
+                <button
+                  type="button"
+                  className="kebab-menu-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => setShowDatePicker(true), 120); }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Add deadline
+                </button>
+                <button
+                  type="button"
+                  className="kebab-menu-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+                  Add a subtask
+                </button>
+                <button
+                  type="button"
+                  className="kebab-menu-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  Add attachment
+                </button>
+                <button
+                  type="button"
+                  className="kebab-menu-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  Delete
+                </button>
+
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
+
+                {/* List selection */}
+                {ALL_CATS.map(catKey => {
+                  const isCur = task.category === catKey;
+                  return (
+                    <button
+                      key={catKey}
+                      type="button"
+                      className="kebab-menu-item"
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                      onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isCur && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </span>
+                      {CAT_META[catKey]?.label}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  className="kebab-menu-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  onClick={e => { e.stopPropagation(); handleNewList(task); }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  New list
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}
 
 export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
   const [customCats, setCustomCats] = useState(() => {
@@ -424,239 +697,33 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     return c;
   }, [tasks]);
 
-  // Border-color precedence: overdue > high-priority > none (single source of truth)
-  const cardBorderColor = (isOverdue, isHighPri) => {
-    if (isOverdue)  return '3px solid #ef4444';
-    if (isHighPri)  return '3px solid #f59e0b';
-    return undefined;
-  };
-
-  const renderTask = (task, isDone) => {
-    const meta         = CAT_META[task.category] ?? CAT_META.work;
-    const isActive     = task.id === activeTaskId;
-    const isConfirming = confirmDeleteId === task.id;
-    const due          = fmtDue(task.dueDate);
-    const isOverdue    = !isDone && due?.overdue;
-    const isHighPri    = !isDone && task.priority === 'high';
-
-    // Single authoritative border rule: overdue > high-priority > none
-    const cardBorderLeft = cardBorderColor(isOverdue, isHighPri);
-
-    return (
-      <motion.div
-        key={task.id}
-        layout
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, x: -16 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
-        className={`sunsama-item${isActive ? ' task-active' : ''}${isDone ? ' item-completed sunsama-check-anim' : ''}${isOverdue ? ' task-overdue' : ''}`}
-        onClick={() => { if (!isConfirming) openDetail(task); }}
-        title={timerRunning && !isActive && !isConfirming ? 'Pause timer to switch tasks' : undefined}
-        style={{ borderLeft: cardBorderLeft }}
-      >
-        {isConfirming ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Delete this task?</span>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <button style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
-                onClick={e => { e.stopPropagation(); onDelete(task.id); setConfirmDeleteId(null); }}>Yes</button>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
-                onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="sunsama-item-left">
-              <div
-                className={`sunsama-checkbox${isDone ? ' checked' : ''}`}
-                onClick={e => { e.stopPropagation(); onToggle(task.id); }}
-                aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
-              >
-                {isDone ? '✓' : ''}
-              </div>
-
-              <div className="sunsama-item-content">
-                {/* Primary row: title + ONE status badge */}
-                <div className="tc-row-primary">
-                  <span className="sunsama-item-title" title={task.name}>{displayName(task.name)}</span>
-                  {isOverdue && <span className="tc-badge tc-badge-overdue">⚠️ Overdue</span>}
-                  {isHighPri && !isOverdue && <span className="tc-badge tc-badge-highpri">🔥 High Priority</span>}
-                </div>
-
-                {/* Secondary row: descriptive meta only (no urgency/priority duplication) */}
-                <div className="tc-row-secondary">
-                  <div className="tc-meta-left">
-                    <span className="sunsama-meta-tag" style={{ color: meta.color }}>{meta.label}</span>
-                    {task.recurrence && (
-                      <span className="sunsama-meta-text">🔁 {task.recurrence}</span>
-                    )}
-                    {task.subtasks?.length > 0 && (
-                      <span className="sunsama-meta-text">☑️ {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}</span>
-                    )}
-                    {task.attachments?.length > 0 && (
-                      <span className="sunsama-meta-text">📎 {task.attachments.length}</span>
-                    )}
-                    {task.timeLogged > 0 && (
-                      <span className="sunsama-meta-text">⏱ {fmtTime(task.timeLogged)}</span>
-                    )}
-                    {task.pomodorosCompleted > 0 && (
-                      <span className="sunsama-meta-text">🍅 {task.pomodorosCompleted}</span>
-                    )}
-                    {task.notes && (
-                      <span className="tc-notes-icon" title={task.notes.length > 120 ? task.notes.slice(0, 120) + '…' : task.notes} aria-label="Has notes">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                          <polyline points="14 2 14 8 20 8"/>
-                          <line x1="16" y1="13" x2="8" y2="13"/>
-                          <line x1="16" y1="17" x2="8" y2="17"/>
-                          <polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                      </span>
-                    )}
-                    {task.syncConflict && (
-                      <span className="sunsama-meta-text" style={{ color: '#f59e0b' }} title={task.syncConflict}>⚠️ Conflict</span>
-                    )}
-                  </div>
-                  {due && (
-                    <span className="tc-due" style={{ color: due.overdue ? '#ef4444' : due.color, fontWeight: due.overdue ? 600 : 500 }}>
-                      {due.text}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="sunsama-item-right" style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
-              {/* Star Button */}
-              <button
-                className="task-action-btn star-btn"
-                style={{ background: 'transparent', border: 'none', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: task.starred ? '#f59e0b' : 'var(--text-secondary)' }}
-                onClick={e => { e.stopPropagation(); (onQuickUpdate || onUpdate)({ ...task, starred: !task.starred }); }}
-                aria-label={task.starred ? 'Unstar task' : 'Star task'}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill={task.starred ? '#f59e0b' : 'none'} stroke={task.starred ? '#f59e0b' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-              </button>
-
-              {/* Kebab Menu Button */}
-              <button
-                className="task-action-btn kebab-btn"
-                style={{ background: kebabOpenId === task.id ? 'var(--bg-surface)' : 'transparent', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-                onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
-                aria-label="More actions"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-                </svg>
-              </button>
-
-              {/* Dropdown Menu */}
-              {kebabOpenId === task.id && (
-                <div
-                  className="kebab-dropdown-menu"
-                  style={{
-                    position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
-                    background: '#0f172a', border: '1px solid var(--border-strong)',
-                    borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', padding: '8px 0',
-                    display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
-                    color: '#f8fafc', fontSize: '0.9rem'
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => setShowDatePicker(true), 120); }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    Add deadline
-                  </button>
-                  <button
-                    type="button"
-                    className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
-                    Add a subtask
-                  </button>
-                  <button
-                    type="button"
-                    className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    Add attachment
-                  </button>
-                  <button
-                    type="button"
-                    className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                    Delete
-                  </button>
-
-                  <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
-
-                  {/* List selection */}
-                  {ALL_CATS.map(catKey => {
-                    const isCur = task.category === catKey;
-                    return (
-                      <button
-                        key={catKey}
-                        type="button"
-                        className="kebab-menu-item"
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                        onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {isCur && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                        </span>
-                        {CAT_META[catKey]?.label}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    className="kebab-menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                    onClick={e => { e.stopPropagation(); handleNewList(task); }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                    New list
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </motion.div>
-    );
-  };
+  const renderTask = (task, isDone) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      isDone={isDone}
+      activeTaskId={activeTaskId}
+      timerRunning={timerRunning}
+      confirmDeleteId={confirmDeleteId}
+      setConfirmDeleteId={setConfirmDeleteId}
+      kebabOpenId={kebabOpenId}
+      setKebabOpenId={setKebabOpenId}
+      openDetail={openDetail}
+      onToggle={onToggle}
+      onDelete={onDelete}
+      onQuickUpdate={onQuickUpdate}
+      onUpdate={onUpdate}
+      setShowDatePicker={setShowDatePicker}
+      ALL_CATS={ALL_CATS}
+      handleNewList={handleNewList}
+    />
+  );
 
   return (
-    <div className="task-list-panel today-3col-container" style={{ background: 'transparent', border: 'none' }}>
+    <div className="task-list-panel today-3col-container" style={{ background: 'transparent', border: 'none', gap: 16 }}>
       
       {/* ── GREETING ROW (Mimicking Today Layout) ── */}
-      <div className="yartu-greeting-row" style={{ marginBottom: 28 }}>
+      <div className="yartu-greeting-row" style={{ marginBottom: 0 }}>
         <div className="yartu-greeting-left">
           <h1 className="yartu-greeting-title">Task Management 🎯</h1>
           <div className="yartu-summary-strip">
@@ -746,197 +813,154 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         </div>
       </div>
 
-      {/* ── 2-COLUMN TASK MANAGEMENT DASHBOARD ── */}
-      <div className="tasks-2col-grid">
+      {/* ── STACKED TASK MANAGEMENT DASHBOARD ── */}
+      <div className="tasks-stacked-layout" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minWidth: 0 }}>
         
-        {/* ── LEFT COLUMN: FILTERS, SEARCH & STATS (Narrow Sidebar) ── */}
-        <div className="today-col col-left">
+        {/* 1. HORIZONTAL PANEL: COMPACT OVERVIEW (CATEGORIES + SEARCH) */}
+        <div className="yartu-card horizontal-overview-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', width: '100%', boxSizing: 'border-box' }}>
           
-          {/* Card 1: COMBINED OVERVIEW CARD (White card, padding, rounded corners) */}
-          <div className="yartu-card" style={{ gap: 24 }}>
-            
-            {/* Categories & Filters */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="yartu-card-hdr">
-                <span className="yartu-card-title">Categories</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Filter tasks</span>
-              </div>
-              <div className="yartu-list" style={{ gap: 8 }}>
+          {/* Categories Row */}
+          <div className="compact-cats-container" style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4, flexShrink: 0 }}>Categories:</span>
+            <button
+              type="button"
+              className={`cat-pill-btn${catFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setCatFilter('all')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 14, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', margin: 0, width: 'fit-content', boxSizing: 'border-box', flexShrink: 0,
+                background: catFilter === 'all' ? '#6366f1' : 'var(--bg-base)',
+                color: catFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                border: '1px solid ' + (catFilter === 'all' ? '#6366f1' : 'var(--border)'),
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>All Tasks</span>
+              <span style={{ background: catFilter === 'all' ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{tasks.filter(t => !t.completed).length}</span>
+            </button>
+            {ALL_CATS.map(cat => {
+              const meta = CAT_META[cat];
+              const count = catCounts[cat] || 0;
+              const isActive = catFilter === cat;
+              const hasContent = count > 0;
+              if (!hasContent && !isActive) return null;
+              return (
                 <button
+                  key={cat}
                   type="button"
-                  className={`cat-filter-btn${catFilter === 'all' ? ' active' : ''}`}
-                  onClick={() => setCatFilter('all')}
+                  className={`cat-pill-btn${isActive ? ' active' : ''}`}
+                  onClick={() => setCatFilter(cat)}
                   style={{
-                    height: 36, padding: '0 16px', borderRadius: 12, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', margin: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box', width: '100%',
-                    background: catFilter === 'all' ? '#6366f1' : 'var(--bg-base)',
-                    color: catFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-                    border: '1px solid ' + (catFilter === 'all' ? '#6366f1' : 'var(--border)'),
+                    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 14, fontSize: '0.8rem', fontWeight: isActive || hasContent ? 600 : 500, cursor: 'pointer', margin: 0, width: 'fit-content', boxSizing: 'border-box', flexShrink: 0,
+                    background: isActive ? meta.color : 'var(--bg-base)',
+                    color: isActive ? '#fff' : hasContent ? 'var(--text-primary)' : 'var(--text-muted, #94a3b8)',
+                    border: '1px solid ' + (isActive ? meta.color : hasContent ? 'var(--border-strong, #cbd5e1)' : 'var(--border-light, #e2e8f0)'),
+                    opacity: isActive || hasContent ? 1 : 0.65,
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <span>All Tasks</span>
-                  <span style={{ background: catFilter === 'all' ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '2px 8px', borderRadius: 10, fontSize: '0.8rem' }}>{tasks.filter(t => !t.completed).length}</span>
-                </button>
-                {ALL_CATS.map(cat => {
-                  const meta = CAT_META[cat];
-                  const count = catCounts[cat] || 0;
-                  const isActive = catFilter === cat;
-                  const hasContent = count > 0;
-                  if (!hasContent && !isActive) return null;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      className={`cat-filter-btn${isActive ? ' active' : ''}`}
-                      onClick={() => setCatFilter(cat)}
-                      style={{
-                        height: 36, padding: '0 16px', borderRadius: 12, fontSize: '0.88rem', fontWeight: isActive || hasContent ? 600 : 500, cursor: 'pointer', margin: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box', width: '100%',
-                        background: isActive ? meta.color : 'var(--bg-base)',
-                        color: isActive ? '#fff' : hasContent ? 'var(--text-primary)' : 'var(--text-muted, #94a3b8)',
-                        border: '1px solid ' + (isActive ? meta.color : hasContent ? 'var(--border-strong, #cbd5e1)' : 'var(--border-light, #e2e8f0)'),
-                        opacity: isActive || hasContent ? 1 : 0.65,
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: isActive ? '#fff' : meta.color }} />
-                        <span>{meta.label}</span>
-                      </div>
-                      <span style={{ background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '2px 8px', borderRadius: 10, fontSize: '0.8rem' }}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick Search */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, borderTop: '1px solid var(--border)', paddingTop: 24 }}>
-              <div className="yartu-card-hdr" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                <span className="yartu-card-title">Search Tasks</span>
-              </div>
-              <div className="task-search-wrap" style={{ position: 'relative' }}>
-                <svg className="task-search-icon" style={{ position: 'absolute', left: 14, top: 13, color: 'var(--text-secondary)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <input
-                  ref={searchRef}
-                  className="task-search-input"
-                  style={{ width: '100%', padding: '10px 14px 10px 40px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '12px', fontSize: '0.95rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  aria-label="Search tasks"
-                />
-                {query && (
-                  <button className="task-search-clear" style={{ position: 'absolute', right: 14, top: 12, background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Task Progress */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, borderTop: '1px solid var(--border)', paddingTop: 24 }}>
-              <div className="yartu-card-hdr stacked" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                <span className="yartu-card-title">Completion Rate</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>All tasks</span>
-              </div>
-              <div className="yartu-rings-row" style={{ padding: '10px 0', justifyContent: 'center' }}>
-                <div className="yartu-ring-card" style={{ width: '100%', alignItems: 'center' }}>
-                  <div className="yartu-ring-wrap">
-                    <svg width="76" height="76" viewBox="0 0 76 76" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="38" cy="38" r="32" fill="none" stroke="var(--ring-track)" strokeWidth="6" />
-                      <circle cx="38" cy="38" r="32" fill="none" stroke="var(--accent)" strokeWidth="6" strokeDasharray="201" strokeDashoffset={201 - (201 * Math.round((completed.length / (tasks.length || 1)) * 100)) / 100} strokeLinecap="round" />
-                    </svg>
-                    <span className="yartu-ring-val">{Math.round((completed.length / (tasks.length || 1)) * 100)}%</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#fff' : meta.color }} />
+                    <span>{meta.label}</span>
                   </div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: 8 }}>{completed.length} of {tasks.length} tasks completed</span>
-                </div>
-              </div>
-            </div>
+                  <span style={{ background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
 
+          {/* Search Bar Row */}
+          <div className="task-search-wrap" style={{ position: 'relative', marginTop: 0, marginBottom: 0, width: '100%' }}>
+            <svg className="task-search-icon" style={{ position: 'absolute', left: 14, top: 11, color: 'var(--text-secondary)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              ref={searchRef}
+              className="task-search-input"
+              style={{ width: '100%', height: 38, padding: '8px 14px 8px 40px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+              type="text"
+              placeholder="Search tasks by title..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              aria-label="Search tasks"
+            />
+            {query && (
+              <button className="task-search-clear" style={{ position: 'absolute', right: 12, top: 10, background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
           </div>
 
         </div>
 
-
-        {/* ── RIGHT COLUMN: MAIN CONTENT (Unified Tasks List & Completed) ── */}
-        <div className="today-col col-mid" style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', minWidth: 0 }}>
-          
-          {/* Card 4: UNIFIED PENDING TASKS */}
-          <div className="yartu-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div className="yartu-card-hdr">
-              <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
-              <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
-            </div>
-            <div className="yartu-list" style={{ padding: '16px', flex: 1, gap: 12 }}>
-              
-              {/* Quick Add Input */}
-              {inlineAddCat === 'top' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.1)', marginBottom: 8 }}>
-                  <input
-                    autoFocus
-                    type="text"
-                    value={inlineAddText}
-                    onChange={e => setInlineAddText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        handleInlineAdd(catFilter === 'all' ? 'work' : catFilter);
-                      } else if (e.key === 'Escape') {
-                        setInlineAddCat(null);
-                        setInlineAddText('');
-                      }
-                    }}
-                    onBlur={() => handleInlineAdd(catFilter === 'all' ? 'work' : catFilter)}
-                    placeholder={`Add a task to ${catFilter === 'all' ? 'Work' : CAT_META[catFilter]?.label}...`}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none', fontSize: '0.95rem' }}
-                  />
-                </div>
-              )}
-
-              <div className="sunsama-list" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {pending.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-faint)', background: 'var(--bg-base)', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.95rem' }}>
-                    No pending tasks in this view. Click "＋ Quick Add" above to create one!
-                  </div>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {pending.map(task => renderTask(task, false))}
-                  </AnimatePresence>
-                )}
-              </div>
-
-            </div>
+        {/* 2. PENDING TASKS (FULL WIDTH) */}
+        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 12 }}>
+          <div className="yartu-card-hdr">
+            <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
+            <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
           </div>
+          <div className="yartu-list" style={{ padding: '8px 0 0 0', flex: 1, gap: 12 }}>
+            
+            {/* Quick Add Input */}
+            {inlineAddCat === 'top' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.1)', marginBottom: 8 }}>
+                <input
+                  autoFocus
+                  type="text"
+                  value={inlineAddText}
+                  onChange={e => setInlineAddText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      handleInlineAdd(catFilter === 'all' ? 'work' : catFilter);
+                    } else if (e.key === 'Escape') {
+                      setInlineAddCat(null);
+                      setInlineAddText('');
+                    }
+                  }}
+                  onBlur={() => handleInlineAdd(catFilter === 'all' ? 'work' : catFilter)}
+                  placeholder={`Add a task to ${catFilter === 'all' ? 'Work' : CAT_META[catFilter]?.label}...`}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none', fontSize: '0.95rem' }}
+                />
+              </div>
+            )}
 
-          {/* Card 5: COMPLETED TASKS */}
-          <div className="yartu-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="yartu-card-hdr">
-              <span className="yartu-card-title">Completed ({completed.length})</span>
-              {completed.length > 0 && (
-                <button className="yartu-card-action" onClick={onClearCompleted} style={{ color: '#ef4444' }}>Clear all</button>
-              )}
-            </div>
-            <div className="yartu-list" style={{ padding: '16px' }}>
-              {completed.length === 0 ? (
-                <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', background: 'var(--bg-base)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  No completed tasks yet
+            <div className="linear-task-list-container">
+              {pending.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-faint)', background: 'var(--bg-base)', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '0.95rem' }}>
+                  No pending tasks in this view. Click "＋ Quick Add" above to create one!
                 </div>
               ) : (
-                <div className="sunsama-list" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <AnimatePresence initial={false}>
-                    {completed.map(task => renderTask(task, true))}
-                  </AnimatePresence>
-                </div>
+                <AnimatePresence initial={false}>
+                  {pending.map(task => renderTask(task, false))}
+                </AnimatePresence>
               )}
             </div>
-          </div>
 
+          </div>
+        </div>
+
+        {/* 3. COMPLETED TASKS (FULL WIDTH) */}
+        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 12 }}>
+          <div className="yartu-card-hdr">
+            <span className="yartu-card-title">Completed ({completed.length})</span>
+            {completed.length > 0 && (
+              <button className="yartu-card-action" onClick={onClearCompleted} style={{ color: '#ef4444' }}>Clear all</button>
+            )}
+          </div>
+          <div className="yartu-list" style={{ padding: '8px 0 0 0' }}>
+            {completed.length === 0 ? (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', background: 'var(--bg-base)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                No completed tasks yet
+              </div>
+            ) : (
+              <div className="linear-task-list-container">
+                <AnimatePresence initial={false}>
+                  {completed.map(task => renderTask(task, true))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
         </div>
 
       </div>

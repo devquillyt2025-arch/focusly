@@ -968,7 +968,7 @@ export default function App() {
         <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
-          className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}`}
+          className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}${activeTab === 'calendar' ? ' calendar-tab-active' : ''}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
@@ -1057,6 +1057,7 @@ export default function App() {
             <CalendarView
               tasks={tasks}
               onAddTask={addTask}
+              onUpdateTask={updateTaskData}
               trackers={trackers}
               habits={habits}
             />

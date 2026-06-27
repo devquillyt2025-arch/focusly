@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { computeGlobalStats, computeHabitStreaks } from '../trackers/trackerUtils';
 import { calculateDailyScore } from '../trackers/analyticsUtils';
+import Select from './Select';
 
 export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClose, onSave }) {
   const [step, setStep] = useState(1);
@@ -175,12 +176,15 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
 
               <div className="form-group" style={{ marginTop: 16 }}>
                 <label>Set one target to focus on</label>
-                <select className="modal-input" value={selectedTarget} onChange={e => setSelectedTarget(e.target.value)}>
-                  <option value="">-- Select a target --</option>
-                  {trackers.filter(t => t.type === 'target').map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                <Select 
+                  className="modal-input" 
+                  value={selectedTarget} 
+                  onChange={e => setSelectedTarget(e.target.value)}
+                  options={[
+                    { value: '', label: '-- Select a target --' },
+                    ...trackers.filter(t => t.type === 'target').map(t => ({ value: t.id, label: t.name })),
+                  ]}
+                />
                 {trackers.filter(t => t.type === 'target').length === 0 && <span style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 4 }}>No targets found.</span>}
               </div>
             </div>

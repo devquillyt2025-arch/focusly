@@ -527,7 +527,7 @@ input, textarea, select { font-family: inherit; }
 /* ═══════════════════════════════════════════════════════════════════
    TASK LIST PANEL
    ═══════════════════════════════════════════════════════════════════ */
-.task-list-panel { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden; box-sizing: border-box; }
+.task-list-panel { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 100%; min-width: 0; overflow: visible; box-sizing: border-box; }
 
 .tl-header {
   padding: 14px 16px 10px;
@@ -1425,7 +1425,7 @@ kbd {
   width: 100%; max-width: 100%; margin: 0 auto; box-sizing: border-box;
 }
 
-.tasks-tab { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden; box-sizing: border-box; }
+.tasks-tab { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 100%; min-width: 0; overflow: visible; box-sizing: border-box; }
 
 /* ═══════════════════════════════════════════════════════════════════
    GOALS LAYOUT
@@ -2996,7 +2996,7 @@ select.modal-input {
   width: 100%;
   max-width: 1600px;
   min-width: 0;
-  overflow-x: hidden;
+  overflow: visible;
   margin: 0 auto;
   padding: 32px 36px 80px;
   gap: 40px;
@@ -3010,6 +3010,16 @@ select.modal-input {
   .sunsama-tab-transition.yartu-tab-active {
     padding: 24px 16px 80px;
   }
+}
+
+/* Full-width, unpadded workspace for Calendar */
+.sunsama-tab-transition.calendar-tab-active {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
 }
 
 @keyframes checkmarkFade {
@@ -3286,7 +3296,7 @@ select.modal-input {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: hidden;
+  overflow: visible;
   box-sizing: border-box;
   margin: 0 auto;
   padding: 0;
@@ -3851,4 +3861,185 @@ select.modal-input {
   color: var(--border-strong);
   font-size: 0.9rem;
   user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LINEAR / SUPERHUMAN DENSE TASK LIST ROW
+   ═══════════════════════════════════════════════════════════════════ */
+.linear-task-list-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.linear-task-row {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 12px 0 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s ease;
+  cursor: pointer;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+.linear-task-row:last-child {
+  border-bottom: none;
+}
+.linear-task-row:hover {
+  background: var(--bg-hover);
+}
+.linear-task-row.task-active {
+  background: var(--accent-glow2, rgba(99, 102, 241, 0.15));
+}
+.linear-task-row.item-completed {
+  opacity: 0.55;
+  background: var(--bg-base);
+}
+
+/* Checkbox shrunk to fit row height */
+.linear-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-left: 12px;
+  border-radius: 4px;
+  border: 2px solid var(--border-strong, #cbd5e1);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.linear-checkbox:hover {
+  border-color: var(--accent, #2563eb);
+}
+.linear-checkbox.checked {
+  background: var(--accent, #0f172a);
+  border-color: var(--accent, #0f172a);
+}
+
+/* Task Title Container (Flexible width, wins layout fight) */
+.linear-task-title-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.linear-task-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.linear-task-row.item-completed .linear-task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+/* Inline Icons */
+.linear-task-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.linear-inline-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.linear-inline-meta svg {
+  color: var(--text-muted);
+}
+
+/* Category Badge (Small muted badge, lower visual weight) */
+.linear-task-cat {
+  width: 90px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.linear-cat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.linear-cat-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Date (Left-aligned plain text in fixed-width column) */
+.linear-task-due {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions (Star & Kebab menu, shrunk to fit row height) */
+.linear-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  position: relative;
+}
+.linear-action-btn {
+  background: transparent;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  padding: 0;
+}
+.linear-action-btn:hover {
+  background: var(--bg-hover);
+}
+
+/* Ensure horizontal overview panel stacks Row 1 and Row 2 perfectly */
+.horizontal-overview-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
 }

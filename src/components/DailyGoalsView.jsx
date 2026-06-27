@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import DailyIntentions from './DailyIntentions';
+import Select from './Select';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   isScheduledToday, isLoggedToday, getLogForDate,
@@ -175,10 +176,24 @@ export default function DailyGoalsView({
           <div className="yartu-card">
             <div className="yartu-card-hdr">
               <span className="yartu-card-title">Tasks</span>
-              <select className="yartu-card-select" value={taskRange} onChange={e => setTaskRange(e.target.value)}>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-              </select>
+              <Select 
+                className="yartu-card-select" 
+                value={taskRange} 
+                onChange={e => setTaskRange(e.target.value)}
+                options={[
+                  { value: 'today', label: 'Today' },
+                  { value: 'week', label: 'This Week' },
+                ]}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.8rem',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  width: '100px'
+                }}
+              />
             </div>
             <div className="yartu-list">
               {displayedTasks.length === 0 ? (

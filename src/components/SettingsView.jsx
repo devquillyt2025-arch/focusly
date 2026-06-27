@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksSync';
+import Select from './Select';
 
 const PRESETS = [
   { label: 'Standard',  sub: '25/5/15',  vals: { focusDuration: 25, shortDuration: 5,  longDuration: 15 } },
@@ -295,17 +296,29 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         <div style={{ display: 'flex', gap: 24, marginTop: 16, marginBottom: 28, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Theme</label>
-            <select className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={theme} onChange={e => onSetTheme(e.target.value)}>
-              <option value="dark">Dark Mode</option>
-              <option value="light">Light Mode</option>
-            </select>
+            <Select 
+              className="form-inp" 
+              style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} 
+              value={theme} 
+              onChange={e => onSetTheme(e.target.value)}
+              options={[
+                { value: 'dark', label: 'Dark Mode' },
+                { value: 'light', label: 'Light Mode' },
+              ]}
+            />
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
             <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Week starts on</label>
-            <select className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={weekStart} onChange={e => setWeekStart(e.target.value)}>
-              <option value="monday">Monday</option>
-              <option value="sunday">Sunday</option>
-            </select>
+            <Select 
+              className="form-inp" 
+              style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} 
+              value={weekStart} 
+              onChange={e => setWeekStart(e.target.value)}
+              options={[
+                { value: 'monday', label: 'Monday' },
+                { value: 'sunday', label: 'Sunday' },
+              ]}
+            />
           </div>
         </div>
 
