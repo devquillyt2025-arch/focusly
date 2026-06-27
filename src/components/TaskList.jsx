@@ -469,58 +469,54 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               </div>
 
               <div className="sunsama-item-content">
-                <div className="sunsama-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>{displayName(task.name)}</span>
+                {/* Primary row: title + status badge */}
+                <div className="tc-row-primary">
+                  <span className="sunsama-item-title">{displayName(task.name)}</span>
                   {isOverdue && (
-                    <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '2px 8px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      ⚠️ Overdue
-                    </span>
+                    <span className="tc-badge tc-badge-overdue">⚠️ Overdue</span>
                   )}
                   {isHighPri && !isOverdue && (
-                    <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 8px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      🔥 High Priority
-                    </span>
+                    <span className="tc-badge tc-badge-highpri">🔥 High Priority</span>
                   )}
                 </div>
-                {task.notes && <div className="sunsama-item-notes">{task.notes}</div>}
-                <div className="sunsama-item-meta">
-                  <span className="sunsama-meta-tag" style={{ color: meta.color }}>
-                    {meta.label}
-                  </span>
-                  {task.priority && task.priority !== 'none' && (
-                    <span className="sunsama-meta-tag" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="pri-dot" style={{ background: PRI_COLOR[task.priority] ?? 'transparent', width: 6, height: 6, borderRadius: '50%', display: 'inline-block' }} />
-                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
-                    </span>
-                  )}
-                  {task.recurrence && (
-                    <span className="sunsama-meta-text">
-                      <span>🔁</span> <span>{task.recurrence}</span>
-                    </span>
-                  )}
-                  {task.subtasks?.length > 0 && (
-                    <span className="sunsama-meta-text">
-                      <span>☑️</span> <span>{task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}</span>
-                    </span>
-                  )}
-                  {task.attachments?.length > 0 && (
-                    <span className="sunsama-meta-text">
-                      <span>📎</span> <span>{task.attachments.length}</span>
-                    </span>
-                  )}
-                  {task.timeLogged > 0 && <span className="sunsama-meta-text"><span>⏱</span> <span>{fmtTime(task.timeLogged)}</span></span>}
-                  {task.pomodorosCompleted > 0 && <span className="sunsama-meta-text"><span>🍅</span> <span>{task.pomodorosCompleted}</span></span>}
+
+                {/* Secondary row: meta chips (left) + due date (right) */}
+                <div className="tc-row-secondary">
+                  <div className="tc-meta-left">
+                    <span className="sunsama-meta-tag" style={{ color: meta.color }}>{meta.label}</span>
+                    {task.priority && task.priority !== 'none' && (
+                      <span className="sunsama-meta-tag">
+                        <span className="pri-dot" style={{ background: PRI_COLOR[task.priority] ?? 'transparent', width: 6, height: 6, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />
+                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                      </span>
+                    )}
+                    {task.recurrence && (
+                      <span className="sunsama-meta-text">🔁 {task.recurrence}</span>
+                    )}
+                    {task.subtasks?.length > 0 && (
+                      <span className="sunsama-meta-text">☑️ {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}</span>
+                    )}
+                    {task.attachments?.length > 0 && (
+                      <span className="sunsama-meta-text">📎 {task.attachments.length}</span>
+                    )}
+                    {task.timeLogged > 0 && (
+                      <span className="sunsama-meta-text">⏱ {fmtTime(task.timeLogged)}</span>
+                    )}
+                    {task.pomodorosCompleted > 0 && (
+                      <span className="sunsama-meta-text">🍅 {task.pomodorosCompleted}</span>
+                    )}
+                    {task.notes && (
+                      <span className="tc-notes-preview">
+                        {task.notes.length > 55 ? task.notes.slice(0, 55) + '…' : task.notes}
+                      </span>
+                    )}
+                    {task.syncConflict && (
+                      <span className="sunsama-meta-text" style={{ color: '#f59e0b' }} title={task.syncConflict}>⚠️ Conflict</span>
+                    )}
+                  </div>
                   {due && (
-                    <span className="sunsama-meta-text" style={{
-                      color: due.color,
-                      ...(due.overdue ? { color: '#ef4444', fontWeight: '600' } : {}),
-                    }}>
+                    <span className="tc-due" style={{ color: due.overdue ? '#ef4444' : due.color, fontWeight: due.overdue ? 600 : 500 }}>
                       {due.text}
-                    </span>
-                  )}
-                  {task.syncConflict && (
-                    <span className="sunsama-meta-text" style={{ color: '#f59e0b' }} title={task.syncConflict}>
-                      <span>⚠️</span> <span>Sync Conflict</span>
                     </span>
                   )}
                 </div>
