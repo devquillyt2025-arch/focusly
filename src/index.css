@@ -70,12 +70,12 @@
 
 /* ─── Light theme overrides ──────────────────────────────────────── */
 :root[data-theme="light"] {
-  --bg-base:       #f7f7f7;
-  --bg-surface:    #ffffff;
-  --bg-elevated:   #fcfcfc;
+  --bg-base:       #ffffff;  /* page/content background — pure white */
+  --bg-surface:    #ffffff;  /* cards, header — pure white */
+  --bg-elevated:   #ffffff;  /* modals, popovers — pure white */
   --bg-card:       #ffffff;
   --bg-hover:      #f1f1f1;
-  --bg-sidebar:    #f7f7f7;
+  --bg-sidebar:    #fafafa;  /* nav sidebar — intentionally distinct from white content */
   --bg-input:      #ffffff;
 
   --text-primary:  #222222;
@@ -896,7 +896,6 @@ input, textarea, select { font-family: inherit; }
   transition: all 0.13s ease;
 }
 .tdp-pri-pill:hover { border-color: var(--accent); color: var(--text-secondary); }
-.tdp-pri-active { background: var(--accent) !important; color: #ffffff !important; border-color: var(--accent) !important; }
 
 .tdp-cat-select { position: relative; }
 .tdp-cat-trigger {
@@ -2946,12 +2945,12 @@ select.modal-input {
    Calm, single-focus, ritual-based daily planning
    ═══════════════════════════════════════════════════════════════════ */
 :root[data-theme="light"] .app-header {
-  background: var(--bg-base);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   padding: 0 36px;
 }
 :root[data-theme="light"] .main-nav {
-  background: var(--bg-base);
+  background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   width: 220px;
   min-width: 220px;
@@ -2973,11 +2972,11 @@ select.modal-input {
   color: var(--text-primary);
 }
 :root[data-theme="light"] .nav-active {
-  background: #ffffff !important;
+  background: var(--bg-surface) !important;
   color: #0f172a !important;
   font-weight: 600 !important;
   border: 1px solid var(--border) !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 :root[data-theme="light"] .nav-active .nav-icon {
   color: #2563eb;

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CAT_META } from './TaskList';
+import { CAT_META } from '../utils/categoryMeta';
 
 function fmtDur(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);

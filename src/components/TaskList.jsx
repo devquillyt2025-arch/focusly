@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CAT_META } from '../utils/categoryMeta';
+import { PRI_META } from '../utils/priorityMeta';
 
 // ── Calendar Date Picker ────────────────────────────────────────────────────
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -144,15 +146,7 @@ function CalendarDatePicker({ value, onChange, onClose }) {
   );
 }
 
-export const CAT_META = {
-  learning: { label: 'Learning', color: '#6366f1' },
-  fitness:  { label: 'Fitness',  color: '#10b981' },
-  mental:   { label: 'Mental',   color: '#f59e0b' },
-  work:     { label: 'Work',     color: '#3b82f6' },
-  growth:   { label: 'Growth',   color: '#ec4899' },
-};
 
-const PRI_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#64748b', none: 'transparent' };
 const PRI_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
 
 const SORT_OPTIONS = [
@@ -236,10 +230,8 @@ function TaskRow({
   const isConfirming = confirmDeleteId === task.id;
   const due = fmtDue(task.dueDate);
   const isOverdue = !isDone && due?.overdue;
-  const isHighPri = !isDone && task.priority === 'high';
-
-  // Priority gets a clearly visible left border accent (4px) as the single glanceable signal for high priority tasks
-  const cardBorderLeft = isHighPri ? '4px solid #f59e0b' : '4px solid transparent';
+  const priColor = !isDone && task.priority !== 'none' ? (PRI_META[task.priority]?.color ?? null) : null;
+  const cardBorderLeft = priColor ? `4px solid ${priColor}` : '4px solid transparent';
 
   return (
     <motion.div
@@ -679,21 +671,21 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
       base = base.filter(t => t.name.toLowerCase().includes(q));
     }
     // Sort applies to pending only; completed stays newest-completedAt-first
-    const pendingSorted   = base.filter(t => !t.completed).sort(sortFns[sortBy]);
-    const completedSorted = base.filter(t =>  t.completed)
+    const pendingSorted   = base.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).sort(sortFns[sortBy]);
+    const completedSorted = base.filter(t => t.status === 'completed' || (!t.status && t.completed))
                                 .sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
     return { pending: pendingSorted, completed: completedSorted };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, catFilter, sortBy, query]);
 
-  const pendingCount = tasks.filter(t => !t.completed).length;
+  const pendingCount = tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length;
 
   // Count pending tasks per category (always from full task list, ignoring current filter)
   const catCounts = useMemo(() => {
     const c = {};
-    for (const t of tasks) {
-      if (!t.completed) c[t.category] = (c[t.category] || 0) + 1;
-    }
+    tasks.forEach(t => {
+      if (t.status === 'needsAction' || (!t.status && !t.completed)) c[t.category] = (c[t.category] || 0) + 1;
+    });
     return c;
   }, [tasks]);
 
@@ -835,7 +827,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               }}
             >
               <span>All Tasks</span>
-              <span style={{ background: catFilter === 'all' ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{tasks.filter(t => !t.completed).length}</span>
+              <span style={{ background: catFilter === 'all' ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length}</span>
             </button>
             {ALL_CATS.map(cat => {
               const meta = CAT_META[cat];
@@ -1016,7 +1008,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   ref={titleRef}
                   className="tdp-title-input"
                   value={local.name || ''}
-                  onChange={e => saveField('name', e.target.value)}
+                  onChange={e => setLocal({ ...local, name: e.target.value })}
                   onBlur={() => {
                     if ((local.name || '').trim() && local.name !== detailTask.name) {
                       (onQuickUpdate || onUpdate)(local);
@@ -1032,15 +1024,20 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               <div className="tdp-field">
                 <label className="tdp-label">Priority</label>
                 <div className="tdp-pri-pills">
-                  {['high', 'medium', 'low'].map(p => (
-                    <button
-                      key={p}
-                      className={`tdp-pri-pill${local.priority === p ? ' tdp-pri-active' : ''}`}
-                      onClick={() => saveField('priority', p)}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
+                  {['none', 'high', 'medium', 'low'].map(p => {
+                    const isActive = local.priority === p;
+                    const pc = PRI_META[p]?.color;
+                    return (
+                      <button
+                        key={p}
+                        className="tdp-pri-pill"
+                        style={isActive ? { background: pc, color: '#fff', borderColor: pc } : {}}
+                        onClick={() => saveField('priority', p)}
+                      >
+                        {PRI_META[p].label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1206,7 +1203,11 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                         value={sub.text}
                         onChange={e => {
                           const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, text: e.target.value, updatedAt: new Date().toISOString() } : s);
-                          saveField('subtasks', nextSubs);
+                          setLocal({ ...local, subtasks: nextSubs });
+                        }}
+                        onBlur={() => {
+                          (onQuickUpdate || onUpdate)(local);
+                          showSaved();
                         }}
                         style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.85rem' }}
                       />
@@ -1303,7 +1304,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                   className="tdp-notes"
                   value={local.notes || ''}
                   onChange={e => {
-                    saveField('notes', e.target.value);
+                    setLocal({ ...local, notes: e.target.value });
                     e.target.style.height = 'auto';
                     e.target.style.height = e.target.scrollHeight + 'px';
                   }}

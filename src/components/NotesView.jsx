@@ -19,6 +19,19 @@ const COLOR_DOTS = [
   '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#a855f7','#ec4899',
 ];
 
+// Solid accent color per note color id — used for tag pill text and toolbar swatch
+const COLOR_ACCENT = {
+  default: null,
+  red:     '#ef4444',
+  orange:  '#f97316',
+  yellow:  '#eab308',
+  green:   '#22c55e',
+  teal:    '#14b8a6',
+  blue:    '#3b82f6',
+  purple:  '#a855f7',
+  pink:    '#ec4899',
+};
+
 function getColor(id) {
   return NOTE_COLORS.find(c => c.id === id) || NOTE_COLORS[0];
 }
@@ -62,6 +75,14 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
 
   useEffect(() => { contentRef.current?.focus(); }, []);
 
+  // Auto-resize textarea to content height — no fixed-height dead space
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [content]);
+
   const handleSave = () => {
     if (!title.trim() && !content.trim()) { onClose(); return; }
     onSave({ ...note, title: title.trim(), content, color, pinned, tags, updatedAt: new Date().toISOString() });
@@ -80,8 +101,12 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
     }
   };
 
-  const colStyle = getColor(color);
-  const isNew    = !note.createdAt || note.id === note.createdAt; // freshly created
+  const colStyle   = getColor(color);
+  const accentHex  = COLOR_ACCENT[color] ?? null;
+  const isNew      = !note.createdAt || note.id === note.createdAt;
+  // Always opaque — colStyle.bg values use rgba(r,g,b,0.12) which makes the modal transparent.
+  // Color is conveyed by the top border accent instead.
+  const modalBg    = 'var(--bg-elevated)';
 
   return (
     <motion.div
@@ -93,10 +118,19 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
         initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.97 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
-        style={{ background: colStyle.bg !== 'var(--bg-input)' ? colStyle.bg : 'var(--bg-elevated)', border: `1px solid ${colStyle.border}`, borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 24px 48px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}>
+        style={{
+          background: modalBg,
+          border: `1px solid ${colStyle.border}`,
+          borderTop: accentHex ? `3px solid ${accentHex}` : `1px solid ${colStyle.border}`,
+          borderRadius: 20,
+          width: '100%', maxWidth: 560,
+          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: '88vh',
+        }}>
 
-        {/* Title */}
-        <div style={{ padding: '20px 20px 0' }}>
+        {/* Title — fixed, never scrolls */}
+        <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
           <input
             type="text"
             value={title}
@@ -106,34 +140,50 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
           />
         </div>
 
-        {/* Content */}
-        <textarea
-          ref={contentRef}
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="Take a note…"
-          style={{ flex: 1, minHeight: 160, maxHeight: 400, resize: 'none', background: 'none', border: 'none', outline: 'none', padding: '12px 20px', fontSize: '0.92rem', color: 'var(--text-secondary)', fontFamily: 'inherit', lineHeight: 1.65, overflowY: 'auto' }}
-        />
+        {/* Title / body separator */}
+        <div style={{ height: 1, background: 'var(--border)', margin: '12px 20px 0', opacity: 0.5, flexShrink: 0 }} />
 
-        {/* Tags row */}
-        <div style={{ padding: '0 20px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, minHeight: 36 }}>
-          {tags.map(t => (
-            <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600 }}>
-              #{t}
-              <button onClick={() => setTags(prev => prev.filter(x => x !== t))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: '0.8rem', lineHeight: 1, marginLeft: 2 }}>×</button>
-            </span>
-          ))}
-          <input
-            value={tagInput}
-            onChange={e => setTagInput(e.target.value)}
-            onKeyDown={addTag}
-            placeholder={tags.length ? '' : '+ add tag'}
-            style={{ background: 'none', border: 'none', outline: 'none', fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'inherit', minWidth: 60, flex: 1 }}
+        {/* Scrollable content area — grows with note, scrolls only when modal hits maxHeight */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
+          {/* Auto-growing body textarea */}
+          <textarea
+            ref={contentRef}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Take a note…"
+            style={{
+              resize: 'none',
+              minHeight: 72,
+              overflow: 'hidden',
+              background: 'none', border: 'none', outline: 'none',
+              padding: '12px 20px 6px',
+              fontSize: '0.92rem', color: 'var(--text-secondary)',
+              fontFamily: 'inherit', lineHeight: 1.65,
+              boxSizing: 'border-box', width: '100%',
+            }}
           />
+
+          {/* Tags — sits directly below body, no floating */}
+          <div style={{ padding: '6px 20px 16px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            {tags.map(t => (
+              <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600 }}>
+                #{t}
+                <button onClick={() => setTags(prev => prev.filter(x => x !== t))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: '0.8rem', lineHeight: 1, marginLeft: 2 }}>×</button>
+              </span>
+            ))}
+            <input
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={addTag}
+              placeholder={tags.length ? '' : '+ add tag'}
+              style={{ background: 'none', border: 'none', outline: 'none', fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'inherit', minWidth: 60, flex: 1 }}
+            />
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        {/* Toolbar — always pinned at bottom */}
+        <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
 
             {/* Pin */}
@@ -144,11 +194,18 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
               </svg>
             </button>
 
-            {/* Color picker */}
+            {/* Color picker — swatch shows active color at all times */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowColorPicker(s => !s)} title="Change color"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px 8px', borderRadius: 8, display: 'flex', alignItems: 'center' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                style={{ background: showColorPicker ? 'rgba(99,102,241,0.08)' : 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px 8px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                {/* Active color swatch — visible without opening picker */}
+                <span style={{
+                  width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
+                  background: accentHex ?? 'transparent',
+                  border: accentHex ? 'none' : '1.5px dashed var(--text-muted)',
+                  display: 'inline-block',
+                }} />
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
                   <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
                 </svg>
@@ -190,7 +247,7 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
             )}
             <button onClick={handleSave}
               style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-              Close
+              Done
             </button>
           </div>
         </div>
@@ -202,75 +259,116 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
 // ── Note Card ─────────────────────────────────────────────────────────────
 function NoteCard({ note, onOpen, onPin, onDelete }) {
   const [hovered, setHovered] = useState(false);
-  const colStyle = getColor(note.color);
-  const preview  = note.content.slice(0, 300);
+  const accent    = COLOR_ACCENT[note.color] ?? null;
+  const colStyle  = getColor(note.color);
+  const isColored = note.color !== 'default';
+
+  // Reset on id change to prevent stuck hover after grid reflow
+  useEffect(() => { setHovered(false); }, [note.id]);
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.95, y: 8 }}
-      animate={{ opacity: 1, scale: 1,    y: 0 }}
-      exit={{    opacity: 0, scale: 0.95, y: 8 }}
+      initial={{ opacity: 0, scale: 0.95, y: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+      animate={{
+        opacity: 1, scale: 1,
+        y: hovered ? -2 : 0,
+        boxShadow: hovered ? '0 8px 20px rgba(0,0,0,0.09)' : '0 1px 4px rgba(0,0,0,0.04)',
+      }}
+      exit={{ opacity: 0, scale: 0.95, y: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onPointerLeave={() => setHovered(false)}
       onClick={() => onOpen(note)}
       style={{
-        background: colStyle.bg, border: `1px solid ${hovered ? colStyle.border.replace('0.4','0.8') : colStyle.border}`,
-        borderRadius: 16, padding: '16px', cursor: 'pointer',
-        display: 'flex', flexDirection: 'column', gap: 8,
-        transition: 'all 0.15s ease',
-        boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
-        transform: hovered ? 'translateY(-2px)' : 'none',
-        breakInside: 'avoid',
+        background: isColored ? colStyle.bg : 'var(--bg-surface)',
+        border: `1px solid ${isColored ? colStyle.border : 'var(--border)'}`,
+        borderRadius: 16,
+        padding: '14px 16px',
+        cursor: 'pointer',
+        height: 200,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
         position: 'relative',
+        overflow: 'hidden',
       }}>
 
       {/* Pinned indicator */}
       {note.pinned && (
-        <div style={{ position: 'absolute', top: 12, right: 12, color: 'var(--accent)', opacity: 0.7 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>
+        <div style={{ position: 'absolute', top: 12, right: 12, color: 'var(--accent)', opacity: 0.6 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>
         </div>
       )}
 
-      {/* Title */}
+      {/* ── Top block: title + tags + body, grows to fill available space ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0 }}>
+
+      {/* Title — max 2 lines, then ellipsis */}
       {note.title && (
-        <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4, paddingRight: note.pinned ? 20 : 0 }}>
+        <div style={{
+          fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)',
+          lineHeight: 1.35, paddingRight: note.pinned ? 20 : 0,
+          display: '-webkit-box', WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical', overflow: 'hidden', flexShrink: 0,
+        }}>
           {note.title}
         </div>
       )}
 
-      {/* Content preview */}
-      {preview && (
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-          {preview}{note.content.length > 300 && '…'}
+      {/* Content preview — hard-clamped to 3 lines */}
+      {note.content && (
+        <div style={{
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          fontSize: '0.81rem',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.6,
+          wordBreak: 'break-word',
+          flexShrink: 0,
+        }}>
+          {note.content}
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags — single overflow-hidden row */}
       {note.tags?.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, overflow: 'hidden' }}>
           {note.tags.map(t => (
-            <span key={t} style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600 }}>#{t}</span>
+            <span key={t} style={{
+              // On colored cards use a semi-white background so the pill reads
+              // against the tinted card fill; on default cards use accent tint.
+              background: isColored ? 'rgba(255,255,255,0.58)' : 'rgba(99,102,241,0.08)',
+              color: accent ?? 'var(--accent)',
+              padding: '2px 8px', borderRadius: 20,
+              fontSize: '0.68rem', fontWeight: 600, lineHeight: 1.6,
+              whiteSpace: 'nowrap',
+            }}>#{t}</span>
           ))}
         </div>
       )}
 
-      {/* Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{timeAgo(note.updatedAt)}</span>
-        {/* Hover actions */}
+      {/* Spacer — pushes footer to card bottom */}
+      <div style={{ flex: 1 }} />
+      </div>
+
+      {/* Footer — always pinned at the card bottom */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, borderTop: `1px solid ${isColored ? colStyle.border : 'var(--border)'}`, flexShrink: 0 }}>
+        <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', letterSpacing: '0.01em' }}>{timeAgo(note.updatedAt)}</span>
         <AnimatePresence>
           {hovered && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
-              style={{ display: 'flex', gap: 2 }}>
+              style={{ display: 'flex', gap: 4 }}>
               <button onClick={e => { e.stopPropagation(); onPin(note.id); }} title={note.pinned ? 'Unpin' : 'Pin'}
-                style={{ background: 'rgba(99,102,241,0.1)', border: 'none', cursor: 'pointer', color: note.pinned ? 'var(--accent)' : 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill={note.pinned?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                style={{ background: 'rgba(99,102,241,0.08)', border: 'none', cursor: 'pointer', color: note.pinned ? 'var(--accent)' : 'var(--text-muted)', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={note.pinned?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               </button>
               <button onClick={e => { e.stopPropagation(); onDelete(note.id); }} title="Delete"
-                style={{ background: 'rgba(239,68,68,0.1)', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                style={{ background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', color: '#ef4444', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
             </motion.div>
           )}
@@ -358,19 +456,18 @@ export default function NotesView() {
   const unpinned = filtered.filter(n => !n.pinned);
 
   const gridStyle = viewMode === 'grid'
-    ? { columns: 'repeat(auto-fill, minmax(240px, 1fr))', columnGap: 16, rowGap: 0 }
+    ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, alignItems: 'start' }
     : { display: 'flex', flexDirection: 'column', gap: 10 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
 
       {/* ── Top Bar ── */}
-      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Notes</h2>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{notes.length} note{notes.length !== 1 ? 's' : ''}</p>
-          </div>
+      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+
+        {/* Heading row — title left, controls right */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Notes</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* View toggle */}
             <div style={{ display: 'flex', background: 'var(--bg-input)', padding: 3, borderRadius: 10, border: '1px solid var(--border)' }}>
@@ -391,10 +488,10 @@ export default function NotesView() {
           </div>
         </div>
 
-        {/* Quick capture row */}
-        <form onSubmit={handleQuickCreate} style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 14px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* Quick capture — capped width, compact height, accent left-border signals "creates" */}
+        <form onSubmit={handleQuickCreate} style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 680, background: 'rgba(99,102,241,0.08)', border: '1.5px solid rgba(99,102,241,0.30)', borderLeft: '3px solid var(--accent)', borderRadius: 10, padding: '8px 12px' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
             <input
@@ -403,53 +500,92 @@ export default function NotesView() {
               value={quickTitle}
               onChange={e => setQuickTitle(e.target.value)}
               placeholder="Quick note… (press Enter to save)"
-              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.9rem', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.875rem', color: 'var(--text-primary)', fontFamily: 'inherit' }}
             />
             {quickTitle && (
-              <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>Save</button>
+              <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '3px 10px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Save</button>
             )}
           </div>
         </form>
 
-        {/* Search + filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Search */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '7px 12px', flex: 1, minWidth: 180 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        {/* ── Single combined filter row: search | color dots | active pills | counter ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 34 }}>
+
+          {/* Search input — compact fixed width */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', width: 260, flexShrink: 0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search notes…"
-              style={{ background: 'none', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary)', fontFamily: 'inherit', flex: 1 }}
+              style={{ background: 'none', border: 'none', outline: 'none', fontSize: '0.82rem', color: 'var(--text-primary)', fontFamily: 'inherit', flex: 1, minWidth: 0 }}
             />
-            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1, padding: 0 }}>×</button>}
+            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>}
           </div>
 
-          {/* Color filters */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Thin divider */}
+          <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
+
+          {/* Color filter dots — no persistent label, tooltips on hover */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <button onClick={() => setActiveColor(null)}
-              style={{ width: 24, height: 24, borderRadius: '50%', border: !activeColor ? '2px solid var(--accent)' : '2px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer' }}
+              style={{ width: 18, height: 18, borderRadius: '50%', border: !activeColor ? '2px solid var(--accent)' : '2px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', flexShrink: 0 }}
               title="All colors" />
             {COLOR_DOTS.map((c, i) => (
               <button key={c} onClick={() => setActiveColor(activeColor === NOTE_COLORS[i+1].id ? null : NOTE_COLORS[i+1].id)}
                 title={NOTE_COLORS[i+1].label}
-                style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: activeColor === NOTE_COLORS[i+1].id ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxShadow: activeColor === NOTE_COLORS[i+1].id ? `0 0 0 2px ${c}` : 'none', transition: 'all 0.15s' }} />
+                style={{ width: 16, height: 16, borderRadius: '50%', background: c, border: activeColor === NOTE_COLORS[i+1].id ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxShadow: activeColor === NOTE_COLORS[i+1].id ? `0 0 0 2px ${c}` : 'none', transition: 'all 0.12s', flexShrink: 0 }} />
             ))}
           </div>
-        </div>
 
-        {/* Tag pills */}
-        {allTags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-            {allTags.map(t => (
-              <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)}
-                style={{ background: activeTag === t ? 'var(--accent)' : 'rgba(99,102,241,0.1)', color: activeTag === t ? '#fff' : 'var(--accent)', border: 'none', borderRadius: 20, padding: '3px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
-                #{t}
-              </button>
-            ))}
+          {/* Active filter pills — color pill */}
+          {activeColor && (
+            <button onClick={() => setActiveColor(null)} title="Clear color filter"
+              style={{ display: 'flex', alignItems: 'center', gap: 4, background: `${COLOR_ACCENT[activeColor]}18`, color: COLOR_ACCENT[activeColor], border: `1px solid ${COLOR_ACCENT[activeColor]}55`, padding: '3px 9px 3px 7px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLOR_ACCENT[activeColor], display: 'inline-block' }} />
+              {getColor(activeColor).label}
+              <span style={{ opacity: 0.6, fontSize: '0.76rem', marginLeft: 2 }}>×</span>
+            </button>
+          )}
+
+          {/* Active filter pills — tag pill */}
+          {activeTag && (
+            <button onClick={() => setActiveTag(null)} title="Clear tag filter"
+              style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(99,102,241,0.09)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.22)', padding: '3px 9px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              #{activeTag}
+              <span style={{ opacity: 0.6, fontSize: '0.76rem', marginLeft: 2 }}>×</span>
+            </button>
+          )}
+
+          {/* Clear all — only when both filters active */}
+          {activeColor && activeTag && (
+            <button onClick={() => { setActiveColor(null); setActiveTag(null); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem', padding: '2px 4px', textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0 }}>
+              Clear all
+            </button>
+          )}
+
+          {/* Note counter — pushed to far right */}
+          <div style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {(search.trim() || activeTag || activeColor)
+              ? `${filtered.length} of ${notes.length} note${notes.length !== 1 ? 's' : ''}`
+              : `${notes.length} note${notes.length !== 1 ? 's' : ''}`}
           </div>
-        )}
+
+          {/* Tag pills — appear after counter as a second wrapped line when tags exist */}
+          {allTags.length > 0 && (
+            <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 5, paddingTop: 4 }}>
+              {allTags.map(t => (
+                <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)}
+                  style={{ background: activeTag === t ? 'var(--accent)' : 'rgba(99,102,241,0.08)', color: activeTag === t ? '#fff' : 'var(--accent)', border: activeTag === t ? 'none' : '1px solid rgba(99,102,241,0.15)', borderRadius: 20, padding: activeTag === t ? '2px 9px' : '2px 9px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  #{t}{activeTag === t && <span style={{ opacity: 0.75, fontSize: '0.74rem' }}>×</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+        </div>
       </div>
 
       {/* ── Notes Content ── */}
@@ -486,23 +622,11 @@ export default function NotesView() {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--text-muted)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="var(--bg-surface)"/></svg>
                   Pinned
                 </div>
-                {viewMode === 'grid' ? (
-                  <div style={{ ...gridStyle }}>
-                    <AnimatePresence>
-                      {pinned.map(n => (
-                        <div key={n.id} style={{ marginBottom: 16 }}>
-                          <NoteCard note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />
-                        </div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <AnimatePresence>
-                      {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
-                    </AnimatePresence>
-                  </div>
-                )}
+                <div style={gridStyle}>
+                  <AnimatePresence>
+                    {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
 
@@ -514,23 +638,11 @@ export default function NotesView() {
                     {search || activeTag || activeColor ? 'Results' : 'Others'}
                   </div>
                 )}
-                {viewMode === 'grid' ? (
-                  <div style={{ ...gridStyle }}>
-                    <AnimatePresence>
-                      {unpinned.map(n => (
-                        <div key={n.id} style={{ marginBottom: 16 }}>
-                          <NoteCard note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />
-                        </div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <AnimatePresence>
-                      {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
-                    </AnimatePresence>
-                  </div>
-                )}
+                <div style={gridStyle}>
+                  <AnimatePresence>
+                    {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
           </>

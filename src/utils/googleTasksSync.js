@@ -208,7 +208,7 @@ export function focuslyToGoogleTask(task) {
   const res = {
     title: task.name || 'Untitled',
     notes: task.notes || '',
-    status: task.completed ? 'completed' : 'needsAction'
+    status: task.status === 'completed' ? 'completed' : 'needsAction'
   };
   if (task.dueDate) {
     res.due = `${task.dueDate}T00:00:00.000Z`;
@@ -481,6 +481,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
           notes: gTask.notes || '',
           dueDate: gTask.due ? gTask.due.split('T')[0] : '',
           completed: gTask.status === 'completed',
+          status: gTask.status || 'needsAction',
           timeLogged: 0,
           pomodorosCompleted: 0,
           createdAt: gTask.updated || new Date().toISOString(),
@@ -523,6 +524,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
             notes: gTask.notes || '',
             dueDate: gTask.due ? gTask.due.split('T')[0] : '',
             completed: gTask.status === 'completed',
+            status: gTask.status || 'needsAction',
             completedAt: gTask.status === 'completed' ? (gTask.completed || t.completedAt || new Date().toISOString()) : null,
             lastSyncedAt: nowIso,
             updatedAt: gTask.updated
@@ -551,6 +553,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
         id: String(Date.now() + Math.random()),
         text: gSub.title || 'Untitled subtask',
         completed: gSub.status === 'completed',
+        status: gSub.status || 'needsAction',
         googleTaskId: gSub.id,
         updatedAt: gSub.updated
       };
@@ -574,6 +577,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
             ...s,
             text: gSub.title || 'Untitled subtask',
             completed: gSub.status === 'completed',
+            status: gSub.status || 'needsAction',
             googleTaskId: gSub.id,
             updatedAt: gSub.updated
           } : s);
@@ -639,6 +643,37 @@ export async function syncTasks(tasks, setTasks, onStatusChange, isFocusTrigger 
     if (onStatusChange) onStatusChange('Sync failed — retry');
   } finally {
     syncInProgress = false;
+  }
+}
+  
+export async function directGoogleTaskUpdate(googleTaskId, updates) {
+  const token = await getValidAccessToken();
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${googleTaskId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[Google Tasks Sync] Direct Update failed:', err);
+    return false;
+  }
+}
+
+export async function directGoogleTaskDelete(googleTaskId) {
+  const token = await getValidAccessToken();
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${googleTaskId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.ok || res.status === 404;
+  } catch (err) {
+    console.error('[Google Tasks Sync] Direct Delete failed:', err);
+    return false;
   }
 }
 

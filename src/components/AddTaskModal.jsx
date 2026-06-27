@@ -1,15 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { CAT_META } from './TaskList';
+import { CAT_META } from '../utils/categoryMeta';
+import { PRI_META } from '../utils/priorityMeta';
 
-const PRIORITIES = [
-  { value: 'none',   label: 'None'   },
-  { value: 'low',    label: 'Low'    },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high',   label: 'High'   },
-];
-
-const PRI_COLOR = { none: '#8b949e', low: '#3b82f6', medium: '#f59e0b', high: '#ef4444' };
+const PRIORITIES = Object.entries(PRI_META).map(([value, { label }]) => ({ value, label }));
 
 const RECURRENCE_OPTIONS = [
   { value: null,       label: 'None'     },
@@ -113,7 +107,7 @@ export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existin
               {PRIORITIES.map(p => (
                 <button key={p.value} type="button"
                   className={`pri-btn${form.priority === p.value ? ' pri-btn-active' : ''}`}
-                  style={form.priority === p.value ? { borderColor: PRI_COLOR[p.value], color: PRI_COLOR[p.value], background: PRI_COLOR[p.value] + '18' } : {}}
+                  style={form.priority === p.value ? { borderColor: PRI_META[p.value].color, color: PRI_META[p.value].color, background: PRI_META[p.value].color + '18' } : {}}
                   onClick={() => set('priority', p.value)}
                 >
                   {p.label}

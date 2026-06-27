@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import TaskList, { CAT_META } from './components/TaskList';
+import TaskList from './components/TaskList';
+import { CAT_META } from './utils/categoryMeta';
 import Timer from './components/Timer';
 import Stats from './components/Stats';
 import AddTaskModal from './components/AddTaskModal';
@@ -35,9 +36,10 @@ import {
   loadTrackers, saveTrackers,
   isScheduledToday, isLoggedToday, computeHabitStreaks
 } from './trackers/trackerUtils';
-import { sendNotification } from './utils/notificationUtils';
-import { handleAuthCallback, syncTasks, pushSyncQueue } from './utils/googleTasksSync';
+import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
 import { handleCalendarAuthCallback } from './utils/googleCalendarSync';
+import { sendNotification } from './utils/notificationUtils';
+import { getSecsForMode } from './utils/timerUtils';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -156,15 +158,7 @@ function loadIntentions() {
   } catch { return {date:todayStr(),items:makeItems(),history:{}}; }
 }
 
-export function getSecsForMode(mode, sett) {
-  switch(mode) {
-    case 'focus':  return (sett.focusDuration||25)*60;
-    case 'short':  return (sett.shortDuration||5)*60;
-    case 'long':   return (sett.longDuration||15)*60;
-    case 'custom': return (sett.customDuration||25)*60;
-    default: return 25*60;
-  }
-}
+
 
 function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 
@@ -219,6 +213,26 @@ export default function App() {
         }
       });
     });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── One-Time Cleanup for Keystroke Bug Duplicates ──
+  useEffect(() => {
+    if (localStorage.getItem('focusly_cleaned_w_duplicates') !== 'true') {
+      const badNames = ["W", "Wo", "Wor", "Work", "Work ", "Work O", "Work On", "Work On.", "Work On..", "Work On..."];
+      setTasks(prev => {
+        const toDelete = prev.filter(t => badNames.includes(t.name) && t.completed === false);
+        if (toDelete.length === 0) return prev;
+        
+        let next = [...prev];
+        toDelete.forEach(dup => {
+          next = next.filter(t => t.id !== dup.id);
+          pushSyncQueue({ type: 'DELETE', taskId: dup.id, googleTaskId: dup.googleTaskId });
+        });
+        setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 1000);
+        return next;
+      });
+      localStorage.setItem('focusly_cleaned_w_duplicates', 'true');
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Window Focus Sync Trigger ──
@@ -529,7 +543,7 @@ export default function App() {
     const t = {
       id:genId(), name:data.name.trim(), category:data.category, priority:data.priority,
       timeEstimate:Math.max(1,Math.min(480,Number(data.timeEstimate)||25)),
-      notes:data.notes.trim(), dueDate:data.dueDate, completed:false,
+      notes:data.notes.trim(), dueDate:data.dueDate, completed:false, status: 'needsAction',
       timeLogged:0, pomodorosCompleted:0, createdAt:new Date().toISOString(), completedAt:null,
       recurrence: data.recurrence || null,
       recurrenceDays: data.recurrenceDays || [],
@@ -579,34 +593,72 @@ export default function App() {
     setHabits(prev => prev.map(h => h.id === id ? toggleCompletion(h) : h));
   }, []);
 
-  const toggleComplete = useCallback((id) => {
-    setTasks(prev => {
-      const task   = prev.find(t => t.id === id);
-      const done   = task ? !task.completed : false;
-      const mapped = prev.map(t => {
-        if (t.id !== id) return t;
-        return { ...t, completed: done, completedAt: done ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
+  const toggleComplete = useCallback(async (id) => {
+    const isSyncEnabled = localStorage.getItem('focusly_sync_enabled') === 'true';
+    const currentTask = tasks.find(t => t.id === id);
+    if (!currentTask) return;
+    
+    const done = !currentTask.completed;
+
+    const performLocalUpdate = (forceSync = false) => {
+      setTasks(prev => {
+        const task = prev.find(t => t.id === id);
+        const mapped = prev.map(t => {
+          if (t.id !== id) return t;
+          return { ...t, completed: done, status: done ? 'completed' : 'needsAction', completedAt: done ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
+        });
+        let finalTasks = mapped;
+        // Auto-create next occurrence when completing a recurring task
+        if (done && task?.recurrence) {
+          const due  = nextDueDate(task.dueDate, task.recurrence, task.recurrenceDays);
+          const next = {
+            ...task,
+            id: genId(), completed: false, status: 'needsAction', completedAt: null,
+            dueDate: due, timeLogged: 0, pomodorosCompleted: 0,
+            createdAt: new Date().toISOString(),
+            googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
+          };
+          finalTasks = [...mapped, next];
+          pushSyncQueue({ type: 'CREATE', taskId: next.id });
+        }
+        pushSyncQueue({ type: 'UPDATE', taskId: id });
+        setTimeout(() => syncTasks(finalTasks, setTasks, setSyncStatus), forceSync ? 10 : 500);
+        return finalTasks;
       });
-      let finalTasks = mapped;
-      // Auto-create next occurrence when completing a recurring task
-      if (done && task?.recurrence) {
-        const due  = nextDueDate(task.dueDate, task.recurrence, task.recurrenceDays);
-        const next = {
-          ...task,
-          id: genId(), completed: false, completedAt: null,
-          dueDate: due, timeLogged: 0, pomodorosCompleted: 0,
-          createdAt: new Date().toISOString(),
-          googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
-        };
-        finalTasks = [...mapped, next];
-        pushSyncQueue({ type: 'CREATE', taskId: next.id });
+      if (id===activeTaskId && timerState==='running') pauseTimer();
+    };
+
+    if (isSyncEnabled && currentTask.googleTaskId) {
+      setSyncStatus('Updating Task Status...');
+      console.log('[Google Tasks Sync] Wait: Updating Task Status API for', currentTask.name);
+      
+      const success = await directGoogleTaskUpdate(currentTask.googleTaskId, {
+        status: done ? 'completed' : 'needsAction'
+      });
+      
+      if (success) {
+        console.log('[Google Tasks Sync] Wait: Task Status API success, refreshing Task List...');
+        
+        // Handle recurrence locally immediately
+        if (done && currentTask.recurrence) {
+           const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
+           const next = { ...currentTask, id: genId(), completed: false, status: 'needsAction', completedAt: null, dueDate: due, googleTaskId: null };
+           setTasks(prev => [...prev, next]);
+           pushSyncQueue({ type: 'CREATE', taskId: next.id });
+        }
+        
+        // Force a fresh sync to pull the status update from Google
+        // We pass the current tasks array, syncTasks will pull latest and update state
+        await syncTasks(tasks, setTasks, setSyncStatus); 
+        if (id===activeTaskId && timerState==='running') pauseTimer();
+      } else {
+        setSyncStatus('Sync failed');
+        performLocalUpdate(); // Fallback to offline queue behavior
       }
-      pushSyncQueue({ type: 'UPDATE', taskId: id });
-      setTimeout(() => syncTasks(finalTasks, setTasks, setSyncStatus), 500);
-      return finalTasks;
-    });
-    if (id===activeTaskId && timerState==='running') pauseTimer();
-  }, [activeTaskId, timerState, pauseTimer]);
+    } else {
+      performLocalUpdate();
+    }
+  }, [tasks, activeTaskId, timerState, pauseTimer, setTasks]);
 
   const deleteTask = useCallback((id) => {
     setTasks(prev => {
@@ -621,13 +673,36 @@ export default function App() {
     if (activeTaskId===id) { setActiveTaskId(null); if(timerState==='running') pauseTimer(); }
   }, [activeTaskId, timerState, pauseTimer]);
 
-  const clearCompleted = useCallback(() => {
-    setTasks(prev=>{
-      const n=prev.filter(t=>t.completed).length; if(!n) return prev;
-      showToast(`Cleared ${n} completed task${n>1?'s':''}`, 'info');
-      return prev.filter(t=>!t.completed);
-    });
-  }, [showToast]);
+  const clearCompleted = useCallback(async () => {
+    const isSyncEnabled = localStorage.getItem('focusly_sync_enabled') === 'true';
+    const completedTasks = tasks.filter(t => t.completed || t.status === 'completed');
+    if (!completedTasks.length) return;
+
+    if (isSyncEnabled) {
+      setSyncStatus('Deleting Completed Tasks...');
+      console.log(`[Google Tasks Sync] Wait: Deleting ${completedTasks.length} tasks from API...`);
+      for (const t of completedTasks) {
+        if (t.googleTaskId) {
+           await directGoogleTaskDelete(t.googleTaskId);
+           // Also track it in local deleted tasks to prevent re-pull
+           const delStr = localStorage.getItem('focusly_deleted_tasks');
+           let deletedIds = [];
+           try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
+           if (!deletedIds.includes(t.googleTaskId)) {
+             deletedIds.push(t.googleTaskId);
+             localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds));
+           }
+        }
+      }
+      console.log('[Google Tasks Sync] Wait: Delete finished, refreshing Task List...');
+      const filtered = tasks.filter(t => !t.completed && t.status !== 'completed');
+      setTasks(filtered);
+      await syncTasks(filtered, setTasks, setSyncStatus);
+    } else {
+      setTasks(prev => prev.filter(t => !t.completed && t.status !== 'completed'));
+    }
+    showToast(`Cleared ${completedTasks.length} completed task${completedTasks.length > 1 ? 's' : ''}`, 'info');
+  }, [tasks, showToast]);
 
   const saveSettings = useCallback((next) => {
     setSettings(next);
@@ -913,15 +988,13 @@ export default function App() {
             exit={{ x: -240, opacity: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
-          {/* ── Section: Daily ── */}
-          <span className="nav-section-label">Daily</span>
+          {/* ── Section: Main ── */}
+          <span className="nav-section-label">Main</span>
           {[
-            { id:'daily',   label:'Today',       Icon: NavIcoSun,          badge: unloggedToday.length || 0 },
-            { id:'habits',  label:'Habits',      Icon: NavIcoRepeat },
-            { id:'tasks',   label:'Tasks',       Icon: NavIcoCheckSquare,  badge: tasks.filter(t=>!t.completed).length || 0 },
-            { id:'timer',   label:'Focus',       Icon: NavIcoTimerIcon },
-            { id:'journal', label:'Journal',     Icon: NavIcoBookOpen },
-            { id:'notes',   label:'Notes',       Icon: NavIcoNotes },
+            { id:'daily',    label:'Today',    Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
+            { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
+            { id:'notes',    label:'Notes',    Icon: NavIcoNotes },
+            { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
           ].map(tab => (
             <button key={tab.id}
               className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
@@ -933,11 +1006,13 @@ export default function App() {
             </button>
           ))}
 
-          {/* ── Section: Planning ── */}
+          {/* ── Section: More ── */}
           <div className="nav-divider" />
-          <span className="nav-section-label">Planning</span>
+          <span className="nav-section-label">More</span>
           {[
-            { id:'calendar',label:'Calendar',Icon: NavIcoCalendar },
+            { id:'habits',  label:'Habits',  Icon: NavIcoRepeat },
+            { id:'timer',   label:'Focus',   Icon: NavIcoTimerIcon },
+            { id:'journal', label:'Journal', Icon: NavIcoBookOpen },
             { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
             { id:'reports', label:'Reports', Icon: NavIcoBarChart },
           ].map(tab => (

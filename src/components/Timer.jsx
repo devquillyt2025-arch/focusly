@@ -1,4 +1,4 @@
-import { CAT_META } from './TaskList';
+import { CAT_META } from '../utils/categoryMeta';
 
 const RADIUS = 88;
 const STROKE = 9;

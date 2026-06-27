@@ -204,7 +204,8 @@ export default function JournalView() {
           <textarea
             className="journal-doc-textarea"
             value={getDocContent(viewedEntry)}
-            onChange={isToday ? e => updateContent(e.target.value) : undefined}
+            onChange={isToday ? e => setEntry(prev => ({ ...prev, content: e.target.value })) : undefined}
+            onBlur={isToday ? e => updateContent(e.target.value) : undefined}
             readOnly={!isToday}
             placeholder={isToday ? "Write your thoughts, reflections, or notes for the day..." : "No content for this day."}
           />
