@@ -995,13 +995,7 @@ export default function App() {
               </button>
             )}
           </div>
-          {activeTab === 'notes' && (
-            <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 20, padding: 2, border: '1px solid var(--border)', flexShrink: 0 }}>
-              <button onClick={() => setSearchScope('notes')} style={{ background: searchScope === 'notes' ? 'var(--accent)' : 'transparent', color: searchScope === 'notes' ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 18, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>Notes</button>
-              <button onClick={() => setSearchScope('all')} style={{ background: searchScope === 'all' ? 'var(--accent)' : 'transparent', color: searchScope === 'all' ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 18, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>All</button>
-            </div>
-          )}
-          {searchOpen && searchQuery.length >= 2 && (searchScope === 'all' || activeTab !== 'notes') && (
+          {searchOpen && searchQuery.length >= 2 && (
             <div className="search-dropdown" onMouseDown={e => e.stopPropagation()}>
               {searchResults.length === 0 ? (
                 <div className="search-empty">No results for "{searchQuery}"</div>
@@ -1183,6 +1177,7 @@ export default function App() {
 
           {/* ── Settings pinned to bottom ── */}
           <div className="nav-spacer" />
+          <div className="nav-settings-separator" />
           <button
             className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
             onClick={() => setActiveTab('settings')}
@@ -1387,6 +1382,7 @@ export default function App() {
             onSave={(savedNote) => noteEditorCtx.onSave(savedNote)}
             onClose={() => setNoteEditorCtx(null)}
             onDelete={(id) => noteEditorCtx.onDelete(id)}
+            onColorChange={noteEditorCtx.onColorChange}
           />
         )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
