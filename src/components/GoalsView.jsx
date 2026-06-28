@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { genId } from '../trackers/trackerUtils';
+import { logActivity, diffObjects } from '../utils/activityLog';
 
 // ─── Categories ────────────────────────────────────────────────────
 const GOAL_CATS = {
@@ -82,8 +83,11 @@ export default function GoalsView() {
 
   // ── Handlers ──
   const handleSave = (goalData) => {
+    const isEdit = !!editingGoal;
+    const changes = isEdit ? diffObjects(editingGoal, goalData, ['title', 'category', 'description', 'targetDate', 'timeframe']) : null;
+    logActivity({ module: 'goals', entity_type: 'goal', entity_id: goalData.id, action: isEdit ? 'updated' : 'created', title: goalData.title, field_changes: changes });
     setGoals(prev =>
-      editingGoal
+      isEdit
         ? prev.map(g => g.id === goalData.id ? goalData : g)
         : [goalData, ...prev]
     );
@@ -106,12 +110,16 @@ export default function GoalsView() {
   };
 
   const completeGoal = (goalId) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (goal) logActivity({ module: 'goals', entity_type: 'goal', entity_id: goalId, action: 'completed', title: goal.title });
     setGoals(prev => prev.map(g =>
       g.id === goalId ? { ...g, completed: true, completedAt: new Date().toISOString() } : g
     ));
   };
 
   const deleteGoal = (goalId) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (goal) logActivity({ module: 'goals', entity_type: 'goal', entity_id: goalId, action: 'deleted', title: goal.title });
     setGoals(prev => prev.filter(g => g.id !== goalId));
   };
 

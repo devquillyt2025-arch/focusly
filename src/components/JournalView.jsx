@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { logActivity } from '../utils/activityLog';
 
 // ─── Storage helpers ───────────────────────────────────────────────
 function localDateStr(date = new Date()) {
@@ -117,12 +118,23 @@ export default function JournalView() {
   }, []);
 
   const updateContent = useCallback((text) => {
-    setEntry(prev => {
-      const next = { ...prev, content: text };
-      persistEntry(todayDate, next);
-      showSaved();
-      return next;
-    });
+    if (text.trim()) {
+      setEntry(prev => {
+        const isNew = !prev.content?.trim();
+        logActivity({ module: 'journal', entity_type: 'journal_entry', entity_id: todayDate, action: isNew ? 'created' : 'updated', title: `Journal — ${todayDate}` });
+        const next = { ...prev, content: text };
+        persistEntry(todayDate, next);
+        showSaved();
+        return next;
+      });
+    } else {
+      setEntry(prev => {
+        const next = { ...prev, content: text };
+        persistEntry(todayDate, next);
+        showSaved();
+        return next;
+      });
+    }
     // Refresh history list (deferred so state settles first)
     setTimeout(() => setHistory(loadAllEntries()), 0);
   }, [todayDate, showSaved]);

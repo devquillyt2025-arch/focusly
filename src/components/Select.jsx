@@ -112,7 +112,10 @@ export default function Select({
           ...style
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          {selectedOption?.color && (
+            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: selectedOption.color, flexShrink: 0 }} />
+          )}
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg 
@@ -174,7 +177,10 @@ export default function Select({
                   transition: 'background 0.1s'
                 }}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {opt.color && (
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />
+                  )}
                   {opt.label}
                 </span>
                 {isSelected && (

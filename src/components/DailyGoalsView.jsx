@@ -132,7 +132,7 @@ export default function DailyGoalsView({
       {/* ── GREETING ROW ── */}
       <div className="yartu-greeting-row">
         <div className="yartu-greeting-left">
-          <h1 className="yartu-greeting-title">Welcome back, Esther 👋</h1>
+          <h1 className="yartu-greeting-title">Welcome back, {localStorage.getItem('focusly-profile-name') || 'Friend'} 👋</h1>
           <div className="yartu-summary-strip">
             <span className="yartu-summary-prefix">Today you have:</span>
             <div className="yartu-summary-item">

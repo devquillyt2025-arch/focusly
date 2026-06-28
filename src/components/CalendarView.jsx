@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logActivity } from '../utils/activityLog';
 import {
   connectGoogleCalendar, disconnectGoogleCalendar, isGCalConnected,
   getCalendarToken, fetchGCalEvents, createGCalEvent, gcalColor,
@@ -224,6 +225,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     if (!modalTitle.trim()) return;
     const newEv = { id: Date.now().toString(), title: modalTitle.trim(), date: modalDate, time: modalTime, endTime: modalTime ? `${String((parseInt(modalTime.split(':')[0],10)+1)%24).padStart(2,'0')}:${modalTime.split(':')[1]}` : null, isAllDay: !modalTime, category: modalCategory };
     saveCustomEvent(newEv);
+    logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: newEv.id, action: 'created', title: newEv.title });
     if (onAddTask) onAddTask({ id: newEv.id, name: newEv.title, dueDate: modalDate, time: newEv.time, endTime: newEv.endTime, isAllDay: newEv.isAllDay, category: modalCategory, completed: false });
     if (gcalConnected && pushToGCal) {
       try {

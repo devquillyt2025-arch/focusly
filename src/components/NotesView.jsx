@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logActivity } from '../utils/activityLog';
+import Select from './Select';
 
 const STORAGE_KEY = 'focusly_notes';
 
@@ -340,11 +342,11 @@ export function NoteModal({ note, onSave, onClose, onDelete }) {
 }
 
 // ── Note Card ─────────────────────────────────────────────────────────────
-function NoteCard({ note, onOpen, onPin, onDelete }) {
+export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick }) {
   const [hovered, setHovered] = useState(false);
-  const accent    = COLOR_ACCENT[note.color] ?? null;
-  const colStyle  = getColor(note.color);
-  const isColored = note.color !== 'default';
+  const isColored = note.color && note.color !== 'default';
+  const colStyle = getColor(note.color);
+  const accent = COLOR_ACCENT[note.color];
 
   // Reset on id change to prevent stuck hover after grid reflow
   useEffect(() => { setHovered(false); }, [note.id]);
@@ -352,14 +354,14 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.95, y: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+      initial={{ opacity: 0, scale: 0.98, y: 4 }}
       animate={{
         opacity: 1, scale: 1,
-        y: hovered ? -2 : 0,
-        boxShadow: hovered ? '0 8px 20px rgba(0,0,0,0.09)' : '0 1px 4px rgba(0,0,0,0.04)',
+        y: 0,
+        boxShadow: hovered ? '0 4px 12px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.05)',
       }}
-      exit={{ opacity: 0, scale: 0.95, y: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+      exit={{ opacity: 0, scale: 0.98, y: 4 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onPointerLeave={() => setHovered(false)}
@@ -367,10 +369,10 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
       style={{
         background: isColored ? colStyle.bg : 'var(--bg-surface)',
         border: `1px solid ${isColored ? colStyle.border : 'var(--border)'}`,
-        borderRadius: 16,
-        padding: '14px 16px',
+        borderRadius: 12,
+        padding: '12px',
         cursor: 'pointer',
-        height: 200,
+        height: 160,
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -388,23 +390,21 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
       {/* ── Top block: title + tags + body, grows to fill available space ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0 }}>
 
-      {/* Title — max 2 lines, then ellipsis */}
-      {note.title && (
-        <div style={{
-          fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)',
-          lineHeight: 1.35, paddingRight: note.pinned ? 20 : 0,
-          display: '-webkit-box', WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical', overflow: 'hidden', flexShrink: 0,
-        }}>
-          {note.title}
-        </div>
-      )}
+      {/* Title — max 1 line, then ellipsis */}
+      <div style={{
+        fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)',
+        lineHeight: 1.35, paddingRight: note.pinned ? 20 : 0,
+        display: '-webkit-box', WebkitLineClamp: 1,
+        WebkitBoxOrient: 'vertical', overflow: 'hidden', flexShrink: 0,
+      }}>
+        {note.title || 'Untitled'}
+      </div>
 
-      {/* Content preview — hard-clamped to 3 lines */}
+      {/* Content preview — hard-clamped to 1 line */}
       {note.content && (
         <div style={{
           display: '-webkit-box',
-          WebkitLineClamp: 3,
+          WebkitLineClamp: 1,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
           fontSize: '0.81rem',
@@ -413,7 +413,7 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
           wordBreak: 'break-word',
           flexShrink: 0,
         }}>
-          {note.content}
+          {note.content.substring(0, 40)}{note.content.length > 40 ? '...' : ''}
         </div>
       )}
 
@@ -421,14 +421,13 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
       {note.tags?.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexShrink: 0, overflow: 'hidden' }}>
           {note.tags.map(t => (
-            <span key={t} style={{
-              // On colored cards use a semi-white background so the pill reads
-              // against the tinted card fill; on default cards use accent tint.
-              background: isColored ? 'rgba(255,255,255,0.58)' : 'rgba(99,102,241,0.08)',
-              color: accent ?? 'var(--accent)',
-              padding: '2px 8px', borderRadius: 20,
+            <span key={t} onClick={(e) => { e.stopPropagation(); onTagClick && onTagClick(t); }} style={{
+              background: 'var(--bg-input)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              padding: '2px 8px', borderRadius: 12,
               fontSize: '0.68rem', fontWeight: 600, lineHeight: 1.6,
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', cursor: onTagClick ? 'pointer' : 'default',
             }}>#{t}</span>
           ))}
         </div>
@@ -462,17 +461,22 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
 }
 
 // ── Main NotesView ─────────────────────────────────────────────────────────
-export default function NotesView({ onOpenNoteEditor }) {
+export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) {
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [notes,       setNotes]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
     catch { return []; }
   });
-  const [search,      setSearch]      = useState('');
+  const [sortOrder,   setSortOrder]   = useState('updated');
   const [activeTag,   setActiveTag]   = useState(null);
   const [activeColor, setActiveColor] = useState(null);
   const [viewMode,    setViewMode]    = useState('grid'); // 'grid' | 'list'
   const [quickTitle,  setQuickTitle]  = useState('');
   const quickRef = useRef(null);
+  
+  const [dateRange, setDateRange] = useState({ start: null, end: null });
+  const [dateOpen, setDateOpen] = useState(false);
+  const dateBtnRef = useRef(null);
 
   const persist = (updated) => {
     setNotes(updated);
@@ -497,6 +501,7 @@ export default function NotesView({ onOpenNoteEditor }) {
   const saveNote = (note) => {
     setNotes(prev => {
       const exists = prev.find(n => n.id === note.id);
+      logActivity({ module: 'notes', entity_type: 'note', entity_id: note.id, action: exists ? 'updated' : 'created', title: note.title || '(untitled)' });
       const updated = exists ? prev.map(n => n.id === note.id ? note : n) : [note, ...prev];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
@@ -506,6 +511,8 @@ export default function NotesView({ onOpenNoteEditor }) {
   const deleteNote = (id) => {
     // Functional update avoids stale closure when called via App.jsx-level modal context.
     setNotes(prev => {
+      const note = prev.find(n => n.id === id);
+      if (note) logActivity({ module: 'notes', entity_type: 'note', entity_id: id, action: 'deleted', title: note.title || '(untitled)' });
       const updated = prev.filter(n => n.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
@@ -539,18 +546,31 @@ export default function NotesView({ onOpenNoteEditor }) {
 
   const filtered = useMemo(() => {
     let result = [...notes];
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    const searchStr = (localSearchQuery || globalSearchQuery).trim().toLowerCase();
+    if (searchStr) {
       result = result.filter(n =>
-        n.title.toLowerCase().includes(q) ||
-        n.content.toLowerCase().includes(q) ||
-        n.tags?.some(t => t.includes(q))
+        (n.title && n.title.toLowerCase().includes(searchStr)) ||
+        (n.content && n.content.toLowerCase().includes(searchStr)) ||
+        n.tags?.some(t => t.toLowerCase().includes(searchStr))
       );
     }
     if (activeTag)   result = result.filter(n => n.tags?.includes(activeTag));
     if (activeColor) result = result.filter(n => n.color === activeColor);
+    
+    if (dateRange.start) {
+      result = result.filter(n => new Date(n.updatedAt) >= dateRange.start);
+    }
+    if (dateRange.end) {
+      const eOfDay = new Date(dateRange.end); eOfDay.setHours(23, 59, 59, 999);
+      result = result.filter(n => new Date(n.updatedAt) <= eOfDay);
+    }
+    
+    if (sortOrder === 'alpha') result.sort((a,b) => a.title.localeCompare(b.title));
+    else if (sortOrder === 'oldest') result.sort((a,b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+    else result.sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    
     return result;
-  }, [notes, search, activeTag, activeColor]);
+  }, [notes, globalSearchQuery, activeTag, activeColor, sortOrder, dateRange]);
 
   const pinned   = filtered.filter(n => n.pinned);
   const unpinned = filtered.filter(n => !n.pinned);
@@ -563,133 +583,108 @@ export default function NotesView({ onOpenNoteEditor }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
 
       {/* ── Top Bar ── */}
-      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-
-        {/* Heading row — title left, controls right */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Notes</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* View toggle */}
-            <div style={{ display: 'flex', background: 'var(--bg-input)', padding: 3, borderRadius: 10, border: '1px solid var(--border)' }}>
-              {[
-                { mode: 'grid', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
-                { mode: 'list', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> },
-              ].map(({ mode, icon }) => (
-                <button key={mode} onClick={() => setViewMode(mode)}
-                  style={{ padding: '5px 8px', borderRadius: 8, border: 'none', background: viewMode === mode ? 'var(--accent)' : 'transparent', color: viewMode === mode ? '#fff' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                  {icon}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => openNew()}
-              style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 12, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}>
-              ＋ New Note
-            </button>
+      <div style={{ padding: '0 24px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        
+        {/* ROW 1: Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, paddingTop: 16, flexWrap: 'nowrap' }}>
+          <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <svg style={{ position: 'absolute', left: 12, color: 'var(--text-muted)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input 
+              type="text" 
+              placeholder="Search notes..." 
+              value={localSearchQuery}
+              onChange={e => setLocalSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px 8px 36px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', outline: 'none', fontSize: '0.875rem' }} 
+            />
           </div>
+          <Select 
+            value={activeColor || 'all'}
+            options={[{value:'all',label:'All Colors'}, ...NOTE_COLORS.slice(1).map(c => ({value:c.id, label:c.label, color: c.bg}))]}
+            onChange={e => setActiveColor(e.target.value === 'all' ? null : e.target.value)}
+            style={{ width: 140, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: '0.85rem' }}
+          />
+          <Select 
+            value={activeTag || 'all'}
+            options={[{value:'all',label:'All Tags'}, ...allTags.map(t => ({value:t, label:`#${t}`}))]}
+            onChange={e => setActiveTag(e.target.value === 'all' ? null : e.target.value)}
+            style={{ width: 140, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: '0.85rem' }}
+          />
+          <div style={{ position: 'relative' }}>
+            <button
+              ref={dateBtnRef}
+              type="button"
+              onClick={() => setDateOpen(!dateOpen)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              {fmtRangeLabel(dateRange)}
+            </button>
+            {dateOpen && (
+              <DateRangePicker
+                dateRange={dateRange}
+                triggerRef={dateBtnRef}
+                onChange={r => { setDateRange(r); setDateOpen(false); }}
+                onClose={() => setDateOpen(false)}
+              />
+            )}
+          </div>
+          <button type="button" onClick={handleQuickCreate} title="Create New Note" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,0.2)', whiteSpace: 'nowrap', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}>
+            <span style={{ fontSize: '1.1rem' }}>➕</span> New Note
+          </button>
         </div>
 
-        {/* Quick capture — capped width, compact height, accent left-border signals "creates" */}
-        <form onSubmit={handleQuickCreate} style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 680, background: 'rgba(99,102,241,0.08)', border: '1.5px solid rgba(99,102,241,0.30)', borderLeft: '3px solid var(--accent)', borderRadius: 10, padding: '8px 12px' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
+        {/* Row 2: Header & Tags */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Notes</h2>
+          <Select
+            value={sortOrder}
+            options={[
+              {value: 'updated', label: 'Recently Updated'},
+              {value: 'oldest', label: 'Oldest'},
+              {value: 'alpha', label: 'Alphabetical (A-Z)'}
+            ]}
+            onChange={e => setSortOrder(e.target.value)}
+            style={{ width: 180, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: '0.8rem' }}
+          />
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {(localSearchQuery.trim() || globalSearchQuery.trim() || activeTag || activeColor)
+              ? `${filtered.length} of ${notes.length} entries`
+              : `${notes.length} entries`}
+          </div>
+          {allTags.length > 0 && (
+            <>
+              <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', flex: 1 }}>
+                {allTags.map(t => (
+                  <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)}
+                    style={{ background: activeTag === t ? 'var(--accent)' : 'rgba(99,102,241,0.08)', color: activeTag === t ? '#fff' : 'var(--accent)', border: activeTag === t ? 'none' : '1px solid rgba(99,102,241,0.15)', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s' }}>
+                    #{t}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Row 3: Create */}
+        <form onSubmit={handleQuickCreate} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
+            <span style={{ fontSize: '1.2rem' }}>✏️</span>
             <input
               ref={quickRef}
               type="text"
               value={quickTitle}
               onChange={e => setQuickTitle(e.target.value)}
-              placeholder="Quick note… (press Enter to save)"
-              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.875rem', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+              placeholder="Write a new note... (⌘ + Enter to save)"
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.9rem', color: 'var(--text-primary)', fontFamily: 'inherit' }}
             />
-            {quickTitle && (
-              <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '3px 10px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Save</button>
-            )}
           </div>
         </form>
 
-        {/* ── Single combined filter row: search | color dots | active pills | counter ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 34 }}>
-
-          {/* Search input — compact fixed width */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', width: 260, flexShrink: 0 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search notes…"
-              style={{ background: 'none', border: 'none', outline: 'none', fontSize: '0.82rem', color: 'var(--text-primary)', fontFamily: 'inherit', flex: 1, minWidth: 0 }}
-            />
-            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>}
-          </div>
-
-          {/* Thin divider */}
-          <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
-
-          {/* Color filter dots — no persistent label, tooltips on hover */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <button onClick={() => setActiveColor(null)}
-              style={{ width: 18, height: 18, borderRadius: '50%', border: !activeColor ? '2px solid var(--accent)' : '2px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', flexShrink: 0 }}
-              title="All colors" />
-            {COLOR_DOTS.map((c, i) => (
-              <button key={c} onClick={() => setActiveColor(activeColor === NOTE_COLORS[i+1].id ? null : NOTE_COLORS[i+1].id)}
-                title={NOTE_COLORS[i+1].label}
-                style={{ width: 16, height: 16, borderRadius: '50%', background: c, border: activeColor === NOTE_COLORS[i+1].id ? '2px solid white' : '2px solid transparent', cursor: 'pointer', boxShadow: activeColor === NOTE_COLORS[i+1].id ? `0 0 0 2px ${c}` : 'none', transition: 'all 0.12s', flexShrink: 0 }} />
-            ))}
-          </div>
-
-          {/* Active filter pills — color pill */}
-          {activeColor && (
-            <button onClick={() => setActiveColor(null)} title="Clear color filter"
-              style={{ display: 'flex', alignItems: 'center', gap: 4, background: `${COLOR_ACCENT[activeColor]}18`, color: COLOR_ACCENT[activeColor], border: `1px solid ${COLOR_ACCENT[activeColor]}55`, padding: '3px 9px 3px 7px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLOR_ACCENT[activeColor], display: 'inline-block' }} />
-              {getColor(activeColor).label}
-              <span style={{ opacity: 0.6, fontSize: '0.76rem', marginLeft: 2 }}>×</span>
-            </button>
-          )}
-
-          {/* Active filter pills — tag pill */}
-          {activeTag && (
-            <button onClick={() => setActiveTag(null)} title="Clear tag filter"
-              style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(99,102,241,0.09)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.22)', padding: '3px 9px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-              #{activeTag}
-              <span style={{ opacity: 0.6, fontSize: '0.76rem', marginLeft: 2 }}>×</span>
-            </button>
-          )}
-
-          {/* Clear all — only when both filters active */}
-          {activeColor && activeTag && (
-            <button onClick={() => { setActiveColor(null); setActiveTag(null); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem', padding: '2px 4px', textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0 }}>
-              Clear all
-            </button>
-          )}
-
-          {/* Note counter — pushed to far right */}
-          <div style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {(search.trim() || activeTag || activeColor)
-              ? `${filtered.length} of ${notes.length} note${notes.length !== 1 ? 's' : ''}`
-              : `${notes.length} note${notes.length !== 1 ? 's' : ''}`}
-          </div>
-
-          {/* Tag pills — appear after counter as a second wrapped line when tags exist */}
-          {allTags.length > 0 && (
-            <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 5, paddingTop: 4 }}>
-              {allTags.map(t => (
-                <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)}
-                  style={{ background: activeTag === t ? 'var(--accent)' : 'rgba(99,102,241,0.08)', color: activeTag === t ? '#fff' : 'var(--accent)', border: activeTag === t ? 'none' : '1px solid rgba(99,102,241,0.15)', borderRadius: 20, padding: activeTag === t ? '2px 9px' : '2px 9px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  #{t}{activeTag === t && <span style={{ opacity: 0.75, fontSize: '0.74rem' }}>×</span>}
-                </button>
-              ))}
-            </div>
-          )}
-
-        </div>
       </div>
 
       {/* ── Notes Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 40px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px' }}>
 
         {notes.length === 0 ? (
           /* Empty state */
@@ -724,7 +719,7 @@ export default function NotesView({ onOpenNoteEditor }) {
                 </div>
                 <div style={gridStyle}>
                   <AnimatePresence>
-                    {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
+                    {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} />)}
                   </AnimatePresence>
                 </div>
               </div>
@@ -740,7 +735,7 @@ export default function NotesView({ onOpenNoteEditor }) {
                 )}
                 <div style={gridStyle}>
                   <AnimatePresence>
-                    {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} />)}
+                    {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} />)}
                   </AnimatePresence>
                 </div>
               </div>
@@ -749,6 +744,139 @@ export default function NotesView({ onOpenNoteEditor }) {
         )}
       </div>
 
+    </div>
+  );
+}
+
+
+// ── Date helpers ──────────────────────────────────────────────────
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function startOfDay(d) { const r = new Date(d); r.setHours(0, 0, 0, 0); return r; }
+function endOfDay(d)   { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; }
+
+function thisWeekRange() {
+  const end   = new Date();
+  const start = startOfDay(new Date()); start.setDate(start.getDate() - 6);
+  return { start, end };
+}
+
+function fmtRangeLabel({ start, end }) {
+  if (!start && !end) return 'Date Range';
+  const o = { month: 'short', day: 'numeric' };
+  const s = start ? start.toLocaleDateString('en-US', o) : '…';
+  const e = end   ? end.toLocaleDateString('en-US', o)   : '…';
+  if (start && end && sameDay(start, end)) return s;
+  return `${s} – ${e}`;
+}
+
+// ── Date range picker popover ─────────────────────────────────────
+function DateRangePicker({ dateRange, triggerRef, onChange, onClose }) {
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const onDown = (e) => {
+      if (triggerRef.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      onClose();
+    };
+    const onScroll = () => onClose();
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [onClose, triggerRef]);
+
+  const [calMonth,  setCalMonth]  = useState(() => {
+    const d = dateRange.start || new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [tempRange, setTempRange] = useState({ start: dateRange.start, end: dateRange.end });
+  const [picking,   setPicking]   = useState('start');
+  const [hoverDay,  setHoverDay]  = useState(null);
+
+  const yr  = calMonth.getFullYear();
+  const mo  = calMonth.getMonth();
+  const firstDow    = new Date(yr, mo, 1).getDay();
+  const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+  const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  const quick = (type) => {
+    const now = new Date();
+    if (type === 'all')   { onChange({ start: null, end: null }); return; }
+    if (type === 'today') { onChange({ start: startOfDay(now), end: now }); return; }
+    if (type === 'week')  { onChange(thisWeekRange()); return; }
+    if (type === 'month') { onChange({ start: new Date(now.getFullYear(), now.getMonth(), 1), end: now }); return; }
+  };
+
+  const handleDayClick = (day) => {
+    const d = new Date(yr, mo, day);
+    if (picking === 'start' || !tempRange.start) {
+      setTempRange({ start: d, end: null });
+      setPicking('end');
+    } else {
+      const s = tempRange.start;
+      onChange({ start: d < s ? d : s, end: d < s ? s : d });
+    }
+  };
+
+  const effectiveEnd = tempRange.end || hoverDay;
+
+  const dayClass = (day) => {
+    const d    = new Date(yr, mo, day);
+    const isSel  = (tempRange.start && sameDay(d, tempRange.start)) || (tempRange.end && sameDay(d, tempRange.end));
+    const isHov  = hoverDay && sameDay(d, hoverDay) && picking === 'end';
+    const isBet  = tempRange.start && effectiveEnd && d > tempRange.start && d < effectiveEnd;
+    const isTod  = sameDay(d, new Date());
+    return ['al-cal-day', isSel ? 'sel' : isHov ? 'hov' : '', isBet ? 'bet' : '', isTod ? 'tod' : '']
+      .filter(Boolean).join(' ');
+  };
+
+  return (
+    <div ref={menuRef} className="al-cal-pop"
+      style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50 }}>
+      <div className="al-cal-qs">
+        {[['today','Today'],['week','This Week'],['month','This Month'],['all','All Time']].map(([v, l]) => (
+          <button key={v} className="al-cal-sc" onClick={() => quick(v)}>{l}</button>
+        ))}
+      </div>
+      <div className="al-cal-hr" />
+
+      <div className="al-cal-nav">
+        <button className="al-cal-nb" onClick={() => setCalMonth(new Date(yr, mo - 1))}>‹</button>
+        <span className="al-cal-ml">{calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+        <button className="al-cal-nb" onClick={() => setCalMonth(new Date(yr, mo + 1))}>›</button>
+      </div>
+
+      <div className="al-cal-grid">
+        {DOW.map(d => <span key={d} className="al-cal-dow">{d}</span>)}
+        {Array.from({ length: firstDow }).map((_, i) => <span key={`_${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          return (
+            <button key={day} className={dayClass(day)}
+              onMouseEnter={() => picking === 'end' && setHoverDay(new Date(yr, mo, day))}
+              onMouseLeave={() => setHoverDay(null)}
+              onClick={() => handleDayClick(day)}>
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="al-cal-hint">
+        <span>{picking === 'start' ? 'Select start date' : 'Select end date'}</span>
+        {tempRange.start && picking === 'end' && (
+          <button className="al-cal-rst"
+            onClick={() => { setTempRange({ start: null, end: null }); setPicking('start'); }}>
+            Reset
+          </button>
+        )}
+      </div>
     </div>
   );
 }

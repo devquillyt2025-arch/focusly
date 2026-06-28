@@ -37,9 +37,11 @@ import {
   isScheduledToday, isLoggedToday, computeHabitStreaks
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
-import { handleCalendarAuthCallback } from './utils/googleCalendarSync';
+import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar } from './utils/googleCalendarSync';
 import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
+import { logActivity, diffObjects } from './utils/activityLog';
+import ActivityLogView from './components/ActivityLogView';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -553,6 +555,7 @@ export default function App() {
       updatedAt: new Date().toISOString(),
       syncConflict: null
     };
+    logActivity({ module: 'tasks', entity_type: 'task', entity_id: t.id, action: 'created', title: t.name });
     setTasks(prev => {
       const next = [t, ...prev];
       pushSyncQueue({ type: 'CREATE', taskId: t.id });
@@ -566,6 +569,9 @@ export default function App() {
   const updateTaskData = useCallback((updated) => {
     const nextUpdated = { ...updated, name: updated.name.trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
     setTasks(prev => {
+      const old = prev.find(t => t.id === updated.id);
+      const changes = old ? diffObjects(old, nextUpdated, ['name', 'notes', 'priority', 'category', 'dueDate', 'timeEstimate']) : null;
+      logActivity({ module: 'tasks', entity_type: 'task', entity_id: updated.id, action: 'updated', title: nextUpdated.name, field_changes: changes });
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
@@ -587,19 +593,40 @@ export default function App() {
   }, []);
 
   // ── Habit callbacks ──
-  const addHabit    = useCallback((h) => setHabits(prev => [h, ...prev]), []);
-  const updateHabit = useCallback((h) => setHabits(prev => prev.map(x => x.id === h.id ? h : x)), []);
-  const deleteHabit = useCallback((id) => setHabits(prev => prev.filter(h => h.id !== id)), []);
+  const addHabit = useCallback((h) => {
+    logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action: 'created', title: h.name });
+    setHabits(prev => [h, ...prev]);
+  }, []);
+  const updateHabit = useCallback((h) => {
+    logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action: 'updated', title: h.name });
+    setHabits(prev => prev.map(x => x.id === h.id ? h : x));
+  }, []);
+  const deleteHabit = useCallback((id) => {
+    setHabits(prev => {
+      const h = prev.find(x => x.id === id);
+      if (h) logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: 'deleted', title: h.name });
+      return prev.filter(x => x.id !== id);
+    });
+  }, []);
   const markHabitDone = useCallback((id) => {
-    setHabits(prev => prev.map(h => h.id === id ? toggleCompletion(h) : h));
+    setHabits(prev => {
+      const h = prev.find(x => x.id === id);
+      if (h) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const wasCompleted = h.completions?.includes(todayStr);
+        logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: wasCompleted ? 'updated' : 'completed', title: h.name, field_changes: wasCompleted ? [{ field: 'completed_today', from: 'true', to: 'false' }] : null });
+      }
+      return prev.map(x => x.id === id ? toggleCompletion(x) : x);
+    });
   }, []);
 
   const toggleComplete = useCallback(async (id) => {
     const isSyncEnabled = localStorage.getItem('focusly_sync_enabled') === 'true';
     const currentTask = tasks.find(t => t.id === id);
     if (!currentTask) return;
-    
+
     const done = !currentTask.completed;
+    logActivity({ module: 'tasks', entity_type: 'task', entity_id: id, action: done ? 'completed' : 'updated', title: currentTask.name, field_changes: done ? null : [{ field: 'completed', from: 'true', to: 'false' }] });
 
     const performLocalUpdate = (forceSync = false) => {
       setTasks(prev => {
@@ -664,6 +691,7 @@ export default function App() {
   const deleteTask = useCallback((id) => {
     setTasks(prev => {
       const task = prev.find(t => t.id === id);
+      if (task) logActivity({ module: 'tasks', entity_type: 'task', entity_id: id, action: 'deleted', title: task.name });
       if (task && task.googleTaskId) {
         pushSyncQueue({ type: 'DELETE', googleTaskId: task.googleTaskId, taskId: id });
       }
@@ -818,6 +846,11 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchScope, setSearchScope] = useState('notes');
+  const searchRef = useRef(null);
+  const avatarRef = useRef(null);
   const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
     const saved = localStorage.getItem('focusly-profile-email');
@@ -864,6 +897,65 @@ export default function App() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const searchResults = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (q.length < 2) return [];
+    const results = [];
+
+    tasks.forEach(t => {
+      if (t.name?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q)) {
+        results.push({ type: 'task', id: t.id, title: t.name, sub: t.notes?.slice(0, 60) || t.category, tab: 'tasks' });
+      }
+    });
+
+    try {
+      JSON.parse(localStorage.getItem('focusly_notes') || '[]').forEach(n => {
+        if (n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q)) {
+          results.push({ type: 'note', id: n.id, title: n.title || 'Untitled note', sub: n.content?.slice(0, 60), tab: 'notes' });
+        }
+      });
+    } catch {}
+
+    try {
+      JSON.parse(localStorage.getItem('focusly_goals') || '[]').forEach(g => {
+        if (g.title?.toLowerCase().includes(q)) {
+          results.push({ type: 'goal', id: g.id, title: g.title, sub: g.category, tab: 'goals' });
+        }
+      });
+    } catch {}
+
+    habits.forEach(h => {
+      if (h.name?.toLowerCase().includes(q)) {
+        results.push({ type: 'habit', id: h.id, title: h.name, sub: 'Habit tracker', tab: 'habits' });
+      }
+    });
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith('focusly_journal_')) continue;
+      try {
+        const e = JSON.parse(localStorage.getItem(key));
+        const content = e?.content || '';
+        if (content.toLowerCase().includes(q)) {
+          const idx = content.toLowerCase().indexOf(q);
+          const preview = content.slice(Math.max(0, idx - 20), idx + 60).trim();
+          results.push({ type: 'journal', id: e.date, title: `Journal — ${e.date}`, sub: preview, tab: 'journal' });
+        }
+      } catch {}
+    }
+
+    return results.slice(0, 8);
+  }, [searchQuery, tasks, habits]);
+
+  useEffect(() => {
+    const handler = e => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+      if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   if (!onboardingComplete) {
     return (
       <OnboardingFlow onComplete={() => {
@@ -885,9 +977,54 @@ export default function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
         </div>
-        <div className="yartu-top-search">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Search for anything..." />
+        <div className="yartu-top-search" ref={searchRef} style={{ display: 'flex', gap: 8 }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', left: 12 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              type="text"
+              placeholder="Search for anything..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+              onFocus={() => { if (searchQuery.length >= 2) setSearchOpen(true); }}
+              onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); e.target.blur(); } }}
+              style={{ width: '100%', paddingLeft: 36 }}
+            />
+            {searchQuery && (
+              <button className="search-clear-btn" onClick={() => { setSearchQuery(''); setSearchOpen(false); }} title="Clear" style={{ position: 'absolute', right: 8 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </div>
+          {activeTab === 'notes' && (
+            <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 20, padding: 2, border: '1px solid var(--border)', flexShrink: 0 }}>
+              <button onClick={() => setSearchScope('notes')} style={{ background: searchScope === 'notes' ? 'var(--accent)' : 'transparent', color: searchScope === 'notes' ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 18, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>Notes</button>
+              <button onClick={() => setSearchScope('all')} style={{ background: searchScope === 'all' ? 'var(--accent)' : 'transparent', color: searchScope === 'all' ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 18, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>All</button>
+            </div>
+          )}
+          {searchOpen && searchQuery.length >= 2 && (searchScope === 'all' || activeTab !== 'notes') && (
+            <div className="search-dropdown" onMouseDown={e => e.stopPropagation()}>
+              {searchResults.length === 0 ? (
+                <div className="search-empty">No results for "{searchQuery}"</div>
+              ) : (
+                searchResults.map(r => (
+                  <button key={r.type + r.id} className="search-result-item" onMouseDown={e => e.preventDefault()} onClick={() => { setActiveTab(r.tab); setSearchOpen(false); setSearchQuery(''); }}>
+                    <span className="search-result-icon" data-type={r.type}>
+                      {r.type === 'task'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
+                      {r.type === 'note'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+                      {r.type === 'goal'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
+                      {r.type === 'habit'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>}
+                      {r.type === 'journal' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}
+                    </span>
+                    <div className="search-result-text">
+                      <span className="search-result-title">{r.title}</span>
+                      {r.sub && <span className="search-result-sub">{r.sub}</span>}
+                    </div>
+                    <span className="search-result-badge">{r.type}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
         <div className="header-right">
           <div style={{ position: 'relative' }}>
@@ -933,15 +1070,10 @@ export default function App() {
             </AnimatePresence>
           </div>
 
-          <div className="yartu-top-avatar" onClick={() => setAvatarOpen(a => !a)}>
+          <div className="yartu-top-avatar" ref={avatarRef} onClick={() => setAvatarOpen(a => !a)}>
             <div className="yartu-avatar-circle" style={{ padding: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {profileAvatar.startsWith('data:image') ? <img src={profileAvatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : profileAvatar !== '😎' ? profileAvatar : getInitials(profileName)}
             </div>
-            <div className="yartu-avatar-text">
-              <span className="yartu-avatar-name">{profileName || 'Esther Howard'}</span>
-              <span className="yartu-avatar-email">{profileEmail || 'estherH@gmail.com'}</span>
-            </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             
             <AnimatePresence>
             {avatarOpen && (
@@ -954,10 +1086,6 @@ export default function App() {
                 onClick={e => e.stopPropagation()}
               >
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Preferences</div>
-                <button className="main-nav-btn" onClick={() => { setOpenModal('analytics'); setAvatarOpen(false); }}>
-                  <span className="nav-icon"><IconChart /></span>
-                  <span className="nav-label">Analytics (A)</span>
-                </button>
                 <button className="main-nav-btn" onClick={() => { setOpenModal('shortcuts'); setAvatarOpen(false); }}>
                   <span className="nav-icon"><IconKeyboard /></span>
                   <span className="nav-label">Shortcuts (?)</span>
@@ -965,6 +1093,32 @@ export default function App() {
                 <button className="main-nav-btn" onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setAvatarOpen(false); }}>
                   <span className="nav-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
                   <span className="nav-label">Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
+                </button>
+                <div className="nav-divider" style={{ margin: '8px 0' }} />
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 11px', marginBottom: -6 }}>Connections</div>
+                <button className="main-nav-btn" style={{ justifyContent: 'space-between' }} onClick={() => { setActiveTab('settings'); setAvatarOpen(false); }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="nav-icon"><NavIcoCheckSquare /></span>
+                    <span className="nav-label">Tasks</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className={`status-dot ${syncStatus === 'Sync failed' ? 'red' : syncStatus !== 'Not connected' ? 'green' : 'gray'}`} />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {syncStatus === 'Sync failed' ? 'Error' : syncStatus !== 'Not connected' ? 'Synced' : 'Not connected'}
+                    </span>
+                  </span>
+                </button>
+                <button className="main-nav-btn" style={{ justifyContent: 'space-between' }} onClick={() => { if (!isGCalConnected()) { connectGoogleCalendar(); } else { setActiveTab('calendar'); setAvatarOpen(false); } }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="nav-icon"><NavIcoCalendar /></span>
+                    <span className="nav-label">Calendar</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className={`status-dot ${isGCalConnected() ? 'green' : 'gray'}`} />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {isGCalConnected() ? 'Connected' : 'Not connected'}
+                    </span>
+                  </span>
                 </button>
                 <div className="nav-divider" style={{ margin: '8px 0' }} />
                 <button className="hdr-cta-btn" style={{ width: '100%' }} onClick={() => { setAvatarOpen(false); if (activeTab === 'tasks') setOpenModal('add'); else openAddTracker(); }}>
@@ -1011,11 +1165,12 @@ export default function App() {
           <div className="nav-divider" />
           <span className="nav-section-label">More</span>
           {[
-            { id:'habits',  label:'Habits',  Icon: NavIcoRepeat },
-            { id:'timer',   label:'Focus',   Icon: NavIcoTimerIcon },
-            { id:'journal', label:'Journal', Icon: NavIcoBookOpen },
-            { id:'goals',   label:'Goals',   Icon: NavIcoGoalTarget },
-            { id:'reports', label:'Reports', Icon: NavIcoBarChart },
+            { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
+            { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
+            { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
+            { id:'goals',    label:'Goals',         Icon: NavIcoGoalTarget },
+            { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
+            { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
           ].map(tab => (
             <button key={tab.id}
               className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
@@ -1099,7 +1254,7 @@ export default function App() {
           )}
 
           {activeTab === 'settings' && (
-            <SettingsView 
+            <SettingsView
               settings={settings}
               onSaveSettings={saveSettings}
               theme={theme}
@@ -1121,6 +1276,9 @@ export default function App() {
                 setSyncStatus('Not connected');
               }}
               onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
+              initialProfileName={profileName}
+              initialProfileEmail={profileEmail}
+              initialProfileAvatar={profileAvatar}
               onUpdateProfile={(name, email, av) => {
                 setProfileName(name);
                 setProfileEmail(email);
@@ -1166,9 +1324,10 @@ export default function App() {
               onDeleteHabit={deleteHabit}
             />
           )}
-          {activeTab === 'journal' && <JournalView />}
-          {activeTab === 'goals'   && <GoalsView />}
-          {activeTab === 'notes'   && <NotesView onOpenNoteEditor={setNoteEditorCtx} />}
+          {activeTab === 'journal'  && <JournalView />}
+          {activeTab === 'goals'    && <GoalsView />}
+          {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchScope === 'notes' ? searchQuery : ''} />}
+          {activeTab === 'activity' && <ActivityLogView setActiveTab={setActiveTab} />}
 
           {activeTab === 'tasks' && (
             <div className="tasks-tab">
@@ -1351,6 +1510,9 @@ function NavIcoCalendar() {
 }
 function NavIcoNotes() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>;
+}
+function NavIcoHistory() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 }
 // Bottom
 function NavIcoSettings() {
