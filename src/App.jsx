@@ -42,6 +42,7 @@ import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { logActivity, diffObjects } from './utils/activityLog';
 import ActivityLogView from './components/ActivityLogView';
+import FocusCompanion from './components/FocusCompanion';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -846,11 +847,23 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifsCleared, setNotifsCleared] = useState(false);
+  const [snoozedIds, setSnoozedIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState('notes');
   const searchRef = useRef(null);
   const avatarRef = useRef(null);
+  const notifRef  = useRef(null);
+  const [isPushEnabled, setIsPushEnabled] = useState(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    return localStorage.getItem('focusly-push-enabled') === 'true' && Notification.permission === 'granted';
+  });
+  const [clockNow, setClockNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
     const saved = localStorage.getItem('focusly-profile-email');
@@ -871,13 +884,72 @@ export default function App() {
     }
   };
 
+  const handlePushToggle = () => {
+    if (!('Notification' in window)) {
+      console.warn('Focusly: This browser does not support desktop notifications.');
+      return;
+    }
+    if (isPushEnabled) {
+      setIsPushEnabled(false);
+      localStorage.setItem('focusly-push-enabled', 'false');
+    } else {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          setIsPushEnabled(true);
+          localStorage.setItem('focusly-push-enabled', 'true');
+          new Notification('Focusly Notifications Enabled', {
+            body: 'You will receive task reminders and updates here.',
+            icon: '/favicon.ico',
+          });
+        } else {
+          setIsPushEnabled(false);
+          localStorage.setItem('focusly-push-enabled', 'false');
+        }
+      });
+    }
+  };
+
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
   const activeHabitsCount = habits.filter(h => !h.archived).length;
-  
+
+  // ── Notification derived data ──
+  const firstName = profileName.split(' ')[0] || 'there';
+  const notifYesterdayStr = localDateStr(new Date(Date.now() - 86400000));
+  const yesterdayPomos = pomodoroLog.filter(ts => ts.startsWith(notifYesterdayStr)).length;
+  const completedToday = tasks.filter(t => t.completed && t.completedAt?.startsWith(todayStr())).length;
+  const totalTasksForPct = tasks.filter(t => !t.completed || t.completedAt?.startsWith(todayStr())).length;
+  const completionPct = totalTasksForPct > 0 ? Math.round((completedToday / totalTasksForPct) * 100) : 0;
+  const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
+  const urgentTask = tasks.filter(t => !t.completed && t.dueDate)
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]
+    || tasks.filter(t => !t.completed)
+      .sort((a, b) => (PRIO_ORDER[a.priority] ?? 3) - (PRIO_ORDER[b.priority] ?? 3))[0];
+  const urgentDueHrs = urgentTask?.dueDate
+    ? Math.round((new Date(urgentTask.dueDate + 'T23:59:59') - Date.now()) / 3600000)
+    : null;
+  const quickestTask = tasks.filter(t => !t.completed)
+    .sort((a, b) => (a.timeEstimate || 25) - (b.timeEstimate || 25))[0];
+
   const notifItems = [
-    { id: 1, title: '🎯 Tasks Reminder', desc: `You have ${pendingTasksCount} pending tasks remaining. Keep up the momentum!`, time: 'Just now', type: 'task' },
-    { id: 2, title: '⚡ Habit Tracker', desc: `You have ${activeHabitsCount || 4} habits active today. Remember to maintain your daily streaks!`, time: '10m ago', type: 'habit' },
-    { id: 3, title: '📊 Analytics Insight', desc: `Great focus! You've logged ${pomodoroLog.length} pomodoro sessions. View analytics for full stats.`, time: '1h ago', type: 'analytics' },
+    {
+      id: 1, title: '🎯 Tasks Reminder', time: 'Just now', type: 'task',
+      desc: urgentTask
+        ? `You have ${pendingTasksCount} pending. "${urgentTask.name}"${urgentDueHrs !== null ? ` is due in ${urgentDueHrs}h.` : ' needs your attention.'}`
+        : `You have ${pendingTasksCount} pending tasks. Keep up the momentum!`,
+    },
+    {
+      id: 2, title: '⚡ Habit Tracker', time: '10m ago', type: 'habit',
+      desc: `You have ${activeHabitsCount || 0} habit${activeHabitsCount !== 1 ? 's' : ''} active today. Remember to maintain your daily streaks!`,
+    },
+    {
+      id: 3, title: '📊 Analytics Insight', time: '1h ago', type: 'analytics',
+      desc: pomodoroLog.length === 0
+        ? 'Ready for your first focus session? Tap to start.'
+        : yesterdayPomos > 0
+          ? `Yesterday you did ${yesterdayPomos} pomodoro${yesterdayPomos !== 1 ? 's' : ''}! Beat that today?`
+          : `Great focus! You've logged ${pomodoroLog.length} session${pomodoroLog.length !== 1 ? 's' : ''} today.`,
+      progressPct: completionPct,
+    },
   ];
 
   // Automated trigger for notifications when enabled
@@ -951,6 +1023,7 @@ export default function App() {
     const handler = e => {
       if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
       if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarOpen(false);
+      if (notifRef.current  && !notifRef.current.contains(e.target))  setNotifOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -968,7 +1041,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
       <header className="app-header">
         <div className="app-logo">
           <IconFocusly />
@@ -1021,7 +1094,22 @@ export default function App() {
           )}
         </div>
         <div className="header-right">
-          <div style={{ position: 'relative' }}>
+          {/* ── Date / Time / Greeting widget ── */}
+          {(() => {
+            const h = clockNow.getHours();
+            const period = h >= 6 && h < 12 ? 'Morning' : h >= 12 && h < 18 ? 'Afternoon' : 'Evening';
+            const greetingText = `Good ${period}, ${firstName}! ${period === 'Evening' ? '🌙' : '☀️'}`;
+            const dayStr = clockNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = clockNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', minWidth: 152, flexShrink: 0, lineHeight: 1.5, letterSpacing: '0.01em', gap: 1 }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-secondary)', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>{greetingText}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{timeStr} · {dayStr}</span>
+              </div>
+            );
+          })()}
+          <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
+          <div style={{ position: 'relative' }} ref={notifRef}>
             <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} />
@@ -1038,22 +1126,84 @@ export default function App() {
                 style={{ width: 340, right: 0, padding: 16, cursor: 'default' }}
                 onClick={e => e.stopPropagation()}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Notifications</div>
-                  <button style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => triggerDesktopNotification('Focusly Notification', 'Push notifications are active!')}>
-                    🔔 Push Desktop
-                  </button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {notifItems.map(item => (
-                    <div key={item.id} style={{ padding: 12, background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.title}</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.time}</span>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{item.desc}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0 12px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Notifications</div>
+                    {!notifsCleared && notifItems.length > 0 && (
+                      <button
+                        onClick={() => setNotifsCleared(true)}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}
+                      >Clear all</button>
+                    )}
+                  </div>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'Notification' in window ? 'pointer' : 'not-allowed', opacity: 'Notification' in window ? 1 : 0.4 }}
+                    title={!('Notification' in window) ? 'Notifications not supported in this browser' : isPushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
+                    onClick={handlePushToggle}
+                  >
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Push</span>
+                    <div style={{ width: 36, height: 20, borderRadius: 10, background: isPushEnabled ? '#22c55e' : 'var(--border-strong, #cbd5e1)', position: 'relative', transition: 'background 0.18s ease', flexShrink: 0 }}>
+                      <div style={{ position: 'absolute', top: 3, left: isPushEnabled ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'left 0.18s ease' }} />
                     </div>
-                  ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {notifsCleared ? (
+                    <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>No notifications</div>
+                  ) : (() => {
+                    const visible = notifItems.filter(item => !snoozedIds.has(item.id));
+                    if (visible.length === 0) return <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>All snoozed · back in 15 min</div>;
+                    return visible.map(item => (
+                      <div key={item.id} style={{ background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                        <div style={{ padding: '10px 12px 8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: '0.83rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.title}</span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{item.time}</span>
+                          </div>
+                          <div
+                            style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', lineHeight: 1.45, cursor: item.type === 'analytics' && pomodoroLog.length === 0 ? 'pointer' : 'default' }}
+                            onClick={() => { if (item.type === 'analytics' && pomodoroLog.length === 0) { setActiveTab('timer'); setNotifOpen(false); } }}
+                          >{item.desc}</div>
+                          {item.progressPct !== undefined && (
+                            <div style={{ marginTop: 7, width: '100%', height: 5, background: '#e5e7eb', borderRadius: 9999, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(100, item.progressPct)}%`, background: '#6366f1', borderRadius: 9999, transition: 'width 0.4s ease' }} />
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 6, padding: '6px 10px 8px', borderTop: '1px solid var(--border)' }}>
+                          {item.type === 'task' && (<>
+                            <button
+                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              onClick={() => { if (quickestTask) { toggleComplete(quickestTask.id); showToast(`"${quickestTask.name}" done ✓`, 'success'); } }}
+                            >Mark Quickest Done</button>
+                            <button
+                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              onClick={() => { setActiveTab('tasks'); setNotifOpen(false); }}
+                            >View All</button>
+                          </>)}
+                          {item.type === 'habit' && (<>
+                            <button
+                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              onClick={() => { setActiveTab('habits'); setNotifOpen(false); }}
+                            >Log Habit</button>
+                            <button
+                              style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              onClick={() => {
+                                setSnoozedIds(prev => new Set([...prev, item.id]));
+                                setTimeout(() => setSnoozedIds(prev => { const n = new Set(prev); n.delete(item.id); return n; }), 15 * 60 * 1000);
+                              }}
+                            >Snooze 15m</button>
+                          </>)}
+                          {item.type === 'analytics' && (
+                            <button
+                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              onClick={() => { switchMode('focus'); setActiveTab('timer'); setNotifOpen(false); }}
+                            >Start 25-min Timer</button>
+                          )}
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
                 <div className="nav-divider" style={{ margin: '12px 0 8px' }} />
                 <button className="main-nav-btn" style={{ justifyContent: 'center', width: '100%', padding: '8px 0' }} onClick={() => { setActiveTab('settings'); setNotifOpen(false); }}>
@@ -1294,20 +1444,34 @@ export default function App() {
 
           {activeTab === 'timer' && (
             <div className="timer-tab">
-              <Timer
-                task={activeTask}
-                timerMode={timerMode}
-                timerState={timerState}
-                timerSeconds={timerSeconds}
-                totalSeconds={totalSeconds}
-                pomodoroCount={pomodoroCount}
-                onSwitchMode={switchMode}
-                onStart={startTimer}
-                onPause={pauseTimer}
-                onReset={resetTimer}
-              />
-              <Stats tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} />
-              <TodayBreakdown tasks={tasks} />
+              <div className="timer-left-col">
+                <Timer
+                  task={activeTask}
+                  timerMode={timerMode}
+                  timerState={timerState}
+                  timerSeconds={timerSeconds}
+                  totalSeconds={totalSeconds}
+                  pomodoroCount={pomodoroCount}
+                  onSwitchMode={switchMode}
+                  onStart={startTimer}
+                  onPause={pauseTimer}
+                  onReset={resetTimer}
+                />
+              </div>
+              <div className="timer-right-col">
+                <FocusCompanion
+                  tasks={tasks}
+                  activeTaskId={activeTaskId}
+                  onSelectTask={selectTask}
+                  onToggle={toggleComplete}
+                  pomodoroLog={pomodoroLog}
+                  timerState={timerState}
+                  timerSeconds={timerSeconds}
+                  timerMode={timerMode}
+                />
+                <TodayBreakdown tasks={tasks} />
+                <Stats tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} />
+              </div>
             </div>
           )}
 

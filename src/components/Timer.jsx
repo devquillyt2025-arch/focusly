@@ -146,7 +146,7 @@ export default function Timer({ task, timerMode, timerState, timerSeconds, total
           {task.notes && <p className="task-detail-notes">{task.notes}</p>}
         </div>
       ) : (
-        <p className="no-task-hint">← Select a task to track time</p>
+        <p className="no-task-hint">Select a task in the panel →</p>
       )}
     </div>
   );

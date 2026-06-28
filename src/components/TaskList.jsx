@@ -712,187 +712,150 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   );
 
   return (
-    <div className="task-list-panel today-3col-container" style={{ background: 'transparent', border: 'none', gap: 16 }}>
+    <div className="task-list-panel today-3col-container" style={{ background: 'transparent', border: 'none', gap: 10 }}>
       
-      {/* ── GREETING ROW (Mimicking Today Layout) ── */}
-      <div className="yartu-greeting-row" style={{ marginBottom: 0 }}>
-        <div className="yartu-greeting-left">
-          <h1 className="yartu-greeting-title">Task Management 🎯</h1>
-          <div className="yartu-summary-strip">
-            <span className="yartu-summary-prefix">Overview:</span>
-            <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-              <span className="yartu-summary-num">{pendingCount}</span>
-              <span className="yartu-summary-label">{pendingCount === 1 ? 'task to complete' : 'tasks to complete'}</span>
-            </div>
-            <span className="yartu-summary-divider">·</span>
-            <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              <span className="yartu-summary-num">{completed.length}</span>
-              <span className="yartu-summary-label">{completed.length === 1 ? 'completed task' : 'completed tasks'}</span>
-            </div>
-            <span className="yartu-summary-divider">·</span>
-            <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            <div className="yartu-summary-item" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {syncStatus === 'Syncing...' ? (
-                <svg style={{ animation: 'customSpin 1s linear infinite', width: 12, height: 12, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
-                  <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <span style={{
-                  width: 6, height: 6, borderRadius: 3,
-                  background: syncStatus.startsWith('Synced') ? '#10b981' : syncStatus === 'Sync failed — retry' ? '#ef4444' : '#64748b',
-                  boxShadow: syncStatus.startsWith('Synced') ? '0 0 8px #10b981' : syncStatus === 'Sync failed — retry' ? '0 0 8px #ef4444' : 'none'
-                }} />
-              )}
-              <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{syncStatus}</span>
-              {syncStatus !== 'Not connected' && syncStatus !== 'Syncing...' && (
-                <button
-                  type="button"
-                  onClick={onSyncNow}
-                  style={{ background: 'transparent', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0 2px', fontWeight: 700, fontSize: '0.82rem', marginLeft: 4 }}
-                  title="Sync Now"
-                >
-                  Sync Now
-                </button>
-              )}
-            </div>
-          </div>
+      <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── UNIFIED COMPACT TOOLBAR: Search → Sort → Filter → Overview → Sync ── */}
+      <div className="yartu-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', width: '100%', boxSizing: 'border-box', flexShrink: 0 }}>
+
+        {/* 1. Search — grows to fill */}
+        <div className="task-search-wrap" style={{ position: 'relative', flex: 1, minWidth: 150, maxWidth: 280 }}>
+          <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', pointerEvents: 'none' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            ref={searchRef}
+            className="task-search-input"
+            style={{ width: '100%', height: 34, padding: '0 10px 0 28px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+            type="text"
+            placeholder="Search tasks..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            aria-label="Search tasks"
+          />
+          {query && (
+            <button style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }} onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
         </div>
 
-        <div className="yartu-mode-toggle" style={{ background: 'transparent', border: 'none', padding: 0, gap: 12 }}>
-          {/* Sort dropdown */}
-          <div className="sort-dropdown" ref={sortRef} style={{ position: 'relative' }}>
-            <button className="sort-btn" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '0 16px', height: 38, borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxSizing: 'border-box' }} onClick={() => setSortOpen(o => !o)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 8h10M3 12h7M3 16h4M17 8v8M14 5l3-3 3 3M14 19l3 3 3-3"/>
-              </svg>
-              Sort
-            </button>
-            {sortOpen && (
-              <div className="sort-menu" style={{ position: 'absolute', top: 44, right: 0, zIndex: 100, background: '#0f172a', border: '1px solid var(--border-strong)', borderRadius: '12px', padding: '8px 0', width: '160px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-                {SORT_OPTIONS.map(opt => {
-                  const isActive = sortBy === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', width: '100%', background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent', border: 'none', color: '#f8fafc', fontSize: '0.9rem', cursor: 'pointer', textAlign: 'left' }}
-                      onClick={() => {
-                        setSortBy(opt.value);
-                        localStorage.setItem(LS_SORT_KEY, opt.value);
-                        setSortOpen(false);
-                      }}
-                      onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-                      onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <span>{opt.label}</span>
-                      {isActive && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <button className="add-task-btn" style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '0 20px', height: 38, borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxSizing: 'border-box', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }} onClick={onAdd}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add Task
+        {/* 2. Sort button */}
+        <div className="sort-dropdown" ref={sortRef} style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 34, padding: '0 12px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', boxSizing: 'border-box', whiteSpace: 'nowrap' }}
+            onClick={() => setSortOpen(o => !o)}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 8h10M3 12h7M3 16h4M17 8v8M14 5l3-3 3 3M14 19l3 3 3-3"/>
+            </svg>
+            {SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? 'Sort'}
           </button>
+          {sortOpen && (
+            <div className="sort-menu" style={{ position: 'absolute', top: 40, left: 0, zIndex: 200, background: 'var(--bg-elevated, #0f172a)', border: '1px solid var(--border-strong)', borderRadius: '10px', padding: '6px 0', width: '160px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+              {SORT_OPTIONS.map(opt => {
+                const isActive = sortBy === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', width: '100%', background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                    onClick={() => { setSortBy(opt.value); localStorage.setItem(LS_SORT_KEY, opt.value); setSortOpen(false); }}
+                    onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'var(--bg-hover)')}
+                    onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span>{opt.label}</span>
+                    {isActive && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ── STACKED TASK MANAGEMENT DASHBOARD ── */}
-      <div className="tasks-stacked-layout" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minWidth: 0 }}>
-        
-        {/* 1. HORIZONTAL PANEL: COMPACT OVERVIEW (CATEGORIES + SEARCH) */}
-        <div className="yartu-card horizontal-overview-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', width: '100%', boxSizing: 'border-box' }}>
-          
-          {/* Categories Row */}
-          <div className="compact-cats-container" style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4, flexShrink: 0 }}>Categories:</span>
-            <button
-              type="button"
-              className={`cat-pill-btn${catFilter === 'all' ? ' active' : ''}`}
-              onClick={() => setCatFilter('all')}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 14, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', margin: 0, width: 'fit-content', boxSizing: 'border-box', flexShrink: 0,
-                background: catFilter === 'all' ? '#6366f1' : 'var(--bg-base)',
-                color: catFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-                border: '1px solid ' + (catFilter === 'all' ? '#6366f1' : 'var(--border)'),
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <span>All Tasks</span>
-              <span style={{ background: catFilter === 'all' ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length}</span>
-            </button>
+        {/* 3. Category filter dropdown */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <select
+            className="task-cat-select"
+            value={catFilter}
+            onChange={e => setCatFilter(e.target.value)}
+            style={{ color: catFilter !== 'all' ? (CAT_META[catFilter]?.color ?? 'var(--text-primary)') : 'var(--text-primary)' }}
+          >
+            <option value="all">All Tasks ({tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length})</option>
             {ALL_CATS.map(cat => {
               const meta = CAT_META[cat];
               const count = catCounts[cat] || 0;
-              const isActive = catFilter === cat;
-              const hasContent = count > 0;
-              if (!hasContent && !isActive) return null;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`cat-pill-btn${isActive ? ' active' : ''}`}
-                  onClick={() => setCatFilter(cat)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 14, fontSize: '0.8rem', fontWeight: isActive || hasContent ? 600 : 500, cursor: 'pointer', margin: 0, width: 'fit-content', boxSizing: 'border-box', flexShrink: 0,
-                    background: isActive ? meta.color : 'var(--bg-base)',
-                    color: isActive ? '#fff' : hasContent ? 'var(--text-primary)' : 'var(--text-muted, #94a3b8)',
-                    border: '1px solid ' + (isActive ? meta.color : hasContent ? 'var(--border-strong, #cbd5e1)' : 'var(--border-light, #e2e8f0)'),
-                    opacity: isActive || hasContent ? 1 : 0.65,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#fff' : meta.color }} />
-                    <span>{meta.label}</span>
-                  </div>
-                  <span style={{ background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)', padding: '1px 6px', borderRadius: 10, fontSize: '0.75rem' }}>{count}</span>
-                </button>
-              );
+              if (!count && catFilter !== cat) return null;
+              return <option key={cat} value={cat}>{meta.label} ({count})</option>;
             })}
-          </div>
-
-          {/* Search Bar Row */}
-          <div className="task-search-wrap" style={{ position: 'relative', marginTop: 0, marginBottom: 0, width: '100%' }}>
-            <svg className="task-search-icon" style={{ position: 'absolute', left: 14, top: 11, color: 'var(--text-secondary)' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              ref={searchRef}
-              className="task-search-input"
-              style={{ width: '100%', height: 38, padding: '8px 14px 8px 40px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-              type="text"
-              placeholder="Search tasks by title..."
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              aria-label="Search tasks"
-            />
-            {query && (
-              <button className="task-search-clear" style={{ position: 'absolute', right: 12, top: 10, background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            )}
-          </div>
-
+          </select>
+          <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-secondary)' }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </div>
 
-        {/* 2. PENDING TASKS (FULL WIDTH) */}
-        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 12 }}>
+        {/* 4. Overview stats — right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{pendingCount}</span>
+            <span>pending</span>
+          </span>
+          <span style={{ color: 'var(--border)' }}>·</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontWeight: 700, color: '#10b981' }}>{completed.length}</span>
+            <span>done</span>
+          </span>
+        </div>
+
+        {/* 5. Sync button — far right */}
+        <div style={{ flexShrink: 0 }}>
+          {syncStatus === 'Syncing...' ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#6366f1' }}>
+              <svg style={{ animation: 'customSpin 1s linear infinite', width: 13, height: 13 }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25"></circle>
+                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Syncing
+            </span>
+          ) : syncStatus === 'Not connected' ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#64748b', display: 'inline-block' }} />
+              Offline
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onSyncNow}
+              title="Sync Now"
+              style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: '1px solid var(--border)', borderRadius: '7px', color: '#6366f1', cursor: 'pointer', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600 }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              {syncStatus.startsWith('Sync failed') ? 'Retry' : 'Sync'}
+            </button>
+          )}
+        </div>
+
+      </div>
+
+      {/* ── STACKED TASK MANAGEMENT DASHBOARD ── */}
+      <div className="tasks-stacked-layout" style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minWidth: 0, flex: 1, minHeight: 0 }}>
+
+        {/* 1. PENDING TASKS (FULL WIDTH) */}
+        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '12px 16px', gap: 8, flex: 1, minHeight: 0 }}>
           <div className="yartu-card-hdr">
             <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
-            <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
+              <button style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '0 14px', height: 30, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }} onClick={onAdd}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Task
+              </button>
+            </div>
           </div>
-          <div className="yartu-list" style={{ padding: '8px 0 0 0', flex: 1, gap: 12 }}>
+          <div className="yartu-list" style={{ padding: '4px 0 0 0', flex: 1, minHeight: 0, gap: 0, overflowY: 'auto' }}>
             
             {/* Quick Add Input */}
             {inlineAddCat === 'top' && (
@@ -932,8 +895,8 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           </div>
         </div>
 
-        {/* 3. COMPLETED TASKS (FULL WIDTH) */}
-        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 12 }}>
+        {/* 2. COMPLETED TASKS (FULL WIDTH) */}
+        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '12px 16px', gap: 8 }}>
           <div className="yartu-card-hdr">
             <span className="yartu-card-title">Completed ({completed.length})</span>
             {completed.length > 0 && (

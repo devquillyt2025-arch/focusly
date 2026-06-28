@@ -635,8 +635,7 @@ export async function syncTasks(tasks, setTasks, onStatusChange, isFocusTrigger 
     await pullTasksFromGoogle(updatedTasks, setTasks, token, onStatusChange);
 
     lastSyncTimestamp = Date.now();
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (onStatusChange) onStatusChange(`Synced (${nowStr})`);
+    if (onStatusChange) onStatusChange('Synced');
     console.log('[Google Tasks Sync] Sync completed successfully!');
   } catch (err) {
     console.error('[Google Tasks Sync] syncTasks orchestrator error:', err);
