@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const STORAGE_KEY = 'focusly_notes';
@@ -62,6 +63,28 @@ function newNote(overrides = {}) {
   };
 }
 
+// ── Content deduplication ────────────────────────────────────────────────
+// Removes storage-level duplication: content = A + B where B is a prefix of A.
+// Only fires when B is ≥20 chars so normal notes with repeated short phrases
+// are never touched. This is a safe one-time migration for a specific data
+// corruption pattern (second occurrence cut off mid-sentence).
+function deduplicateContent(content) {
+  if (!content || content.length < 40 || content.length > 20000) return content;
+  const half = Math.floor(content.length / 2);
+  // Exact duplication: content = A + A
+  if (content.length % 2 === 0) {
+    const A = content.slice(0, half);
+    if (content.slice(half) === A) return A;
+  }
+  // Truncated duplication: content = A + B where B is a non-trivial prefix of A
+  for (let splitAt = half; splitAt <= content.length - 20; splitAt++) {
+    const A = content.slice(0, splitAt);
+    const B = content.slice(splitAt);
+    if (A.startsWith(B)) return A;
+  }
+  return content;
+}
+
 // ── Note Editor Modal ──────────────────────────────────────────────────────
 function NoteModal({ note, onSave, onClose, onDelete }) {
   const [title,   setTitle]   = useState(note.title);
@@ -108,11 +131,15 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
   // Color is conveyed by the top border accent instead.
   const modalBg    = 'var(--bg-elevated)';
 
-  return (
+  // Bug 1 fix: portal renders directly into document.body, completely outside
+  // the framer-motion <motion.div> wrapper in App.jsx that has transform:translateY(0px)
+  // at rest. That transform creates a CSS containing block for position:fixed,
+  // making the overlay only cover the tab content area instead of the full viewport.
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={handleSave}>
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -127,6 +154,11 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
           boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
           display: 'flex', flexDirection: 'column',
           maxHeight: '88vh',
+          // Bug 2 fix: overflow:hidden gives the flex container a hard clip boundary
+          // at maxHeight. Without it, flex children can visually expand the container
+          // past the max, so the inner scrollable div never gets a bounded height to
+          // scroll against.
+          overflow: 'hidden',
         }}>
 
         {/* Title — fixed, never scrolls */}
@@ -252,7 +284,8 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
 
@@ -396,6 +429,20 @@ export default function NotesView() {
     setNotes(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   };
+
+  // Bug 3 fix: one-time migration that removes content duplicated at the data
+  // level (stored note has the text block twice, second copy possibly truncated).
+  // Runs once on mount, only persists when something actually changed.
+  useEffect(() => {
+    const cleaned = notes.map(n => ({
+      ...n,
+      content: deduplicateContent(n.content),
+    }));
+    if (JSON.stringify(cleaned) !== JSON.stringify(notes)) {
+      persist(cleaned);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── CRUD ───────────────────────────────────────────────────────────
   const saveNote = (note) => {
