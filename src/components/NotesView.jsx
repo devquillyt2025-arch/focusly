@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const STORAGE_KEY = 'focusly_notes';
@@ -86,7 +85,7 @@ function deduplicateContent(content) {
 }
 
 // ── Note Editor Modal ──────────────────────────────────────────────────────
-function NoteModal({ note, onSave, onClose, onDelete }) {
+export function NoteModal({ note, onSave, onClose, onDelete }) {
   const [title,   setTitle]   = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [color,   setColor]   = useState(note.color);
@@ -131,18 +130,18 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
   // Color is conveyed by the top border accent instead.
   const modalBg    = 'var(--bg-elevated)';
 
-  // Bug 1 fix: portal renders directly into document.body, completely outside
-  // the framer-motion <motion.div> wrapper in App.jsx that has transform:translateY(0px)
-  // at rest. That transform creates a CSS containing block for position:fixed,
-  // making the overlay only cover the tab content area instead of the full viewport.
-  return createPortal(
+  // Bug 1 fix: NoteModal is rendered directly from App.jsx (outside the tab-transition
+  // motion.div that has transform:translateY applied by framer-motion at rest).
+  // A position:fixed overlay inside a transformed ancestor is scoped to that ancestor,
+  // not the viewport. Rendering at the App level — same as AddTaskModal — fixes this.
+  return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={handleSave}>
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
         style={{
@@ -154,10 +153,6 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
           boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
           display: 'flex', flexDirection: 'column',
           maxHeight: '88vh',
-          // Bug 2 fix: overflow:hidden gives the flex container a hard clip boundary
-          // at maxHeight. Without it, flex children can visually expand the container
-          // past the max, so the inner scrollable div never gets a bounded height to
-          // scroll against.
           overflow: 'hidden',
         }}>
 
@@ -175,8 +170,10 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
         {/* Title / body separator */}
         <div style={{ height: 1, background: 'var(--border)', margin: '12px 20px 0', opacity: 0.5, flexShrink: 0 }} />
 
-        {/* Scrollable content area — grows with note, scrolls only when modal hits maxHeight */}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Bug 2 fix: block layout (not flex) means the textarea keeps its JS-set height
+            and overflows the container instead of being flex-shrunk to fit it. The container's
+            overflowY:auto then correctly shows a scrollbar. */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
           {/* Auto-growing body textarea */}
           <textarea
@@ -284,8 +281,7 @@ function NoteModal({ note, onSave, onClose, onDelete }) {
           </div>
         </div>
       </motion.div>
-    </motion.div>,
-    document.body
+    </motion.div>
   );
 }
 
@@ -412,7 +408,7 @@ function NoteCard({ note, onOpen, onPin, onDelete }) {
 }
 
 // ── Main NotesView ─────────────────────────────────────────────────────────
-export default function NotesView() {
+export default function NotesView({ onOpenNoteEditor }) {
   const [notes,       setNotes]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
     catch { return []; }
@@ -420,7 +416,6 @@ export default function NotesView() {
   const [search,      setSearch]      = useState('');
   const [activeTag,   setActiveTag]   = useState(null);
   const [activeColor, setActiveColor] = useState(null);
-  const [editingNote, setEditingNote] = useState(null);
   const [viewMode,    setViewMode]    = useState('grid'); // 'grid' | 'list'
   const [quickTitle,  setQuickTitle]  = useState('');
   const quickRef = useRef(null);
@@ -455,8 +450,12 @@ export default function NotesView() {
   };
 
   const deleteNote = (id) => {
-    const updated = notes.filter(n => n.id !== id);
-    persist(updated);
+    // Functional update avoids stale closure when called via App.jsx-level modal context.
+    setNotes(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const togglePin = (id) => {
@@ -464,8 +463,8 @@ export default function NotesView() {
     persist(updated);
   };
 
-  const openNew = (overrides = {}) => setEditingNote(newNote(overrides));
-  const openEdit = (note) => setEditingNote(note);
+  const openNew = (overrides = {}) => onOpenNoteEditor({ note: newNote(overrides), onSave: saveNote, onDelete: deleteNote });
+  const openEdit = (note) => onOpenNoteEditor({ note, onSave: saveNote, onDelete: deleteNote });
 
   // Quick create from the top bar input
   const handleQuickCreate = (e) => {
@@ -474,7 +473,7 @@ export default function NotesView() {
     const note = newNote({ title: quickTitle.trim() });
     saveNote(note);
     setQuickTitle('');
-    setEditingNote(note); // immediately open for more editing
+    onOpenNoteEditor({ note, onSave: saveNote, onDelete: deleteNote }); // immediately open for more editing
   };
 
   // ── Derived data ───────────────────────────────────────────────────
@@ -696,17 +695,6 @@ export default function NotesView() {
         )}
       </div>
 
-      {/* ── Note Editor Modal ── */}
-      <AnimatePresence>
-        {editingNote && (
-          <NoteModal
-            note={editingNote}
-            onSave={saveNote}
-            onClose={() => setEditingNote(null)}
-            onDelete={deleteNote}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

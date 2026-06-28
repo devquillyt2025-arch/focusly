@@ -27,7 +27,7 @@ import JournalView from './components/JournalView';
 import GoalsView from './components/GoalsView';
 import HabitsView from './components/HabitsView';
 import CalendarView from './components/CalendarView';
-import NotesView from './components/NotesView';
+import NotesView, { NoteModal } from './components/NotesView';
 import AddTrackerModal from './components/AddTrackerModal';
 import {
   loadHabits, saveHabits, migrateFromTrackers, toggleCompletion,
@@ -262,6 +262,7 @@ export default function App() {
   const [editingTracker, setEditingTracker] = useState(null);
   const [showAddTracker, setShowAddTracker] = useState(false);
   const [editingTask,    setEditingTask]    = useState(null);
+  const [noteEditorCtx,  setNoteEditorCtx]  = useState(null); // { note, onSave, onDelete }
   const [habits,         setHabits]         = useState(() => loadHabits() ?? []);
 
   // ── PWA Install State ──
@@ -1167,7 +1168,7 @@ export default function App() {
           )}
           {activeTab === 'journal' && <JournalView />}
           {activeTab === 'goals'   && <GoalsView />}
-          {activeTab === 'notes'   && <NotesView />}
+          {activeTab === 'notes'   && <NotesView onOpenNoteEditor={setNoteEditorCtx} />}
 
           {activeTab === 'tasks' && (
             <div className="tasks-tab">
@@ -1220,6 +1221,15 @@ export default function App() {
 
       {/* ── Modals ── */}
       <AnimatePresence>
+        {noteEditorCtx && (
+          <NoteModal
+            key={noteEditorCtx.note.id}
+            note={noteEditorCtx.note}
+            onSave={(savedNote) => noteEditorCtx.onSave(savedNote)}
+            onClose={() => setNoteEditorCtx(null)}
+            onDelete={(id) => noteEditorCtx.onDelete(id)}
+          />
+        )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
         {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
         {openModal==='analytics' && <AnalyticsModal key="analytics" tasks={tasks}      pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} />}
