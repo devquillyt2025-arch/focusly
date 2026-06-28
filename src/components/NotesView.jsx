@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const STORAGE_KEY = 'focusly_notes';
@@ -93,7 +94,9 @@ export function NoteModal({ note, onSave, onClose, onDelete }) {
   const [tagInput, setTagInput] = useState('');
   const [tags,    setTags]    = useState(note.tags || []);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const contentRef = useRef(null);
+  const colorBtnRef  = useRef(null);  // for getBoundingClientRect-based portal positioning
+  const contentRef   = useRef(null);
+  const [colorPopupPos, setColorPopupPos] = useState(null); // { bottom, left } in viewport px
 
   useEffect(() => { contentRef.current?.focus(); }, []);
 
@@ -104,6 +107,17 @@ export function NoteModal({ note, onSave, onClose, onDelete }) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
   }, [content]);
+
+  // Close color-picker portal on outside click
+  useEffect(() => {
+    if (!showColorPicker) return;
+    const close = (e) => {
+      if (!e.target.closest('[data-cpop]') && !e.target.closest('[data-cbtn]'))
+        setShowColorPicker(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showColorPicker]);
 
   const handleSave = () => {
     if (!title.trim() && !content.trim()) { onClose(); return; }
@@ -223,11 +237,25 @@ export function NoteModal({ note, onSave, onClose, onDelete }) {
               </svg>
             </button>
 
-            {/* Color picker — swatch shows active color at all times */}
+            {/* Color picker — portal, anchored to button via getBoundingClientRect */}
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowColorPicker(s => !s)} title="Change color"
+              <button
+                ref={colorBtnRef}
+                data-cbtn="1"
+                onClick={() => {
+                  if (colorBtnRef.current) {
+                    const r = colorBtnRef.current.getBoundingClientRect();
+                    // Open upward: bottom of popover aligns to top of button, left-aligned
+                    setColorPopupPos({
+                      bottom: window.innerHeight - r.top + 8,
+                      left: r.left,
+                    });
+                  }
+                  setShowColorPicker(s => !s);
+                }}
+                title="Change color"
                 style={{ background: showColorPicker ? 'rgba(99,102,241,0.08)' : 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px 8px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                {/* Active color swatch — visible without opening picker */}
+                {/* Active color swatch */}
                 <span style={{
                   width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
                   background: accentHex ?? 'transparent',
@@ -239,22 +267,48 @@ export function NoteModal({ note, onSave, onClose, onDelete }) {
                   <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
                 </svg>
               </button>
-              <AnimatePresence>
-                {showColorPicker && (
-                  <motion.div initial={{ opacity: 0, y: -6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.95 }} transition={{ duration: 0.12 }}
-                    style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 8, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 14, padding: 12, display: 'flex', gap: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 10, flexWrap: 'wrap', maxWidth: 220 }}>
+              {/* Portal is rendered directly — AnimatePresence can't track a ReactPortal
+                  as its direct child, so we rely on motion.div's own initial→animate
+                  for the enter fade; close is instant (acceptable UX trade-off). */}
+              {showColorPicker && colorPopupPos && createPortal(
+                <motion.div
+                  data-cpop="1"
+                  initial={{ opacity: 0, scale: 0.92, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.12 }}
+                    style={{
+                      position: 'fixed',
+                      bottom: colorPopupPos.bottom,
+                      left: colorPopupPos.left,
+                      zIndex: 400,
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 12,
+                      padding: '8px 10px',
+                      display: 'flex',
+                      flexDirection: 'row',   // single horizontal row — no wrap
+                      alignItems: 'center',
+                      gap: 6,
+                      boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
+                    }}>
                     {/* Default (no color) */}
-                    <button onClick={() => { setColor('default'); setShowColorPicker(false); }}
-                      style={{ width: 28, height: 28, borderRadius: '50%', border: color === 'default' ? '2px solid var(--accent)' : '2px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {color === 'default' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <button
+                      onClick={() => { setColor('default'); setShowColorPicker(false); }}
+                      title="Default"
+                      style={{ width: 24, height: 24, borderRadius: '50%', border: color === 'default' ? '2px solid var(--accent)' : '1.5px solid var(--border)', background: 'var(--bg-input)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}>
+                      {color === 'default' && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
                     </button>
                     {COLOR_DOTS.map((c, i) => (
-                      <button key={c} onClick={() => { setColor(NOTE_COLORS[i+1].id); setShowColorPicker(false); }}
-                        style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: color === NOTE_COLORS[i+1].id ? '3px solid white' : '2px solid transparent', cursor: 'pointer', boxShadow: color === NOTE_COLORS[i+1].id ? `0 0 0 2px ${c}` : 'none' }} />
+                      <button
+                        key={c}
+                        title={NOTE_COLORS[i + 1].label}
+                        onClick={() => { setColor(NOTE_COLORS[i + 1].id); setShowColorPicker(false); }}
+                        style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: color === NOTE_COLORS[i + 1].id ? '2.5px solid white' : '2px solid transparent', cursor: 'pointer', boxShadow: color === NOTE_COLORS[i + 1].id ? `0 0 0 2px ${c}` : 'none', flexShrink: 0, padding: 0 }}
+                      />
                     ))}
-                  </motion.div>
+                  </motion.div>,
+                  document.body
                 )}
-              </AnimatePresence>
             </div>
 
             {/* Delete (only for existing notes) */}
