@@ -60,8 +60,117 @@ function catStyle(cat) {
   return CAT_COLORS[(cat || '').toLowerCase()] || { bg: 'rgba(107,114,128,.1)', color: '#6b7280' };
 }
 
+// ── Custom Category Dropdown ──────────────────────────────────────
+function CategoryDropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const allOptions = [{ value: '', label: 'All categories' }, ...options.map(o => ({ value: o, label: o }))];
+  const selected = allOptions.find(o => o.value === value) || allOptions[0];
+
+  const choose = (val) => { onChange(val); setOpen(false); };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Filter by category"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          height: 36, padding: '0 12px',
+          background: value ? 'rgba(99,102,241,.06)' : 'var(--bg-input)',
+          border: `1px solid ${value ? '#a5b4fc' : 'var(--border)'}`,
+          borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem',
+          color: value ? '#4338ca' : 'var(--text-secondary)',
+          fontWeight: value ? 600 : 400,
+          fontFamily: 'inherit', whiteSpace: 'nowrap',
+          transition: 'border-color .13s, background .13s',
+          minWidth: 140,
+        }}
+      >
+        {value && (
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: catStyle(value).color, flexShrink: 0 }} />
+        )}
+        <span style={{ flex: 1, textAlign: 'left' }}>{selected.label}</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true" style={{ flexShrink: 0, transition: 'transform .18s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      {/* Menu */}
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            role="listbox"
+            aria-label="Category filter options"
+            initial={{ opacity: 0, y: -6, scale: .97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: .97 }}
+            transition={{ duration: .14, ease: 'easeOut' }}
+            style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+              minWidth: '100%', listStyle: 'none', margin: 0, padding: '4px',
+              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 6px 18px rgba(0,0,0,.12)',
+              zIndex: 60,
+            }}
+          >
+            {allOptions.map(opt => {
+              const isActive = opt.value === value;
+              const cs = opt.value ? catStyle(opt.value) : null;
+              return (
+                <li key={opt.value} role="option" aria-selected={isActive}>
+                  <button
+                    type="button"
+                    onClick={() => choose(opt.value)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                      padding: '7px 10px', border: 'none', borderRadius: 7, cursor: 'pointer',
+                      fontSize: '0.83rem', fontFamily: 'inherit', textAlign: 'left',
+                      background: isActive ? '#eef2ff' : 'transparent',
+                      color: isActive ? '#4338ca' : 'var(--text-primary)',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'background .12s',
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                    onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
+                  >
+                    {cs
+                      ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: cs.color, flexShrink: 0 }} />
+                      : <span style={{ width: 8, height: 8, flexShrink: 0 }} />
+                    }
+                    <span style={{ flex: 1 }}>{opt.label}</span>
+                    {isActive && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Link Card ─────────────────────────────────────────────────────
-function LinkCard({ link, onEdit, onDelete, onToggleStar }) {
+function LinkCard({ link, onEdit, onDelete, onToggleStar, compact }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const cs = catStyle(link.category);
 
@@ -69,13 +178,67 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar }) {
 
   const iconBtn = (label, col, hBg, hCol, svg, onClick) => (
     <button onClick={e => { e.stopPropagation(); onClick(); }} aria-label={label} title={label}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', color: col, padding: 6, display: 'flex', borderRadius: 6, flexShrink: 0, transition: 'all .12s' }}
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: col, padding: 5, display: 'flex', borderRadius: 6, flexShrink: 0, transition: 'all .12s' }}
       onMouseEnter={e => { e.currentTarget.style.background = hBg; e.currentTarget.style.color = hCol; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = col; }}>
       {svg}
     </button>
   );
 
+  const starBtn = (
+    <button onClick={e => { e.stopPropagation(); onToggleStar(link.id); }}
+      aria-label={link.starred ? 'Unstar' : 'Star'}
+      title={link.starred ? 'Remove from favourites' : 'Add to favourites'}
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: link.starred ? '#f59e0b' : 'var(--text-muted)', padding: compact ? 5 : 4, display: 'flex', borderRadius: 5, transition: 'color .15s', flexShrink: 0 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill={link.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    </button>
+  );
+
+  const deleteSection = confirmDel ? (
+    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.1)', borderRadius: 6, padding: '2px 7px' }}>
+      <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>Delete?</span>
+      <button onClick={e => { e.stopPropagation(); onDelete(link.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', padding: '2px 3px' }}>Yes</button>
+      <button onClick={e => { e.stopPropagation(); setConfirmDel(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 3px' }}>No</button>
+    </div>
+  ) : iconBtn('Delete', 'var(--text-muted)', 'rgba(239,68,68,.08)', '#ef4444',
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>,
+      () => setConfirmDel(true)
+    );
+
+  const actions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+      <CopyBtn text={link.url} />
+      {iconBtn('Edit', 'var(--text-muted)', 'var(--bg-hover)', 'var(--accent)',
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+        () => onEdit(link)
+      )}
+      {deleteSection}
+    </div>
+  );
+
+  // ── Compact list row ──
+  if (compact) {
+    return (
+      <motion.div layout initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: .14 }}
+        onClick={openLink} role="link" tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLink(); } }}
+        aria-label={`Open ${link.name}`}
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)', transition: 'background .12s' }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}>
+        <FaviconIcon url={link.url} size={22} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{link.name}</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{domain(link.url) || link.url}</span>
+        </div>
+        {link.category && <span style={{ borderRadius: 9999, background: cs.bg, color: cs.color, padding: '2px 9px', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>{link.category}</span>}
+        {starBtn}
+        {actions}
+      </motion.div>
+    );
+  }
+
+  // ── Grid card ──
   return (
     <motion.div
       layout
@@ -92,15 +255,9 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar }) {
       whileHover={{ boxShadow: '0 4px 14px rgba(0,0,0,.1)', y: -1 }}
     >
       {/* Star */}
-      <button
-        onClick={e => { e.stopPropagation(); onToggleStar(link.id); }}
-        aria-label={link.starred ? 'Unstar' : 'Star'}
-        title={link.starred ? 'Remove from favourites' : 'Add to favourites'}
-        style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: link.starred ? '#f59e0b' : 'var(--text-muted)', padding: 4, display: 'flex', borderRadius: 5, transition: 'color .15s' }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill={link.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      </button>
+      <div style={{ position: 'absolute', top: 12, right: 12 }}>{starBtn}</div>
 
-      {/* Top row: favicon + name + category */}
+      {/* Top row: favicon + name */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, paddingRight: 24 }}>
         <FaviconIcon url={link.url} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -114,26 +271,7 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar }) {
         {link.category ? (
           <span style={{ borderRadius: 9999, background: cs.bg, color: cs.color, padding: '3px 10px', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{link.category}</span>
         ) : <span />}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-          <CopyBtn text={link.url} />
-          {iconBtn('Edit', 'var(--text-muted)', 'var(--bg-hover)', 'var(--accent)',
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-            () => onEdit(link)
-          )}
-          {confirmDel ? (
-            <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.1)', borderRadius: 6, padding: '2px 7px' }}>
-              <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>Delete?</span>
-              <button onClick={e => { e.stopPropagation(); onDelete(link.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', padding: '2px 3px' }}>Yes</button>
-              <button onClick={e => { e.stopPropagation(); setConfirmDel(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 3px' }}>No</button>
-            </div>
-          ) : (
-            iconBtn('Delete', 'var(--text-muted)', 'rgba(239,68,68,.08)', '#ef4444',
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>,
-              () => setConfirmDel(true)
-            )
-          )}
-        </div>
+        {actions}
       </div>
     </motion.div>
   );
@@ -248,10 +386,11 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
 
 // ── Main LinksView ────────────────────────────────────────────────
 export default function LinksView() {
-  const [links,   setLinks]   = useState(load);
-  const [query,   setQuery]   = useState('');
+  const [links,     setLinks]     = useState(load);
+  const [query,     setQuery]     = useState('');
   const [catFilter, setCatFilter] = useState('');
-  const [modal,   setModal]   = useState(null); // null | 'add' | entry
+  const [modal,     setModal]     = useState(null); // null | 'add' | entry
+  const [viewMode,  setViewMode]  = useState('grid'); // 'grid' | 'list'
 
   const persist = (next) => { setLinks(next); save(next); };
 
@@ -293,34 +432,54 @@ export default function LinksView() {
     return parts.join(' · ');
   })();
 
+  const vmBtn = (mode, title, svgPath) => (
+    <button onClick={() => setViewMode(mode)} aria-label={title} title={title}
+      style={{ background: viewMode === mode ? 'var(--accent)' : 'var(--bg-input)', color: viewMode === mode ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all .13s' }}>
+      {svgPath}
+    </button>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .links-toolbar { flex-wrap: wrap !important; }
+          .links-toolbar .links-search { max-width: 100% !important; }
+          .links-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
       {/* ── Toolbar ── */}
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div className="links-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
 
           {/* Search */}
-          <div style={{ position: 'relative', flex: 1, maxWidth: 300 }}>
+          <div className="links-search" style={{ position: 'relative', width: 280, flexShrink: 0 }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="search" aria-label="Search links" placeholder="Search links..."
               value={query} onChange={e => setQuery(e.target.value)}
-              style={{ width: '100%', height: 38, padding: '0 10px 0 32px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.84rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', height: 36, padding: '0 10px 0 32px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.84rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
           </div>
 
           {/* Category filter */}
           {allCats.length > 0 && (
-            <select value={catFilter} onChange={e => setCatFilter(e.target.value)} aria-label="Filter by category"
-              style={{ height: 38, padding: '0 32px 0 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.82rem', color: catFilter ? 'var(--accent)' : 'var(--text-secondary)', outline: 'none', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', minWidth: 130, fontFamily: 'inherit' }}>
-              <option value="">All categories</option>
-              {allCats.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <CategoryDropdown value={catFilter} onChange={setCatFilter} options={allCats} />
           )}
 
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flex: 1 }}>{countLabel}</span>
 
+          {/* View toggle */}
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {vmBtn('grid', 'Grid view',
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            )}
+            {vmBtn('list', 'List view',
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            )}
+          </div>
+
           <button onClick={() => setModal('add')}
-            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
+            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
             onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
             onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -330,8 +489,8 @@ export default function LinksView() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
+        <div style={{ width: '100%' }}>
 
           {links.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', gap: 16, textAlign: 'center' }}>
@@ -355,10 +514,13 @@ export default function LinksView() {
             </div>
 
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            <div className="links-grid" style={viewMode === 'list'
+              ? { display: 'flex', flexDirection: 'column', gap: 6 }
+              : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
               <AnimatePresence>
                 {filtered.map(link => (
                   <LinkCard key={link.id} link={link}
+                    compact={viewMode === 'list'}
                     onEdit={l => setModal(l)}
                     onDelete={deleteLink}
                     onToggleStar={toggleStar} />
