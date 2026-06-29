@@ -43,6 +43,8 @@ import { getSecsForMode } from './utils/timerUtils';
 import { logActivity, diffObjects } from './utils/activityLog';
 import ActivityLogView from './components/ActivityLogView';
 import FocusCompanion from './components/FocusCompanion';
+import VaultView from './components/VaultView';
+import LinksView from './components/LinksView';
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -1312,6 +1314,8 @@ export default function App() {
             { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
             { id:'notes',    label:'Notes',    Icon: NavIcoNotes },
             { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
+            { id:'vault',    label:'Vault',    Icon: NavIcoVault },
+            { id:'links',    label:'Links',    Icon: NavIcoLinks },
           ].map(tab => (
             <button key={tab.id}
               className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
@@ -1506,6 +1510,8 @@ export default function App() {
           {activeTab === 'journal'  && <JournalView />}
           {activeTab === 'goals'    && <GoalsView />}
           {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchScope === 'notes' ? searchQuery : ''} />}
+          {activeTab === 'vault'    && <VaultView />}
+          {activeTab === 'links'   && <LinksView />}
           {activeTab === 'activity' && <ActivityLogView setActiveTab={setActiveTab} />}
 
           {activeTab === 'tasks' && (
@@ -1693,6 +1699,12 @@ function NavIcoNotes() {
 }
 function NavIcoHistory() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+}
+function NavIcoVault() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+}
+function NavIcoLinks() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
 }
 // Bottom
 function NavIcoSettings() {
