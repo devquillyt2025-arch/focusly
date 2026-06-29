@@ -12,7 +12,7 @@
 function generateRandomString(length) {
   const array = new Uint8Array(length);
   window.crypto.getRandomValues(array);
-  return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('').slice(0, length);
+  return Array.from(array, dec => ('0' + dec.toString(16)).slice(-2)).join('').slice(0, length);
 }
 
 async function generateCodeChallenge(codeVerifier) {

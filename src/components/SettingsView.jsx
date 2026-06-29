@@ -231,7 +231,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       <section className="settings-card">
         <h3 className="settings-card-title">Google Tasks Sync</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 24 }}>
-          Sync your Focusly tasks with Google Tasks. Note: This sync only works on this device/browser since sync state lives in localStorage.
+          Sync your My Workspace tasks with Google Tasks. Note: This sync only works on this device/browser since sync state lives in localStorage.
         </p>
         
         {syncStatus === 'Not connected' ? (
@@ -367,7 +367,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       <section className="settings-card">
         <h3 className="settings-card-title">Data Management</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 24 }}>
-          Focusly is entirely local. Your data stays in your browser ({calculateStorage()} KB used).
+          My Workspace is entirely local. Your data stays in your browser ({calculateStorage()} KB used).
         </p>
         
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -387,7 +387,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       {/* About */}
       <section className="settings-card" style={{ textAlign: 'center', padding: '32px 24px', background: 'transparent', border: 'none', boxShadow: 'none' }}>
         <div style={{ fontSize: '2.2rem', marginBottom: 12 }}>🌱</div>
-        <div style={{ fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)' }}>Focusly v3.0</div>
+        <div style={{ fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)' }}>My Workspace v3.0</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: 8 }}>A beautiful Pomodoro timer and task manager.</p>
         <a href="mailto:bugs@focusly.app" style={{ color: '#6366f1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block', marginTop: 16 }}>Report a bug</a>
       </section>

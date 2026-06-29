@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CAT_META } from '../utils/categoryMeta';
 import { PRI_META } from '../utils/priorityMeta';
+import ErrorBoundary from './ErrorBoundary';
 
 // ── Calendar Date Picker ────────────────────────────────────────────────────
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -261,7 +262,11 @@ function TaskRow({
           {/* Checkbox */}
           <div
             className={`linear-checkbox${isDone ? ' checked' : ''}`}
+            role="checkbox"
+            aria-checked={isDone}
+            tabIndex={0}
             onClick={e => { e.stopPropagation(); onToggle(task.id); }}
+            onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggle(task.id); } }}
             aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
           >
             {isDone ? '✓' : ''}
@@ -478,6 +483,154 @@ function TaskRow({
   );
 }
 
+function DonutChart({ pendingCount, completedCount }) {
+  const R = 50, SW = 9;
+  const C = 2 * Math.PI * R;
+  const size = (R + SW) * 2 + 2;
+  const cx = size / 2, cy = size / 2;
+
+  const total = pendingCount + completedCount;
+  const pendingArc   = total > 0 ? (pendingCount   / total) * C : C;
+  const completedArc = total > 0 ? (completedCount / total) * C : 0;
+  const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={SW} />
+        {total > 0 && pendingCount > 0 && (
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="#6366f1" strokeWidth={SW}
+            strokeDasharray={`${pendingArc} ${C - pendingArc}`} strokeDashoffset={0} strokeLinecap="butt" />
+        )}
+        {completedCount > 0 && (
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="#10b981" strokeWidth={SW}
+            strokeDasharray={`${completedArc} ${C - completedArc}`} strokeDashoffset={C - pendingArc} strokeLinecap="butt" />
+        )}
+        {total === 0 && (
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(99,102,241,0.2)" strokeWidth={SW} />
+        )}
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+        <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{pct}%</span>
+        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</span>
+      </div>
+    </div>
+  );
+}
+
+function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCompleted, catCounts }) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const totalTasks = pending.length + completed.length;
+  const completedPct = totalTasks > 0 ? Math.round((completed.length / totalTasks) * 100) : 0;
+  const catBreakdown = Object.entries(catCounts).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 4);
+
+  return (
+    <div className="yartu-card" style={{ display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 14, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Completion Analytics</h3>
+        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 3, background: 'var(--bg-base)', borderRadius: 10, padding: 3, flexShrink: 0 }}>
+        {[{ id: 'overview', label: 'Overview' }, { id: 'completed', label: `Completed (${completed.length})` }].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            flex: 1, padding: '6px 8px', borderRadius: 7, border: 'none', cursor: 'pointer',
+            fontSize: '0.78rem', fontWeight: 600, transition: 'all 0.15s ease',
+            background: activeTab === tab.id ? 'var(--bg-elevated)' : 'transparent',
+            color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+            boxShadow: activeTab === tab.id ? '0 1px 4px rgba(0,0,0,0.25)' : 'none',
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}>
+            <DonutChart pendingCount={pending.length} completedCount={completed.length} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+              <div style={{ background: 'rgba(99,102,241,0.1)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#818cf8', lineHeight: 1 }}>{pending.length}</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
+              </div>
+              <div style={{ background: 'rgba(16,185,129,0.1)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>{completed.length}</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Completed</div>
+              </div>
+            </div>
+          </div>
+
+          {totalTasks > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Overall Progress</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: completedPct === 100 ? '#10b981' : 'var(--text-secondary)' }}>{completedPct}%</span>
+              </div>
+              <div style={{ height: 7, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
+              </div>
+            </div>
+          )}
+
+          {catBreakdown.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>By Category</span>
+              {catBreakdown.map(([cat, count]) => {
+                const meta = CAT_META[cat] ?? CAT_META.work;
+                const barPct = pending.length > 0 ? (count / pending.length) * 100 : 0;
+                return (
+                  <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: 58, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.label}</span>
+                    <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${barPct}%`, background: meta.color, borderRadius: 99, transition: 'width 0.4s ease' }} />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: 14, textAlign: 'right' }}>{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {totalTasks === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px', textAlign: 'center', background: 'var(--bg-base)', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: '1.8rem' }}>🎯</span>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>Start your journey by adding your first task!</div>
+              <button onClick={onAdd} style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>＋ Add First Task</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'completed' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0 }}>
+          {completed.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button onClick={onClearCompleted} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '4px 12px', borderRadius: 7, fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer' }}>Clear all</button>
+            </div>
+          )}
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            {completed.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '28px 16px', textAlign: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No completed tasks yet</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>Start checking off tasks to see them here!</div>
+                </div>
+              </div>
+            ) : (
+              <AnimatePresence initial={false}>
+                {completed.map(task => renderTask(task, true))}
+              </AnimatePresence>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
   const [customCats, setCustomCats] = useState(() => {
     try {
@@ -500,6 +653,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const [catOpen,         setCatOpen]         = useState(false);
   const [inlineAddCat,    setInlineAddCat]    = useState(null);
   const [inlineAddText,   setInlineAddText]   = useState('');
+  const [detailTab,       setDetailTab]       = useState('details'); // 'details' | 'scheduling' | 'subtasks'
   const sortRef      = useRef(null);
   const searchRef    = useRef(null);
   const savedTimerRef = useRef(null);
@@ -507,6 +661,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   const notesRef     = useRef(null);
   const catMenuRef       = useRef(null);
   const datePickerRef    = useRef(null);
+  const skipBlurRef      = useRef(false); // prevents onBlur from firing after Escape in inline-add
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Close calendar picker on outside click
@@ -563,6 +718,23 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     }
   }, [tasks, detailTask]);
 
+  // Sync fields the panel doesn't own (status, timeLogged, etc.) when tasks prop updates while panel is open.
+  // This prevents stale status showing after the timer or a toggle fires from outside the panel.
+  useEffect(() => {
+    if (!detailTask) return;
+    const fresh = tasks.find(t => t.id === detailTask.id);
+    if (!fresh) return;
+    setLocal(prev => prev ? {
+      ...prev,
+      status: fresh.status,
+      completed: fresh.completed,
+      timeLogged: fresh.timeLogged,
+      pomodorosCompleted: fresh.pomodorosCompleted,
+      starred: fresh.starred,
+    } : prev);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
+
   // Escape key closes panel
   useEffect(() => {
     if (!detailTask) return;
@@ -610,6 +782,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     setDetailTask(task);
     setLocal({ ...task });
     setCatOpen(false);
+    setDetailTab('details');
   };
 
   const closePanel = () => {
@@ -714,7 +887,21 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   return (
     <div className="task-list-panel today-3col-container" style={{ background: 'transparent', border: 'none', gap: 10 }}>
       
-      <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .tasks-dashboard-grid {
+          display: grid;
+          grid-template-columns: 60% 1fr;
+          gap: 24px;
+          width: 100%;
+          flex: 1;
+          min-height: 0;
+          align-items: start;
+        }
+        @media (max-width: 992px) {
+          .tasks-dashboard-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
 
       {/* ── UNIFIED COMPACT TOOLBAR: Search → Sort → Filter → Overview → Sync ── */}
       <div className="yartu-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', width: '100%', boxSizing: 'border-box', flexShrink: 0 }}>
@@ -744,6 +931,9 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         {/* 2. Sort button */}
         <div className="sort-dropdown" ref={sortRef} style={{ position: 'relative', flexShrink: 0 }}>
           <button
+            aria-label={`Sort tasks by ${SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? 'Created'}`}
+            aria-expanded={sortOpen}
+            aria-haspopup="listbox"
             style={{ display: 'flex', alignItems: 'center', gap: 5, height: 34, padding: '0 12px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', boxSizing: 'border-box', whiteSpace: 'nowrap' }}
             onClick={() => setSortOpen(o => !o)}
           >
@@ -840,11 +1030,11 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
 
       </div>
 
-      {/* ── STACKED TASK MANAGEMENT DASHBOARD ── */}
-      <div className="tasks-stacked-layout" style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minWidth: 0, flex: 1, minHeight: 0 }}>
+      {/* ── TASKS DASHBOARD: 60/40 GRID ── */}
+      <div className="tasks-dashboard-grid">
 
-        {/* 1. PENDING TASKS (FULL WIDTH) */}
-        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '12px 16px', gap: 8, flex: 1, minHeight: 0 }}>
+        {/* LEFT (60%): PENDING TASKS */}
+        <div className="yartu-card" style={{ display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 8, minHeight: 0 }}>
           <div className="yartu-card-hdr">
             <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -855,9 +1045,8 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               </button>
             </div>
           </div>
-          <div className="yartu-list" style={{ padding: '4px 0 0 0', flex: 1, minHeight: 0, gap: 0, overflowY: 'auto' }}>
-            
-            {/* Quick Add Input */}
+          <div className="yartu-list tasks-scroll-list" style={{ padding: '4px 0 0 0', gap: 0, overflowY: 'auto', maxHeight: '60vh' }}>
+
             {inlineAddCat === 'top' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.1)', marginBottom: 8 }}>
                 <input
@@ -869,11 +1058,15 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                     if (e.key === 'Enter') {
                       handleInlineAdd(catFilter === 'all' ? 'work' : catFilter);
                     } else if (e.key === 'Escape') {
+                      skipBlurRef.current = true;
                       setInlineAddCat(null);
                       setInlineAddText('');
                     }
                   }}
-                  onBlur={() => handleInlineAdd(catFilter === 'all' ? 'work' : catFilter)}
+                  onBlur={() => {
+                    if (skipBlurRef.current) { skipBlurRef.current = false; return; }
+                    handleInlineAdd(catFilter === 'all' ? 'work' : catFilter);
+                  }}
                   placeholder={`Add a task to ${catFilter === 'all' ? 'Work' : CAT_META[catFilter]?.label}...`}
                   style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none', fontSize: '0.95rem' }}
                 />
@@ -895,28 +1088,17 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           </div>
         </div>
 
-        {/* 2. COMPLETED TASKS (FULL WIDTH) */}
-        <div className="yartu-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '12px 16px', gap: 8 }}>
-          <div className="yartu-card-hdr">
-            <span className="yartu-card-title">Completed ({completed.length})</span>
-            {completed.length > 0 && (
-              <button className="yartu-card-action" onClick={onClearCompleted} style={{ color: '#ef4444' }}>Clear all</button>
-            )}
-          </div>
-          <div className="yartu-list" style={{ padding: '8px 0 0 0' }}>
-            {completed.length === 0 ? (
-              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', background: 'var(--bg-base)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                No completed tasks yet
-              </div>
-            ) : (
-              <div className="linear-task-list-container">
-                <AnimatePresence initial={false}>
-                  {completed.map(task => renderTask(task, true))}
-                </AnimatePresence>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* RIGHT (40%): COMPLETION ANALYTICS */}
+        <ErrorBoundary message="Analytics panel failed to render.">
+          <CompletionAnalytics
+            pending={pending}
+            completed={completed}
+            onAdd={onAdd}
+            renderTask={renderTask}
+            onClearCompleted={onClearCompleted}
+            catCounts={catCounts}
+          />
+        </ErrorBoundary>
 
       </div>
 
@@ -927,6 +1109,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           <div className={`task-detail-panel${detailTask ? ' tdp-open' : ''}`} aria-hidden={!detailTask}>
         {local && (
           <>
+            {/* ── Header ── */}
             <div className="tdp-header">
               <span className="tdp-heading">Task Details</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -944,347 +1127,369 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               </div>
             </div>
 
-            <div className="tdp-body">
-              {/* Sync Conflict Resolution */}
-              {local.syncConflict && (
-                <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-                  <div style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: 4 }}>⚠️ Sync Conflict</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>{local.syncConflict}</div>
-                  <button
-                    type="button"
-                    style={{ background: '#f59e0b', color: '#000', border: 'none', padding: '4px 12px', borderRadius: 6, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
-                    onClick={() => {
-                      const updated = { ...local, syncConflict: null, updatedAt: new Date().toISOString() };
-                      setLocal(updated);
-                      (onQuickUpdate || onUpdate)(updated);
-                    }}
-                  >
-                    Dismiss & Keep Local
-                  </button>
-                </div>
-              )}
-
-              {/* Title */}
-              <div className="tdp-field">
-                <label className="tdp-label">Title</label>
-                <input
-                  ref={titleRef}
-                  className="tdp-title-input"
-                  value={local.name || ''}
-                  onChange={e => setLocal({ ...local, name: e.target.value })}
-                  onBlur={() => {
-                    if ((local.name || '').trim() && local.name !== detailTask.name) {
-                      (onQuickUpdate || onUpdate)(local);
-                      showSaved();
-                    }
-                  }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-                  placeholder="Task title"
-                />
-              </div>
-
-              {/* Priority */}
-              <div className="tdp-field">
-                <label className="tdp-label">Priority</label>
-                <div className="tdp-pri-pills">
-                  {['none', 'high', 'medium', 'low'].map(p => {
-                    const isActive = local.priority === p;
-                    const pc = PRI_META[p]?.color;
-                    return (
-                      <button
-                        key={p}
-                        className="tdp-pri-pill"
-                        style={isActive ? { background: pc, color: '#fff', borderColor: pc } : {}}
-                        onClick={() => saveField('priority', p)}
-                      >
-                        {PRI_META[p].label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Category */}
-              <div className="tdp-field">
-                <label className="tdp-label">Category</label>
-                <div className="tdp-cat-select" ref={catMenuRef}>
-                  <button
-                    type="button"
-                    className={`tdp-cat-trigger${catOpen ? ' tdp-cat-open' : ''}`}
-                    onClick={() => setCatOpen(o => !o)}
-                  >
-                    <span style={{ color: CAT_META[local.category]?.color }}>
-                      {CAT_META[local.category]?.label}
-                    </span>
-                    <TdpIconChevron />
-                  </button>
-                  {catOpen && (
-                    <div className="tdp-cat-menu">
-                      {Object.entries(CAT_META).map(([key, meta]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          className={`tdp-cat-option${local.category === key ? ' tdp-cat-active' : ''}`}
-                          onClick={() => { saveField('category', key); setCatOpen(false); }}
-                        >
-                          <span className="tdp-cat-dot" style={{ background: meta.color }} />
-                          {meta.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Due Date */}
-              <div className="tdp-field">
-                <label className="tdp-label">Due Date</label>
-                <div ref={datePickerRef} style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowDatePicker(p => !p)}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      background: 'var(--bg-input)', border: `1px solid ${showDatePicker ? 'var(--accent)' : 'var(--border)'}`,
-                      borderRadius: 'var(--radius-sm)', padding: '9px 12px', cursor: 'pointer',
-                      color: local.dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                      fontSize: '0.875rem', fontWeight: local.dueDate ? 600 : 400,
-                      transition: 'border-color 0.13s ease', gap: 8,
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: local.dueDate ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
-                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                      {local.dueDate
-                        ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                        : 'Pick a date'}
-                    </span>
-                    {local.dueDate && (
-                      <span
-                        role="button"
-                        onClick={e => { e.stopPropagation(); saveField('dueDate', ''); setShowDatePicker(false); }}
-                        title="Clear"
-                        style={{ color: '#ef4444', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
-                      >×</span>
-                    )}
-                  </button>
-                  <AnimatePresence>
-                    {showDatePicker && (
-                      <CalendarDatePicker
-                        value={local.dueDate || ''}
-                        onChange={v => { saveField('dueDate', v); }}
-                        onClose={() => setShowDatePicker(false)}
-                      />
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-
-              {/* Recurrence */}
-              <div className="tdp-field">
-                <label className="tdp-label">Repeat</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {[
-                    { value: null,       label: 'None'     },
-                    { value: 'daily',    label: 'Daily'    },
-                    { value: 'weekdays', label: 'Weekdays' },
-                    { value: 'weekly',   label: 'Weekly'   },
-                    { value: 'monthly',  label: 'Monthly'  },
-                    { value: 'custom',   label: 'Custom'   },
-                  ].map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      type="button"
-                      onClick={() => saveField('recurrence', opt.value)}
-                      style={{
-                        padding: '5px 13px', borderRadius: 20, border: '1px solid',
-                        borderColor: local.recurrence === opt.value ? 'var(--accent)' : 'var(--border)',
-                        background:  local.recurrence === opt.value ? 'var(--accent-glow)' : 'transparent',
-                        color:       local.recurrence === opt.value ? 'var(--accent)' : 'var(--text-secondary)',
-                        fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                        transition: 'all 0.13s ease',
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {local.recurrence === 'custom' && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                    {['S','M','T','W','T','F','S'].map((lbl, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => {
-                          const days = (local.recurrenceDays || []).includes(i)
-                            ? (local.recurrenceDays || []).filter(d => d !== i)
-                            : [...(local.recurrenceDays || []), i].sort((a,b) => a-b);
-                          saveField('recurrenceDays', days);
-                        }}
-                        style={{
-                          width: 32, height: 32, borderRadius: '50%', border: '1px solid',
-                          borderColor: (local.recurrenceDays||[]).includes(i) ? 'var(--accent)' : 'var(--border)',
-                          background:  (local.recurrenceDays||[]).includes(i) ? 'var(--accent)'  : 'transparent',
-                          color:       (local.recurrenceDays||[]).includes(i) ? '#fff'           : 'var(--text-muted)',
-                          fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all 0.13s ease',
-                        }}
-                      >
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {local.recurrence && local.recurrence !== null && (
-                  <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span>🔁</span>
-                    <span>Repeats {local.recurrence}{local.dueDate ? ` · next: ${new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Subtasks */}
-              <div className="tdp-field">
-                <label className="tdp-label">Subtasks</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                  {(local.subtasks || []).map(sub => (
-                    <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <button
-                        type="button"
-                        style={{ background: 'transparent', border: '1px solid ' + (sub.completed ? '#10b981' : '#64748b'), width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#10b981', padding: 0 }}
-                        onClick={() => {
-                          const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, completed: !s.completed, updatedAt: new Date().toISOString() } : s);
-                          saveField('subtasks', nextSubs);
-                        }}
-                      >
-                        {sub.completed && <TdpIconCheck />}
-                      </button>
-                      <input
-                        type="text"
-                        value={sub.text}
-                        onChange={e => {
-                          const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, text: e.target.value, updatedAt: new Date().toISOString() } : s);
-                          setLocal({ ...local, subtasks: nextSubs });
-                        }}
-                        onBlur={() => {
-                          (onQuickUpdate || onUpdate)(local);
-                          showSaved();
-                        }}
-                        style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.85rem' }}
-                      />
-                      <button
-                        type="button"
-                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
-                        onClick={() => {
-                          if (sub.googleTaskId) {
-                            const delStr = localStorage.getItem('focusly_deleted_tasks');
-                            let deletedIds = delStr ? JSON.parse(delStr) : [];
-                            if (!deletedIds.includes(sub.googleTaskId)) {
-                              deletedIds.push(sub.googleTaskId);
-                              localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds));
-                            }
-                          }
-                          const nextSubs = (local.subtasks || []).filter(s => s.id !== sub.id);
-                          saveField('subtasks', nextSubs);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  <input
-                    id="subtask-input"
-                    type="text"
-                    placeholder="Add a subtask..."
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && e.target.value.trim()) {
-                        const newSub = { id: Date.now().toString(), text: e.target.value.trim(), completed: false, updatedAt: new Date().toISOString() };
-                        saveField('subtasks', [...(local.subtasks || []), newSub]);
-                        e.target.value = '';
-                      }
-                    }}
-                    style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }}
-                  />
-                </div>
-              </div>
-
-              {/* Attachments */}
-              <div className="tdp-field">
-                <label className="tdp-label">Attachments</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                  {(local.attachments || []).map(att => (
-                    <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                        <span style={{ color: '#e2e8f0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
-                      </div>
-                      <button
-                        type="button"
-                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
-                        onClick={() => {
-                          const nextAtts = (local.attachments || []).filter(a => a.id !== att.id);
-                          saveField('attachments', nextAtts);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <label
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8', transition: 'all 0.15s ease' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+            {/* ── Tab Bar ── */}
+            <div className="tdp-tab-bar">
+              {[
+                { id: 'details',    label: 'Details',     icon: '📋' },
+                { id: 'scheduling', label: 'Scheduling',  icon: '🗓️' },
+                { id: 'subtasks',   label: 'Subtasks',    icon: `✅${(local.subtasks?.length ?? 0) > 0 ? ` (${local.subtasks.filter(s=>s.completed).length}/${local.subtasks.length})` : ''}` },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  className={`tdp-tab-btn${detailTab === tab.id ? ' tdp-tab-active' : ''}`}
+                  onClick={() => setDetailTab(tab.id)}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  <span>Add attachment file...</span>
-                  <input
-                    id="attachment-input"
-                    type="file"
-                    style={{ display: 'none' }}
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const newAtt = { id: Date.now().toString(), name: file.name, size: file.size };
-                        saveField('attachments', [...(local.attachments || []), newAtt]);
-                        e.target.value = '';
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-
-              {/* Notes */}
-              <div className="tdp-field">
-                <label className="tdp-label">Notes</label>
-                <textarea
-                  ref={notesRef}
-                  className="tdp-notes"
-                  value={local.notes || ''}
-                  onChange={e => {
-                    setLocal({ ...local, notes: e.target.value });
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  onBlur={() => {
-                    const cur = local.notes || '', orig = detailTask.notes || '';
-                    if (cur !== orig) { (onQuickUpdate || onUpdate)(local); showSaved(); }
-                  }}
-                  placeholder="Add notes..."
-                />
-              </div>
-
-              {/* Created */}
-              <div className="tdp-created">
-                Created {new Date(detailTask.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </div>
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
+            {/* ── Body (scrollable) ── */}
+            <div className="tdp-body">
+
+              {/* ══ TAB: DETAILS ══ */}
+              {detailTab === 'details' && (
+                <>
+                  {/* Sync Conflict */}
+                  {local.syncConflict && (
+                    <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', padding: 12, borderRadius: 8 }}>
+                      <div style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: 4 }}>⚠️ Sync Conflict</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>{local.syncConflict}</div>
+                      <button
+                        type="button"
+                        style={{ background: '#f59e0b', color: '#000', border: 'none', padding: '4px 12px', borderRadius: 6, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+                        onClick={() => {
+                          const updated = { ...local, syncConflict: null, updatedAt: new Date().toISOString() };
+                          setLocal(updated);
+                          (onQuickUpdate || onUpdate)(updated);
+                        }}
+                      >
+                        Dismiss & Keep Local
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Title */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Title</label>
+                    <input
+                      ref={titleRef}
+                      className="tdp-title-input"
+                      value={local.name || ''}
+                      onChange={e => setLocal({ ...local, name: e.target.value })}
+                      onBlur={() => {
+                        if ((local.name || '').trim() && local.name !== detailTask.name) {
+                          (onQuickUpdate || onUpdate)(local);
+                          showSaved();
+                        }
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                      placeholder="Task title"
+                    />
+                  </div>
+
+                  {/* Priority — compact select */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Priority</label>
+                    <div className="tdp-compact-row">
+                      {['none', 'high', 'medium', 'low'].map(p => {
+                        const isActive = local.priority === p;
+                        const pc = PRI_META[p]?.color;
+                        const dotColor = p === 'none' ? 'var(--text-muted)' : pc;
+                        return (
+                          <button
+                            key={p}
+                            className={`tdp-seg-btn${isActive ? ' tdp-seg-active' : ''}`}
+                            style={isActive ? { background: pc + '22', borderColor: pc, color: pc } : {}}
+                            onClick={() => saveField('priority', p)}
+                          >
+                            <span className="tdp-seg-dot" style={{ background: dotColor }} />
+                            {PRI_META[p].label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Category */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Category</label>
+                    <div className="tdp-cat-select" ref={catMenuRef}>
+                      <button
+                        type="button"
+                        className={`tdp-cat-trigger${catOpen ? ' tdp-cat-open' : ''}`}
+                        onClick={() => setCatOpen(o => !o)}
+                      >
+                        <span style={{ color: CAT_META[local.category]?.color }}>
+                          {CAT_META[local.category]?.label}
+                        </span>
+                        <TdpIconChevron />
+                      </button>
+                      {catOpen && (
+                        <div className="tdp-cat-menu">
+                          {Object.entries(CAT_META).map(([key, meta]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              className={`tdp-cat-option${local.category === key ? ' tdp-cat-active' : ''}`}
+                              onClick={() => { saveField('category', key); setCatOpen(false); }}
+                            >
+                              <span className="tdp-cat-dot" style={{ background: meta.color }} />
+                              {meta.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Notes</label>
+                    <textarea
+                      ref={notesRef}
+                      className="tdp-notes"
+                      value={local.notes || ''}
+                      onChange={e => {
+                        setLocal({ ...local, notes: e.target.value });
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                      }}
+                      onBlur={() => {
+                        const cur = local.notes || '', orig = detailTask.notes || '';
+                        if (cur !== orig) { (onQuickUpdate || onUpdate)(local); showSaved(); }
+                      }}
+                      placeholder="Add notes..."
+                    />
+                  </div>
+
+                  {/* Attachments */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Attachments</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                      {(local.attachments || []).map(att => (
+                        <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                            <span style={{ color: '#e2e8f0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
+                          </div>
+                          <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                            onClick={() => saveField('attachments', (local.attachments || []).filter(a => a.id !== att.id))}>
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8', transition: 'all 0.15s ease' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <span>Add attachment file...</span>
+                      <input id="attachment-input" type="file" style={{ display: 'none' }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            saveField('attachments', [...(local.attachments || []), { id: Date.now().toString(), name: file.name, size: file.size }]);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Created */}
+                  <div className="tdp-created">
+                    Created {new Date(detailTask.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </div>
+                </>
+              )}
+
+              {/* ══ TAB: SCHEDULING ══ */}
+              {detailTab === 'scheduling' && (
+                <>
+                  {/* Due Date */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Due Date</label>
+                    <div ref={datePickerRef} style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowDatePicker(p => !p)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          background: 'var(--bg-input)', border: `1px solid ${showDatePicker ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: 'var(--radius-sm)', padding: '9px 12px', cursor: 'pointer',
+                          color: local.dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                          fontSize: '0.875rem', fontWeight: local.dueDate ? 600 : 400,
+                          transition: 'border-color 0.13s ease', gap: 8,
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: local.dueDate ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
+                            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                          </svg>
+                          {local.dueDate
+                            ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                            : 'Pick a date'}
+                        </span>
+                        {local.dueDate && (
+                          <span role="button"
+                            onClick={e => { e.stopPropagation(); saveField('dueDate', ''); setShowDatePicker(false); }}
+                            title="Clear"
+                            style={{ color: '#ef4444', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
+                          >×</span>
+                        )}
+                      </button>
+                      <AnimatePresence>
+                        {showDatePicker && (
+                          <CalendarDatePicker
+                            value={local.dueDate || ''}
+                            onChange={v => { saveField('dueDate', v); }}
+                            onClose={() => setShowDatePicker(false)}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Repeat — compact select */}
+                  <div className="tdp-field">
+                    <label className="tdp-label">Repeat</label>
+                    <div className="tdp-select-wrap">
+                      <select
+                        className="tdp-native-select"
+                        value={local.recurrence ?? 'none'}
+                        onChange={e => saveField('recurrence', e.target.value === 'none' ? null : e.target.value)}
+                      >
+                        <option value="none">None</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekdays">Weekdays</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      <svg className="tdp-select-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    {local.recurrence === 'custom' && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                        {['S','M','T','W','T','F','S'].map((lbl, i) => (
+                          <button key={i} type="button"
+                            onClick={() => {
+                              const days = (local.recurrenceDays || []).includes(i)
+                                ? (local.recurrenceDays || []).filter(d => d !== i)
+                                : [...(local.recurrenceDays || []), i].sort((a,b) => a-b);
+                              saveField('recurrenceDays', days);
+                            }}
+                            style={{
+                              width: 32, height: 32, borderRadius: '50%', border: '1px solid',
+                              borderColor: (local.recurrenceDays||[]).includes(i) ? 'var(--accent)' : 'var(--border)',
+                              background:  (local.recurrenceDays||[]).includes(i) ? 'var(--accent)'  : 'transparent',
+                              color:       (local.recurrenceDays||[]).includes(i) ? '#fff' : 'var(--text-muted)',
+                              fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.13s ease',
+                            }}
+                          >{lbl}</button>
+                        ))}
+                      </div>
+                    )}
+                    {local.recurrence && (
+                      <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span>🔁</span>
+                        <span>Repeats {local.recurrence}{local.dueDate ? ` · next: ${new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
+                      </div>
+                    )}
+                  </div>
+
+                </>
+              )}
+
+              {/* ══ TAB: SUBTASKS ══ */}
+              {detailTab === 'subtasks' && (
+                <>
+                  <div className="tdp-field">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <label className="tdp-label">Subtasks</label>
+                      {(local.subtasks?.length ?? 0) > 0 && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          {local.subtasks.filter(s => s.completed).length}/{local.subtasks.length} done
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    {(local.subtasks?.length ?? 0) > 0 && (
+                      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(local.subtasks.filter(s=>s.completed).length / local.subtasks.length) * 100}%`,
+                          background: 'linear-gradient(90deg, #6366f1, #10b981)',
+                          borderRadius: 99, transition: 'width 0.35s ease',
+                        }} />
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                      {(local.subtasks || []).map(sub => (
+                        <div key={sub.id} className="tdp-subtask-row">
+                          <button
+                            type="button"
+                            className={`tdp-subtask-check${sub.completed ? ' checked' : ''}`}
+                            onClick={() => {
+                              const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, completed: !s.completed, updatedAt: new Date().toISOString() } : s);
+                              saveField('subtasks', nextSubs);
+                            }}
+                          >
+                            {sub.completed && <TdpIconCheck />}
+                          </button>
+                          <input
+                            type="text"
+                            value={sub.text}
+                            onChange={e => {
+                              const nextSubs = (local.subtasks || []).map(s => s.id === sub.id ? { ...s, text: e.target.value, updatedAt: new Date().toISOString() } : s);
+                              setLocal({ ...local, subtasks: nextSubs });
+                            }}
+                            onBlur={() => { (onQuickUpdate || onUpdate)(local); showSaved(); }}
+                            style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+                          />
+                          <button type="button"
+                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
+                            onClick={() => {
+                              if (sub.googleTaskId) {
+                                const delStr = localStorage.getItem('focusly_deleted_tasks');
+                                let deletedIds = delStr ? JSON.parse(delStr) : [];
+                                if (!deletedIds.includes(sub.googleTaskId)) { deletedIds.push(sub.googleTaskId); localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds)); }
+                              }
+                              saveField('subtasks', (local.subtasks || []).filter(s => s.id !== sub.id));
+                            }}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="tdp-subtask-add-row">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <input
+                        id="subtask-input"
+                        type="text"
+                        placeholder="Add a subtask and press Enter..."
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            const newSub = { id: Date.now().toString(), text: e.target.value.trim(), completed: false, updatedAt: new Date().toISOString() };
+                            saveField('subtasks', [...(local.subtasks || []), newSub]);
+                            e.target.value = '';
+                          }
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+            </div>{/* end tdp-body */}
+
+            {/* ── Footer ── */}
             <div className="tdp-footer">
               <button
                 type="button"

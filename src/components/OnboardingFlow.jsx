@@ -82,7 +82,7 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 1 && (
           <div className="fade-in">
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>🌱</div>
-            <h1 style={{ marginBottom: 12 }}>Welcome to Focusly</h1>
+            <h1 style={{ marginBottom: 12 }}>Welcome to My Workspace</h1>
             <p style={{ color: '#94a3b8', marginBottom: 32, lineHeight: 1.6 }}>Your all-in-one productivity companion.</p>
             <ul style={{ textAlign: 'left', display: 'inline-block', marginBottom: 40, color: '#e2e8f0' }}>
               <li style={{ marginBottom: 12 }}>🍅 Focus with Pomodoro timers</li>

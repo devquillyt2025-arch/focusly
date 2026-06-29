@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import Select from './Select';
+import ErrorBoundary from './ErrorBoundary';
 
 const STORAGE_KEY = 'focusly_notes';
 
@@ -408,13 +409,17 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {!showColors ? (
                 <>
-                  <button onClick={e => { e.stopPropagation(); onPin(note.id); }} title={note.pinned ? 'Unpin' : 'Pin'}
+                  <button onClick={e => { e.stopPropagation(); onPin(note.id); }}
+                    aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
+                    title={note.pinned ? 'Unpin' : 'Pin'}
                     style={{ background: 'rgba(99,102,241,0.08)', border: 'none', cursor: 'pointer', color: note.pinned ? 'var(--accent)' : 'var(--text-muted)', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill={note.pinned?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill={note.pinned?'currentColor':'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </button>
-                  <button onClick={e => { e.stopPropagation(); setShowColors(true); }} title="Change Color"
+                  <button onClick={e => { e.stopPropagation(); setShowColors(true); }}
+                    aria-label="Change note color"
+                    title="Change Color"
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{
+                    <span aria-hidden="true" style={{
                       display: 'block',
                       width: 18, height: 18,
                       borderRadius: '50%',
@@ -424,9 +429,11 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
                       transition: 'transform 0.15s ease',
                     }} />
                   </button>
-                  <button onClick={e => { e.stopPropagation(); onDelete(note.id); }} title="Delete"
+                  <button onClick={e => { e.stopPropagation(); onDelete(note.id); }}
+                    aria-label="Delete note"
+                    title="Delete"
                     style={{ background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', color: '#ef4444', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                   </button>
                 </>
               ) : (
@@ -599,6 +606,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
     : { display: 'flex', flexDirection: 'column', gap: 10 };
 
   return (
+    <ErrorBoundary title="Notes failed to load" message="An unexpected error occurred in the Notes view. Try refreshing.">
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
 
       {/* ── Top Bar ── */}
@@ -611,7 +619,8 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 190, flexShrink: 0 }}>
             <svg style={{ position: 'absolute', left: 9, color: 'var(--text-muted)', pointerEvents: 'none' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
-              type="text"
+              type="search"
+              aria-label="Search notes"
               placeholder="Search notes..."
               value={localSearchQuery}
               onChange={e => setLocalSearchQuery(e.target.value)}
@@ -630,27 +639,33 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           </button>
 
           {/* 3. Color palette — compact 22 px swatches */}
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg-input)', padding: '4px 6px', borderRadius: 9999, border: '1px solid var(--border)', flexShrink: 0 }}>
-            <div
+          <div role="group" aria-label="Filter by color" style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg-input)', padding: '4px 6px', borderRadius: 9999, border: '1px solid var(--border)', flexShrink: 0 }}>
+            <button
+              type="button"
               onClick={() => setActiveColor(null)}
+              aria-label="Show all colors"
+              aria-pressed={!activeColor}
               title="All Colors"
-              style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-surface)', border: !activeColor ? '2px solid #6366f1' : '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0 }}
+              style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-surface)', border: !activeColor ? '2px solid #6366f1' : '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, padding: 0 }}
             >
-              {!activeColor && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-            </div>
+              {!activeColor && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>}
+            </button>
             {NOTE_COLORS.slice(1).map(c => {
               const isActive = activeColor === c.id;
               return (
-                <div
+                <button
                   key={c.id}
+                  type="button"
+                  aria-label={`Filter by ${c.label}`}
+                  aria-pressed={isActive}
                   title={c.label}
                   onClick={() => setActiveColor(isActive ? null : c.id)}
-                  style={{ width: 22, height: 22, borderRadius: '50%', background: COLOR_ACCENT[c.id], display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', transform: isActive ? 'scale(1.18)' : (hoverColor === c.id ? 'scale(1.05)' : 'scale(1)'), boxShadow: isActive ? `0 0 0 2px var(--bg-surface), 0 0 0 3px ${COLOR_ACCENT[c.id]}` : 'none', flexShrink: 0, opacity: hoverColor === c.id || isActive ? 1 : 0.75 }}
+                  style={{ width: 22, height: 22, borderRadius: '50%', background: COLOR_ACCENT[c.id], display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', transform: isActive ? 'scale(1.18)' : (hoverColor === c.id ? 'scale(1.05)' : 'scale(1)'), boxShadow: isActive ? `0 0 0 2px var(--bg-surface), 0 0 0 3px ${COLOR_ACCENT[c.id]}` : 'none', flexShrink: 0, opacity: hoverColor === c.id || isActive ? 1 : 0.75, border: 'none', padding: 0 }}
                   onMouseEnter={() => setHoverColor(c.id)}
                   onMouseLeave={() => setHoverColor(null)}
                 >
-                  {isActive && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
+                  {isActive && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>}
+                </button>
               );
             })}
           </div>
@@ -715,7 +730,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
       </div>
 
       {/* ── Notes Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
 
         {notes.length === 0 ? (
           /* Empty state */
@@ -776,6 +791,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
       </div>
 
     </div>
+    </ErrorBoundary>
   );
 }
 
