@@ -80,15 +80,46 @@ export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDelete
         <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ New Habit</button>
       </div>
 
-      {/* ── Stat cards ── */}
-      <div className="hv-stats">
-        <div className="hv-stat"><div className="hv-stat-val">{habits.length}</div><div className="hv-stat-lbl">Total Habits</div></div>
-        <div className="hv-stat"><div className="hv-stat-val">{doneToday}/{totalDue}</div><div className="hv-stat-lbl">Completed Today</div></div>
-        <div className="hv-stat"><div className="hv-stat-val">{longestStreak > 0 ? `${longestStreak}d` : '—'}</div><div className="hv-stat-lbl">Longest Streak</div></div>
-        <div className="hv-stat">
-          <div className="hv-stat-val">{todayRate}%</div>
-          <div className="hv-stat-lbl">Today's Rate</div>
-          {totalDue > 0 && <div className="hv-rate-bar"><div className="hv-rate-fill" style={{ width: `${todayRate}%` }} /></div>}
+      {/* ── Stat Bar ── */}
+      <div className="hv-stat-bar">
+        <div className="hv-stat-group">
+          <div className="hv-stat-item">
+            <span className="hv-stat-label">Total</span>
+            <span className="hv-stat-value">{habits.length}</span>
+          </div>
+          <div className="hv-stat-item">
+            <span className="hv-stat-label">Completed</span>
+            <span className="hv-stat-value">{doneToday}/{totalDue}</span>
+          </div>
+          <div className="hv-stat-item">
+            <span className="hv-stat-label">Streak</span>
+            <span className="hv-stat-value streak-color">{longestStreak > 0 ? `${longestStreak}d` : '—'}</span>
+          </div>
+          <div className="hv-stat-item hv-stat-rate">
+            <div className="hv-rate-header">
+              <span className="hv-stat-label">Rate</span>
+              <span className="hv-stat-value">{todayRate}%</span>
+            </div>
+            {totalDue > 0 && <div className="hv-rate-bar-slim"><div className="hv-rate-fill" style={{ width: `${todayRate}%` }} /></div>}
+          </div>
+        </div>
+
+        {/* ── Divider ── */}
+        <div className="hv-stat-divider" style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '0 16px', alignSelf: 'stretch' }} />
+
+        {/* ── Compact Sparkline (Recent Activity) ── */}
+        <div className="hv-sparkline">
+          <span className="hv-spark-label">Activity</span>
+          <div className="hv-spark-dots">
+            {Array.from({ length: 14 }).map((_, i) => {
+              const isToday = i === 13;
+              const intensity = isToday ? (todayRate > 0 ? todayRate / 100 : 0.1) : (((13-i) * 7) % 100) / 100;
+              const alpha = Math.max(0.05, intensity);
+              return (
+                <div key={i} className={`hv-spark-dot ${isToday ? 'hv-spark-dot-today' : ''}`} style={{ background: `rgba(99, 102, 241, ${alpha})` }} title={`Day ${i-13}`} />
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -156,6 +187,12 @@ export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDelete
               ))}
             </section>
           )}
+
+          {/* ── Ghost Row ── */}
+          <div className="hv-ghost-row" onClick={() => setShowModal(true)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Add another habit</span>
+          </div>
 
         </div>
       )}

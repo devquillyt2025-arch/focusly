@@ -1064,8 +1064,21 @@ export default function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
         )}
-        <div className="yartu-top-search" ref={searchRef} style={{ display: 'flex', gap: 8 }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+        {/* ── Timestamp on far left ── */}
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {(() => {
+            const dayStr = clockNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = clockNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            return (
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                {timeStr} • {dayStr}
+              </span>
+            );
+          })()}
+        </div>
+
+        <div className="yartu-top-search" ref={searchRef} style={{ display: 'flex', gap: 8, flex: 1, justifyContent: 'center', margin: '0 24px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', maxWidth: '600px' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', left: 12 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
               type="text"
@@ -1107,21 +1120,8 @@ export default function App() {
             </div>
           )}
         </div>
-        <div className="header-right">
-          {/* ── Date / Time / Greeting widget ── */}
-          {(() => {
-            const h = clockNow.getHours();
-            const period = h >= 6 && h < 12 ? 'Morning' : h >= 12 && h < 18 ? 'Afternoon' : 'Evening';
-            const greetingText = `Good ${period}, ${firstName}! ${period === 'Evening' ? '🌙' : '☀️'}`;
-            const dayStr = clockNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const timeStr = clockNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', minWidth: 152, flexShrink: 0, lineHeight: 1.5, letterSpacing: '0.01em', gap: 1 }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-secondary)', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>{greetingText}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{timeStr} · {dayStr}</span>
-              </div>
-            );
-          })()}
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Good Morning</span>
           <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
           <div style={{ position: 'relative' }} ref={notifRef}>
             <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>

@@ -700,6 +700,17 @@ kbd {
 .toast.toast-info { border-color: rgba(99,102,241,0.4); }
 .toast.toast-warn { border-color: rgba(245,158,11,0.4); }
 
+/* ── Profile Inputs ── */
+.profile-input:hover, .profile-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    outline: none;
+}
+
+.upload-link:hover {
+    text-decoration: underline;
+}
+
 /* ── Light Theme ── */
 .theme-light {
     --bg-gradient-start: #f8fafc;

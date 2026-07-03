@@ -149,33 +149,39 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       {/* Profile Section */}
       <section className="settings-card">
         <h3 className="settings-card-title">Profile</h3>
-        <div style={{ display: 'flex', gap: 32, alignItems: 'center', marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', marginTop: 16, flexWrap: 'wrap' }}>
           <div className="avatar-picker" style={{ textAlign: 'center', flexShrink: 0 }}>
             <div style={{ width: 88, height: 88, borderRadius: 44, background: 'var(--c-bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', overflow: 'hidden', border: '2px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}>
               {avatar.startsWith('data:image') ? <img src={avatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : avatar}
             </div>
-            <label style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: '#6366f1', cursor: 'pointer' }}>
+            <label className="upload-link" style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: '#6366f1', cursor: 'pointer', transition: 'all 0.2s' }}>
               Upload Image
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
             </label>
           </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 260, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <div>
               <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Name</label>
-              <input type="text" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="What should we call you?" />
+              <div style={{ position: 'relative' }}>
+                <input type="text" maxLength={20} className="form-inp profile-input" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12, paddingRight: '48px' }} value={profileName} onChange={e => setProfileName(e.target.value.slice(0, 20))} placeholder="What should we call you?" />
+                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileName.length >= 20 ? '#ef4444' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileName.length}/20</div>
+              </div>
             </div>
             <div>
               <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Email</label>
-              <input type="email" className="form-inp" style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12 }} value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="yourname@example.com" maxLength={254} />
+              <div style={{ position: 'relative' }}>
+                <input type="email" maxLength={50} className="form-inp profile-input" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12, paddingRight: '48px' }} value={profileEmail} onChange={e => setProfileEmail(e.target.value.slice(0, 50))} placeholder="yourname@example.com" />
+                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileEmail.length >= 50 ? '#ef4444' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileEmail.length}/50</div>
+              </div>
             </div>
           </div>
         </div>
 
         <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14, display: 'block' }}>Choose Emoji</label>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 14 }}>
             {EMOJI_AVATARS.map(em => (
-              <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? 'rgba(99,102,241,0.15)' : 'var(--c-bg-card)', border: avatar === em ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 16, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: avatar === em ? '0 4px 12px rgba(99,102,241,0.15)' : 'none' }}>
+              <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? 'rgba(99,102,241,0.15)' : 'var(--c-bg-card)', border: avatar === em ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 16, width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: avatar === em ? '0 4px 12px rgba(99,102,241,0.15)' : 'none' }}>
                 {em}
               </button>
             ))}
@@ -187,7 +193,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       <section className="settings-card">
         <h3 className="settings-card-title">Notifications</h3>
         
-        <label className="toggle-row master-toggle" onClick={handleMasterNotifToggle} style={{ background: 'rgba(99, 102, 241, 0.08)', padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, cursor: 'pointer' }}>
+        <label className="toggle-row master-toggle" onClick={handleMasterNotifToggle} style={{ background: 'rgba(99, 102, 241, 0.08)', padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
           <div>
             <div className="toggle-lbl" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Enable Notifications</div>
             <div className="toggle-sub" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>Master switch for all push notifications</div>
@@ -198,18 +204,18 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         </label>
 
         <div style={{ opacity: notifMaster ? 1 : 0.5, pointerEvents: notifMaster ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 20, marginTop: 24, marginLeft: 24, paddingLeft: 20, borderLeft: '2px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Morning Briefing</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Daily summary of pending trackers</div>
             </div>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <input type="time" className="form-inp" value={morningTime} onChange={e => setMorningTime(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, background: 'var(--bg-surface)' }} />
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginLeft: 'auto' }}>
+              <input type="time" className="form-inp" value={morningTime} onChange={e => setMorningTime(e.target.value)} style={{ padding: '6px 12px', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, background: 'var(--bg-surface)', width: '140px' }} />
               <div className="toggle-track" onClick={() => setNotifMorning(!notifMorning)} data-on={notifMorning ? 'true' : 'false'} style={{ cursor: 'pointer', flexShrink: 0 }}><div className="toggle-thumb" /></div>
             </div>
           </div>
 
-          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Streak at-risk alerts (8 PM)</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Alert if you're about to lose a 3+ day streak</div>
@@ -217,7 +223,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <div className="toggle-track" data-on={notifStreak ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
           </label>
 
-          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Pomodoro timer alerts</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Notify when focus/break sessions end</div>
