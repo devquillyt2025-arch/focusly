@@ -2903,11 +2903,11 @@ select.modal-input {
 .cdp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .cdp-stat {
   display: flex; align-items: center; gap: 12px;
-  background: var(--bg-elevated); border: 1px solid var(--border);
+  background: transparent; border: 1px solid transparent;
   border-radius: 12px; padding: 12px 14px;
   transition: border-color var(--ease);
 }
-.cdp-stat:hover { border-color: var(--border-strong); }
+.cdp-stat:hover { border-color: var(--border); }
 .cdp-stat-icon {
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
@@ -2928,7 +2928,7 @@ select.modal-input {
 /* ── Filter bar — slim strip ── */
 .cdp-filterbar {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-  padding: 8px 14px; background: var(--bg-elevated); border: 1px solid var(--border);
+  padding: 8px 14px; background: transparent; border: 1px solid transparent;
   border-radius: 12px;
 }
 .cdp-filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2960,7 +2960,10 @@ select.modal-input {
 }
 .cdp-row:hover { box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
 .cdp-row-pinned { box-shadow: 0 0 0 1.5px var(--accent); }
-.cdp-row-overdue { background: linear-gradient(180deg, rgba(239,68,68,0.05), transparent 40%), var(--bg-elevated); }
+.cdp-row-overdue {
+  background: linear-gradient(180deg, rgba(239,68,68,0.06), transparent 40%), var(--bg-elevated);
+  border-left: 3px solid #ef4444;
+}
 
 .cdp-row-head { display: flex; align-items: center; gap: 11px; }
 .cdp-row-titlecol { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; min-width: 0; flex: 1; }
@@ -3564,6 +3567,12 @@ select.modal-input {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+/* Flatten nested cards inside Tasks dashboard to prevent double-elevation */
+.tasks-dashboard-grid .yartu-card,
+.task-list-panel > .yartu-card {
+  box-shadow: none;
+  border-color: var(--border);
 }
 
 .yartu-card-header {
@@ -4982,54 +4991,54 @@ select.modal-input {
 .linear-task-row {
   display: flex;
   align-items: center;
-  height: 38px;
-  padding: 0 12px 0 0;
+  height: 36px;
+  padding: 0 10px 0 0;
+  margin-bottom: 2px;
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  transition: background 0.1s ease;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: background 0.12s ease, border-color 0.12s ease;
   cursor: pointer;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
 }
-.linear-task-row:last-child {
-  border-bottom: none;
-}
 .linear-task-row:hover {
   background: var(--bg-hover);
+  border-color: var(--border);
 }
 .linear-task-row.task-active {
   background: var(--accent-glow2, rgba(99, 102, 241, 0.15));
+  border-color: var(--border-accent);
 }
 .linear-task-row.item-completed {
   opacity: 0.55;
-  background: var(--bg-base);
 }
 
-/* Checkbox shrunk to fit row height */
+/* Checkbox — circular, fills with the row's category color when checked */
 .linear-checkbox {
-  width: 16px;
-  height: 16px;
-  margin-left: 12px;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  margin-left: 10px;
+  border-radius: 50%;
   border: 2px solid var(--border-strong, #cbd5e1);
-  background: var(--bg-surface);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 0.75rem;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s ease;
 }
 .linear-checkbox:hover {
-  border-color: var(--accent, #2563eb);
+  border-color: var(--cat, var(--accent, #2563eb));
+  background: color-mix(in srgb, var(--cat, var(--accent)) 12%, transparent);
 }
 .linear-checkbox.checked {
-  background: var(--accent, #0f172a);
-  border-color: var(--accent, #0f172a);
+  background: var(--cat, var(--accent, #0f172a));
+  border-color: var(--cat, var(--accent, #0f172a));
 }
 
 /* Task Title Container (Flexible width, wins layout fight) */
@@ -5061,6 +5070,7 @@ select.modal-input {
   gap: 8px;
   flex-shrink: 0;
 }
+.linear-task-icons:empty { display: none; }
 .linear-inline-meta {
   display: inline-flex;
   align-items: center;
@@ -5076,7 +5086,7 @@ select.modal-input {
 
 /* Category Badge (Small muted badge, lower visual weight) */
 .linear-task-cat {
-  width: 90px;
+  width: 96px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -5085,33 +5095,48 @@ select.modal-input {
 .linear-cat-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 .linear-cat-badge-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-/* Date (Left-aligned plain text in fixed-width column) */
+/* Date column — date + optional Overdue tag, or "No due date" placeholder */
 .linear-task-due {
-  width: 80px;
+  width: 118px;
   flex-shrink: 0;
-  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
   font-weight: 500;
-  color: var(--text-secondary);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.ltd-date { overflow: hidden; text-overflow: ellipsis; }
+.ltd-empty { color: var(--text-faint); font-weight: 400; font-style: italic; }
+.ltd-overdue-tag {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #ef4444;
+  background: rgba(239,68,68,0.12);
+  padding: 2px 6px;
+  border-radius: 5px;
 }
 
 /* Actions (Star & Kebab menu, shrunk to fit row height) */
@@ -5137,6 +5162,58 @@ select.modal-input {
 }
 .linear-action-btn:hover {
   background: var(--bg-hover);
+}
+
+/* ── Tasks page: flatten to a single elevation level ── */
+.tasks-tab .yartu-card {
+  border-radius: 14px;
+  box-shadow: none;
+  padding: 16px 18px;
+  gap: 12px;
+}
+.tasks-tab .yartu-card:hover { border-color: var(--border); }
+
+/* ── Completion Analytics: category breakdown bars ── */
+.ca-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  transition: opacity 0.15s ease;
+}
+.ca-cat-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.ca-cat-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  width: 60px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ca-cat-track {
+  flex: 1;
+  height: 7px;
+  background: var(--ring-track, rgba(255,255,255,0.06));
+  border-radius: 99px;
+  overflow: hidden;
+}
+.ca-cat-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.45s cubic-bezier(0.34, 1.2, 0.64, 1);
+  min-width: 0;
+}
+.ca-cat-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 /* Ensure horizontal overview panel stacks Row 1 and Row 2 perfectly */

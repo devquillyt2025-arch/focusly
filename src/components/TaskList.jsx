@@ -259,17 +259,20 @@ function TaskRow({
         </div>
       ) : (
         <>
-          {/* Checkbox */}
+          {/* Checkbox — circular, fills with category color when checked */}
           <div
             className={`linear-checkbox${isDone ? ' checked' : ''}`}
             role="checkbox"
             aria-checked={isDone}
             tabIndex={0}
+            style={{ '--cat': meta.color }}
             onClick={e => { e.stopPropagation(); onToggle(task.id); }}
             onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggle(task.id); } }}
             aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
           >
-            {isDone ? '✓' : ''}
+            {isDone && (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            )}
           </div>
 
           {/* Task Title (Flexible width, wins layout fight) */}
@@ -342,17 +345,22 @@ function TaskRow({
             )}
           </div>
 
-          {/* Category (Small muted badge, lower visual weight) */}
+          {/* Category — color-coded pill */}
           <div className="linear-task-cat">
-            <span className="linear-cat-badge">
+            <span className="linear-cat-badge" style={{ background: meta.color + '16', color: meta.color }}>
               <span className="linear-cat-badge-dot" style={{ background: meta.color }} />
               {meta.label}
             </span>
           </div>
 
-          {/* Date (Left-aligned plain text in fixed-width column with urgency coloring) */}
-          <div className="linear-task-due" style={{ color: !isDone ? due?.color : undefined, fontWeight: !isDone ? due?.fontWeight : undefined }}>
-            {due ? due.text : ''}
+          {/* Date — consistent column: date (urgency-colored) + Overdue tag, or "No due date" placeholder */}
+          <div className="linear-task-due">
+            {due ? (
+              <span className="ltd-date" style={{ color: !isDone ? due.color : undefined, fontWeight: !isDone ? due.fontWeight : undefined }}>{due.text}</span>
+            ) : (
+              <span className="ltd-empty">No due date</span>
+            )}
+            {isOverdue && <span className="ltd-overdue-tag">Overdue</span>}
           </div>
 
           {/* Actions (Star & Kebab menu, shrunk to fit row height) */}
@@ -497,14 +505,14 @@ function DonutChart({ pendingCount, completedCount }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={SW} />
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--ring-track)" strokeWidth={SW} />
         {total > 0 && pendingCount > 0 && (
           <circle cx={cx} cy={cy} r={R} fill="none" stroke="#6366f1" strokeWidth={SW}
             strokeDasharray={`${pendingArc} ${C - pendingArc}`} strokeDashoffset={0} strokeLinecap="butt" />
         )}
         {completedCount > 0 && (
           <circle cx={cx} cy={cy} r={R} fill="none" stroke="#10b981" strokeWidth={SW}
-            strokeDasharray={`${completedArc} ${C - completedArc}`} strokeDashoffset={C - pendingArc} strokeLinecap="butt" />
+            strokeDasharray={`${completedArc} ${C - completedArc}`} strokeDashoffset={-pendingArc} strokeLinecap="butt" />
         )}
         {total === 0 && (
           <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(99,102,241,0.2)" strokeWidth={SW} />
@@ -518,11 +526,19 @@ function DonutChart({ pendingCount, completedCount }) {
   );
 }
 
+const BASE_CATS = ['work', 'learning', 'fitness', 'mental', 'growth'];
+
 function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCompleted, catCounts }) {
   const [activeTab, setActiveTab] = useState('overview');
   const totalTasks = pending.length + completed.length;
   const completedPct = totalTasks > 0 ? Math.round((completed.length / totalTasks) * 100) : 0;
-  const catBreakdown = Object.entries(catCounts).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a).slice(0, 4);
+  // Show the base categories always (grayed out at 0) plus any custom list that has tasks —
+  // sorted by count desc so active categories lead.
+  const catKeys = Array.from(new Set([...BASE_CATS, ...Object.keys(catCounts)]));
+  const catBreakdown = catKeys
+    .map(k => [k, catCounts[k] || 0])
+    .sort(([, a], [, b]) => b - a);
+  const maxCatCount = Math.max(1, ...catBreakdown.map(([, c]) => c));
 
   return (
     <div className="yartu-card" style={{ display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 14, overflowY: 'auto' }}>
@@ -565,26 +581,27 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Overall Progress</span>
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: completedPct === 100 ? '#10b981' : 'var(--text-secondary)' }}>{completedPct}%</span>
               </div>
-              <div style={{ height: 7, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: 7, background: 'var(--ring-track)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
               </div>
             </div>
           )}
 
           {catBreakdown.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>By Category</span>
               {catBreakdown.map(([cat, count]) => {
                 const meta = CAT_META[cat] ?? CAT_META.work;
-                const barPct = pending.length > 0 ? (count / pending.length) * 100 : 0;
+                const empty = count === 0;
+                const barPct = empty ? 0 : Math.max(8, (count / maxCatCount) * 100);
                 return (
-                  <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: 58, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.label}</span>
-                    <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barPct}%`, background: meta.color, borderRadius: 99, transition: 'width 0.4s ease' }} />
+                  <div key={cat} className="ca-cat-row" style={{ opacity: empty ? 0.4 : 1 }}>
+                    <span className="ca-cat-dot" style={{ background: empty ? 'var(--text-muted)' : meta.color }} />
+                    <span className="ca-cat-label">{meta.label}</span>
+                    <div className="ca-cat-track">
+                      <div className="ca-cat-fill" style={{ width: `${barPct}%`, background: empty ? 'transparent' : `linear-gradient(90deg, ${meta.color}cc, ${meta.color})` }} />
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: 14, textAlign: 'right' }}>{count}</span>
+                    <span className="ca-cat-count" style={{ color: empty ? 'var(--text-muted)' : 'var(--text-primary)', background: empty ? 'transparent' : meta.color + '16' }}>{count}</span>
                   </div>
                 );
               })}
@@ -851,7 +868,18 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, catFilter, sortBy, query]);
 
-  const pendingCount = tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length;
+  // ── Single source of truth for the analytics panel ──
+  // The left list is filtered by catFilter/query; the analytics dashboard
+  // (ring, completed count, category bars) always reflects the FULL task set
+  // so the three visuals never disagree.
+  const isPendingTask = t => t.status === 'needsAction' || (!t.status && !t.completed);
+  const isCompletedTask = t => t.status === 'completed' || (!t.status && t.completed);
+  const allPending = useMemo(() => tasks.filter(isPendingTask), [tasks]);
+  const allCompleted = useMemo(
+    () => tasks.filter(isCompletedTask).sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt)),
+    [tasks]
+  );
+  const pendingCount = allPending.length;
 
   // Count pending tasks per category (always from full task list, ignoring current filter)
   const catCounts = useMemo(() => {
@@ -992,7 +1020,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           </span>
           <span style={{ color: 'var(--border)' }}>·</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontWeight: 700, color: '#10b981' }}>{completed.length}</span>
+            <span style={{ fontWeight: 700, color: '#10b981' }}>{allCompleted.length}</span>
             <span>done</span>
           </span>
         </div>
@@ -1091,8 +1119,8 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         {/* RIGHT (40%): COMPLETION ANALYTICS */}
         <ErrorBoundary message="Analytics panel failed to render.">
           <CompletionAnalytics
-            pending={pending}
-            completed={completed}
+            pending={allPending}
+            completed={allCompleted}
             onAdd={onAdd}
             renderTask={renderTask}
             onClearCompleted={onClearCompleted}

@@ -319,7 +319,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
 }
 
 // ── Note Card ─────────────────────────────────────────────────────────────
-export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSelect }) {
+export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSelect, viewMode = 'grid' }) {
   const [hovered, setHovered] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const isColored = note.color && note.color !== 'default';
@@ -350,10 +350,13 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
         borderRadius: 12,
         padding: '12px',
         cursor: 'pointer',
-        height: 178,
+        height: viewMode === 'list' ? 'auto' : 178,
+        minHeight: viewMode === 'list' ? 60 : undefined,
         boxSizing: 'border-box',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: viewMode === 'list' ? 'row' : 'column',
+        gap: viewMode === 'list' ? 16 : undefined,
+        alignItems: viewMode === 'list' ? 'center' : undefined,
         position: 'relative',
         overflow: 'hidden',
         boxShadow: isColored ? 'none' : 'var(--shadow-sm)',
@@ -383,7 +386,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
       {note.content && (
         <div style={{
           display: '-webkit-box',
-          WebkitLineClamp: 4,
+          WebkitLineClamp: viewMode === 'list' ? 1 : 4,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
           fontSize: '0.81rem',
@@ -591,7 +594,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
       result = result.filter(n => new Date(n.updatedAt) <= eOfDay);
     }
     
-    if (sortOrder === 'alpha') result.sort((a,b) => a.title.localeCompare(b.title));
+    if (sortOrder === 'alpha') result.sort((a,b) => (a.title || '').localeCompare(b.title || ''));
     else if (sortOrder === 'oldest') result.sort((a,b) => new Date(a.updatedAt) - new Date(b.updatedAt));
     else result.sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     
@@ -699,9 +702,33 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
             )}
           </div>
 
+          {/* 5b. View mode toggle */}
+          <div role="group" aria-label="View mode" style={{ display: 'flex', gap: 0, background: 'var(--bg-input)', borderRadius: 7, border: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
+              title="Grid view"
+              style={{ padding: '5px 8px', background: viewMode === 'grid' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'grid' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
+              title="List view"
+              style={{ padding: '5px 8px', background: viewMode === 'list' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+          </div>
+
           {/* 6. Entry count — pushed to far right */}
           <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {(localSearchQuery.trim() || globalSearchQuery.trim() || activeTag || activeColor)
+            {(localSearchQuery.trim() || globalSearchQuery.trim() || activeTag || activeColor || dateRange.start || dateRange.end)
               ? `${filtered.length} of ${notes.length} entries`
               : `${notes.length} entries`}
           </span>
@@ -752,7 +779,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '40%', gap: 10, color: 'var(--text-muted)', textAlign: 'center' }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No notes match your search</div>
-            <button onClick={() => { setLocalSearchQuery(''); setActiveTag(null); setActiveColor(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}>Clear filters</button>
+            <button onClick={() => { setLocalSearchQuery(''); setActiveTag(null); setActiveColor(null); setDateRange({ start: null, end: null }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}>Clear filters</button>
           </div>
         ) : (
           <>
@@ -765,7 +792,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
                 </div>
                 <div style={gridStyle}>
                   <AnimatePresence>
-                    {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} onColorSelect={updateNoteColor} />)}
+                    {pinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} onColorSelect={updateNoteColor} viewMode={viewMode} />)}
                   </AnimatePresence>
                 </div>
               </div>
@@ -781,7 +808,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
                 )}
                 <div style={gridStyle}>
                   <AnimatePresence>
-                    {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} onColorSelect={updateNoteColor} />)}
+                    {unpinned.map(n => <NoteCard key={n.id} note={n} onOpen={openEdit} onPin={togglePin} onDelete={deleteNote} onTagClick={setActiveTag} onColorSelect={updateNoteColor} viewMode={viewMode} />)}
                   </AnimatePresence>
                 </div>
               </div>

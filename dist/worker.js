@@ -7,3 +7,4 @@ self.onmessage = function(e) {
     if (timerId) { clearInterval(timerId); timerId = null; }
   }
 };
+                                                                                                                                  

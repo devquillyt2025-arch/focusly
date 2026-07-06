@@ -123,7 +123,7 @@ export default function CountdownsView() {
 
   const today = todayLocal();
   const totalCount     = countdowns.length;
-  const completedCount = countdowns.filter(c => c.completed || today > c.endDate).length;
+  const completedCount = countdowns.filter(c => c.completed).length;
   const overdueCount   = countdowns.filter(c => !c.completed && today > c.endDate).length;
   const activeCount    = totalCount - completedCount;
   const avgPct         = countdowns.length
@@ -649,7 +649,7 @@ function CountdownModal({ onSave, onClose, editCd = null, onDelete }) {
 // ─── Inline icons ──────────────────────────────────────────────────
 function CdIcoHourglass() {
   return (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2d2d44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 2h14"/><path d="M5 22h14"/>
       <path d="M5 2c0 6 6 6 6 10s-6 4-6 10"/><path d="M19 2c0 6-6 6-6 10s6 4 6 10"/>
     </svg>
