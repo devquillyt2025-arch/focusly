@@ -7,14 +7,17 @@
 
 /* ─── CSS Variables ─────────────────────────────────────────────── */
 :root {
-  /* Deep background layers */
-  --bg-base:       #121212;
-  --bg-surface:    #1e1e1e;
-  --bg-elevated:   #2d2d2d;
-  --bg-card:       #1e1e1e;
+  /* Deep background layers (3-tier elevation) */
+  --bg-base:       #0a0a0a;
+  --surface-panel: #141416;
+  --surface-nested:#1c1c1f;
+  
+  --bg-surface:    var(--surface-panel);
+  --bg-elevated:   var(--surface-nested);
+  --bg-card:       var(--surface-panel);
   --bg-hover:      rgba(255,255,255,0.1);
-  --bg-sidebar:    #1e1e1e;
-  --bg-input:      #2d2d2d;
+  --bg-sidebar:    var(--surface-panel);
+  --bg-input:      var(--surface-nested);
 
   /* Text hierarchy */
   --text-primary:  #f5f5f5;
@@ -70,13 +73,17 @@
 
 /* ─── Light theme overrides ──────────────────────────────────────── */
 :root[data-theme="light"] {
-  --bg-base:       #ffffff;  /* page/content background — pure white */
-  --bg-surface:    #ffffff;  /* cards, header — pure white */
-  --bg-elevated:   #ffffff;  /* modals, popovers — pure white */
-  --bg-card:       #ffffff;
+  /* Deep background layers (3-tier elevation) */
+  --bg-base:       #f9fafb;
+  --surface-panel: #ffffff;
+  --surface-nested:#f3f4f6;
+
+  --bg-surface:    var(--surface-panel);
+  --bg-elevated:   var(--surface-nested);
+  --bg-card:       var(--surface-panel);
   --bg-hover:      #f1f1f1;
-  --bg-sidebar:    #ffffff;  /* nav sidebar — matches white content background */
-  --bg-input:      #ffffff;
+  --bg-sidebar:    var(--surface-panel);
+  --bg-input:      var(--surface-nested);
 
   --text-primary:  #222222;
   --text-secondary:#717171;
@@ -4367,7 +4374,7 @@ select.modal-input {
 }
 
 .yartu-card {
-  background: var(--bg-surface);
+  background: var(--surface-panel);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 24px;
@@ -4995,7 +5002,7 @@ select.modal-input {
   height: 36px;
   padding: 0 10px 0 0;
   margin-bottom: 2px;
-  background: var(--bg-surface);
+  background: var(--surface-nested);
   border: 1px solid transparent;
   border-radius: 10px;
   transition: background 0.12s ease, border-color 0.12s ease;
