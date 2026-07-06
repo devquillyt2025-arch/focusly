@@ -24,7 +24,7 @@ const MODULE_META = {
   tasks:    { label: 'Tasks',    tab: 'tasks'    },
   habits:   { label: 'Habits',  tab: 'habits'   },
   notes:    { label: 'Notes',   tab: 'notes'    },
-  goals:    { label: 'Goals',   tab: 'goals'    },
+  countdowns: { label: 'Countdowns', tab: 'countdowns' },
   journal:  { label: 'Journal', tab: 'journal'  },
   calendar: { label: 'Calendar',tab: 'calendar' },
 };

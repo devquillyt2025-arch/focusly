@@ -212,13 +212,15 @@ function ServiceGroup({ serviceName, accounts, defaultOpen, onEdit, onDelete, on
   const inits = initials(serviceName);
 
   return (
-    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden' }}>
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
 
       {/* Header */}
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+        style={{ width: '100%', padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background .12s' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
       >
         {/* Avatar */}
         <div style={{ width: 40, height: 40, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: '0.82rem', color: '#fff', letterSpacing: '.02em' }}>

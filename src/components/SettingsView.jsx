@@ -11,7 +11,7 @@ const PRESETS = [
 
 const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '👻'];
 
-export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile, initialProfileName, initialProfileEmail, initialProfileAvatar }) {
+export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile, initialProfileName, initialProfileEmail, initialProfileAvatar, gcalConnected, onConnectGCal, onDisconnectGCal }) {
   // Profile state — seed from App.jsx's already-resolved state (same values the header shows)
   const [profileName, setProfileName] = useState(
     () => initialProfileName || localStorage.getItem('focusly-profile-name') || 'Productivity User'
@@ -295,6 +295,58 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
                 }}
               >
                 Disconnect Google Tasks
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Google Calendar Sync Section */}
+      <section className="settings-card">
+        <h3 className="settings-card-title">Google Calendar Sync</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 24 }}>
+          Connect Google Calendar to see your events on the Focusly calendar. You can manage events from the <strong style={{ color: 'var(--text-primary)' }}>Calendar</strong> tab.
+        </p>
+
+        {!gcalConnected ? (
+          <div>
+            <button
+              type="button"
+              className="primary-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 24px', borderRadius: 14, fontWeight: 600, fontSize: '0.95rem', border: 'none', cursor: 'pointer', background: '#4285F4', color: '#fff', boxShadow: '0 4px 12px rgba(66,133,244,0.2)' }}
+              onClick={onConnectGCal}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="17" rx="2" stroke="#fff" strokeWidth="1.5"/>
+                <path d="M16 2v4M8 2v4M3 9h18" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+                <text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff">G</text>
+              </svg>
+              Connect Google Calendar
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Status row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'rgba(66,133,244,0.07)', border: '1px solid rgba(66,133,244,0.2)', borderRadius: 14 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px rgba(34,197,94,0.5)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>Google Calendar connected</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 3 }}>Events sync automatically when you open the Calendar tab.</div>
+              </div>
+            </div>
+            {/* Disconnect */}
+            <div>
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ color: '#ef4444', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
+                onClick={() => {
+                  if (window.confirm('Disconnect Google Calendar?\n\nThis will hide all Google Calendar events from Focusly. You can reconnect at any time.')) {
+                    onDisconnectGCal();
+                  }
+                }}
+              >
+                Disconnect Google Calendar
               </button>
             </div>
           </div>

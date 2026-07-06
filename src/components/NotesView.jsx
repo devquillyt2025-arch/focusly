@@ -185,7 +185,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
           />
         </div>
 
-        <hr style={{ border: 'none', borderBottom: '1px solid #e5e7eb', margin: '16px 24px 0', flexShrink: 0 }} />
+        <hr style={{ border: 'none', borderBottom: '1px solid var(--border)', margin: '16px 24px 0', flexShrink: 0 }} />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1 }}>
@@ -229,7 +229,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
           </div>
         </div>
 
-        <div style={{ padding: '16px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', bottom: 0, background: modalBg, zIndex: 10 }}>
+        <div style={{ padding: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', bottom: 0, background: modalBg, zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={handleCopy} title="Copy"
               className="hover:opacity-80"
@@ -345,8 +345,8 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
       onPointerLeave={() => { setHovered(false); setShowColors(false); }}
       onClick={() => onOpen(note)}
       style={{
-        background: isColored ? colStyle.bg : '#ffffff',
-        border: `1px solid ${isColored ? colStyle.border : '#e5e7eb'}`,
+        background: isColored ? colStyle.bg : 'var(--bg-card)',
+        border: `1px solid ${isColored ? colStyle.border : 'var(--border)'}`,
         borderRadius: 12,
         padding: '12px',
         cursor: 'pointer',
@@ -356,7 +356,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
         flexDirection: 'column',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: isColored ? 'none' : '0 1px 3px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.05)',
+        boxShadow: isColored ? 'none' : 'var(--shadow-sm)',
       }}>
 
       {/* Pinned indicator */}

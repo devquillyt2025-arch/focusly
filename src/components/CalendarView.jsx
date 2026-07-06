@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import {
-  connectGoogleCalendar, disconnectGoogleCalendar, isGCalConnected,
+  isGCalConnected,
   getCalendarToken, fetchGCalEvents, createGCalEvent, gcalColor,
 } from '../utils/googleCalendarSync';
 import Select from './Select';
@@ -74,18 +74,32 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   const [modalNotes,    setModalNotes]    = useState('');
   const [pushToGCal,    setPushToGCal]    = useState(true);
   const [detailEvent,   setDetailEvent]   = useState(null);
-  const [showUnscheduled, setShowUnscheduled] = useState(() => window.innerWidth > 1024);
+  const [showUnscheduled, setShowUnscheduled] = useState(false);
   const [resizing,      setResizing]      = useState(null);
   const [dragOverHour,  setDragOverHour]  = useState(null);
   const [isDragging,    setIsDragging]    = useState(false);
 
-  const [currentTimeMin, setCurrentTimeMin] = useState(() => {
-    const n = new Date(); return n.getHours() * 60 + n.getMinutes();
-  });
-  useEffect(() => {
-    const t = setInterval(() => { const n = new Date(); setCurrentTimeMin(n.getHours() * 60 + n.getMinutes()); }, 60000);
-    return () => clearInterval(t);
+  // Ref-based now-indicator: mutates DOM directly — no grid re-render every 60s
+  const nowLineRef  = useRef(null);
+  const nowLabelRef = useRef(null);
+
+  const updateNowLine = useCallback(() => {
+    const n = new Date();
+    const mins = n.getHours() * 60 + n.getMinutes();
+    const top  = Math.round(mins * PX_PER_MIN);
+    if (nowLineRef.current)  nowLineRef.current.style.top = `${top}px`;
+    if (nowLabelRef.current) {
+      const h = n.getHours(), m = n.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      nowLabelRef.current.textContent = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
   }, []);
+
+  useEffect(() => {
+    updateNowLine();
+    const t = setInterval(updateNowLine, 60000);
+    return () => clearInterval(t);
+  }, [updateNowLine]);
 
   const [gcalConnected, setGcalConnected] = useState(() => isGCalConnected());
   const [gcalEvents,    setGcalEvents]    = useState([]);
@@ -258,6 +272,18 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   };
   const dragEnd = e => { setIsDragging(false); setDragOverHour(null); if (e.target) e.target.style.opacity = '1'; };
 
+  // ── Auto-scroll Day view to current hour on mount / when day changes ──
+  const dayScrollRef = useRef(null);
+  useEffect(() => {
+    if (viewMode !== 'day' || dayDateStr !== todayStr) return;
+    const el = dayScrollRef.current;
+    if (!el) return;
+    const n = new Date();
+    const mins = n.getHours() * 60 + n.getMinutes();
+    // Sit ~1 hour above current time in the viewport
+    el.scrollTop = Math.max(0, Math.round(mins * PX_PER_MIN) - HOUR_PX);
+  }, [viewMode, dayDateStr, todayStr]);
+
   // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className="calendar-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)', overflow: 'hidden', position: 'relative' }}>
@@ -283,20 +309,25 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {gcalConnected ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'rgba(66,133,244,.1)', border: '1px solid rgba(66,133,244,.3)', borderRadius: 8 }}>
-              <GCalIcon size={13}/>
-              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#4285f4' }}>{gcalSyncing ? 'Syncing…' : gcalError ? 'Error' : 'Google Calendar'}</span>
-              <button onClick={fetchGCalRange} title="Refresh" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#4285f4', padding: 0, display: 'flex' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: gcalSyncing ? 'spin 1s linear infinite' : 'none' }}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-              </button>
-              <button onClick={() => { disconnectGoogleCalendar(); setGcalConnected(false); setGcalEvents([]); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, fontSize: '0.9rem' }}>×</button>
+          {/* GCal status indicator — read-only; connect/disconnect lives in Settings */}
+          {gcalConnected && (
+            <div
+              title={gcalError ? 'Sync error — open Settings to reconnect' : gcalSyncing ? 'Syncing Google Calendar…' : 'Google Calendar connected'}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', background: 'rgba(66,133,244,.07)', border: '1px solid rgba(66,133,244,.2)', borderRadius: 8, cursor: 'default' }}
+            >
+              <GCalIcon size={12}/>
+              {/* Status dot */}
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                background: gcalError ? '#ef4444' : gcalSyncing ? '#f59e0b' : '#22c55e',
+                boxShadow: gcalSyncing ? '0 0 4px rgba(245,158,11,.6)' : gcalError ? '0 0 4px rgba(239,68,68,.6)' : '0 0 4px rgba(34,197,94,.5)',
+              }}/>
+              {gcalSyncing && (
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4285f4' }}>Syncing…</span>
+              )}
             </div>
-          ) : (
-            <button onClick={() => connectGoogleCalendar()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(66,133,244,.08)', border: '1px solid rgba(66,133,244,.3)', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#4285f4' }}>
-              <GCalIcon size={13}/> Connect Google Calendar
-            </button>
           )}
+
 
           <div style={{ display: 'flex', background: 'var(--bg-input)', padding: 3, borderRadius: 10, border: '1px solid var(--border)' }}>
             {['month','week','day'].map(m => (
@@ -416,7 +447,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
 
         {/* Day */}
         {viewMode === 'day' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
+            <div ref={dayScrollRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
 
               {/* Sticky All-Day Row */}
               <div
@@ -449,6 +480,19 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
               {/* 24-Hour Timeline */}
               <div style={{ position: 'relative', height: HOUR_PX * 24, width: '100%', flexShrink: 0, overflow: 'hidden' }}>
 
+                {/* Empty-day prompt — inline near current hour, only when today has no timed events */}
+                {dayDateStr === todayStr && timedEvs.length === 0 && (() => {
+                  const nowHour = new Date().getHours();
+                  return (
+                    <div style={{ position: 'absolute', top: nowHour * HOUR_PX + HOUR_PX / 2 - 14, left: 72, right: 16, zIndex: 5, pointerEvents: 'none' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, background: 'var(--bg-surface)', border: '1px dashed var(--border-strong)', borderRadius: 8, padding: '4px 12px', opacity: 0.85 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Nothing scheduled — add something?
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {HOURS.map(({ hour, label }) => (
                   <div key={hour}
                     onClick={() => openAddModal(dayDateStr, `${String(hour).padStart(2,'0')}:00`)}
@@ -456,18 +500,47 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverHour(null); }}
                     onDrop={e => dropOnHour(e, dayDateStr, hour)}
                     style={{ position: 'absolute', top: hour * HOUR_PX, left: 0, right: 0, height: HOUR_PX, borderBottom: `1px solid ${dragOverHour === hour ? 'rgba(99,102,241,.45)' : 'var(--border)'}`, display: 'flex', boxSizing: 'border-box', cursor: 'pointer', background: dragOverHour === hour ? 'rgba(99,102,241,.07)' : 'transparent', transition: 'background .1s ease, border-color .1s ease' }}
+                    onMouseEnter={e => {
+                      if (dragOverHour !== hour) e.currentTarget.style.background = 'rgba(255,255,255,0.018)';
+                      const hint = e.currentTarget.querySelector('.cal-plus-hint');
+                      if (hint) hint.style.opacity = '1';
+                    }}
+                    onMouseLeave={e => {
+                      if (dragOverHour !== hour) e.currentTarget.style.background = 'transparent';
+                      const hint = e.currentTarget.querySelector('.cal-plus-hint');
+                      if (hint) hint.style.opacity = '0';
+                    }}
                   >
-                    <div style={{ width: 64, padding: '8px 10px', borderRight: '1px solid var(--border)', flexShrink: 0, textAlign: 'right', color: dragOverHour === hour ? 'var(--accent)' : 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 700, boxSizing: 'border-box', userSelect: 'none', transition: 'color .1s ease' }}>{label}</div>
-                    <div style={{ flex: 1 }} />
+                    {/* A11y: color upgraded from --text-muted (#424d5e) to --text-secondary (#8b96aa) for WCAG AA contrast */}
+                    <div style={{ width: 64, padding: '8px 10px', borderRight: '1px solid var(--border)', flexShrink: 0, textAlign: 'right', color: dragOverHour === hour ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700, boxSizing: 'border-box', userSelect: 'none', transition: 'color .1s ease' }}>{label}</div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', paddingLeft: 10 }}>
+                      {/* Hover "+" affordance — prefills create-event at this hour */}
+                      <span className="cal-plus-hint" style={{ opacity: 0, transition: 'opacity .15s ease', fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4, pointerEvents: 'none', userSelect: 'none' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add event
+                      </span>
+                    </div>
                   </div>
                 ))}
 
-                {/* Current time indicator */}
+                {/* Current time indicator — DOM-mutated via ref, no re-render on 60s tick */}
                 {dayDateStr === todayStr && (
-                  <div style={{ position: 'absolute', top: Math.round(currentTimeMin * PX_PER_MIN), left: 64, right: 0, height: 2, background: '#ef4444', zIndex: 40, pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', marginLeft: -5, boxShadow: '0 0 8px rgba(239,68,68,.6)' }}/>
+                  <div
+                    ref={nowLineRef}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 0, zIndex: 40, pointerEvents: 'none' }}
+                  >
+                    {/* Time label */}
+                    <span
+                      ref={nowLabelRef}
+                      style={{ position: 'absolute', left: 2, top: -9, fontSize: '0.6rem', fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}
+                    />
+                    {/* Dot at the column boundary */}
+                    <div style={{ position: 'absolute', left: 59, top: -5, width: 10, height: 10, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px rgba(239,68,68,.6)' }}/>
+                    {/* Horizontal line */}
+                    <div style={{ position: 'absolute', left: 64, right: 0, top: 0, height: 2, background: '#ef4444' }}/>
                   </div>
                 )}
+
 
                 {/* Event blocks */}
                 <div style={{ position: 'absolute', top: 0, left: 64, right: 0, height: HOUR_PX * 24, pointerEvents: 'none' }}>

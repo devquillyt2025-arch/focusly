@@ -24,7 +24,7 @@ import WeeklyReviewModal from './components/WeeklyReviewModal';
 import DailyGoalsView from './components/DailyGoalsView';
 import ReportsView from './components/ReportsView';
 import JournalView from './components/JournalView';
-import GoalsView from './components/GoalsView';
+import CountdownsView from './components/CountdownsView';
 import HabitsView from './components/HabitsView';
 import CalendarView from './components/CalendarView';
 import NotesView, { NoteModal } from './components/NotesView';
@@ -37,7 +37,7 @@ import {
   isScheduledToday, isLoggedToday, computeHabitStreaks
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
-import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar } from './utils/googleCalendarSync';
+import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
 import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { logActivity, diffObjects } from './utils/activityLog';
@@ -1005,9 +1005,9 @@ export default function App() {
     } catch {}
 
     try {
-      JSON.parse(localStorage.getItem('focusly_goals') || '[]').forEach(g => {
-        if (g.title?.toLowerCase().includes(q)) {
-          results.push({ type: 'goal', id: g.id, title: g.title, sub: g.category, tab: 'goals' });
+      JSON.parse(localStorage.getItem('focusly_countdowns') || '[]').forEach(c => {
+        if (c.name?.toLowerCase().includes(q)) {
+          results.push({ type: 'countdown', id: c.id, title: c.name, sub: `${c.startDate} – ${c.endDate}`, tab: 'countdowns' });
         }
       });
     } catch {}
@@ -1121,7 +1121,15 @@ export default function App() {
           )}
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Good Morning</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{
+            (() => {
+              const h = clockNow.getHours();
+              if (h >= 5  && h < 12) return 'Good Morning';
+              if (h >= 12 && h < 17) return 'Good Afternoon';
+              if (h >= 17 && h < 21) return 'Good Evening';
+              return 'Good Night';
+            })()
+          }</span>
           <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
           <div style={{ position: 'relative' }} ref={notifRef}>
             <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
@@ -1316,6 +1324,7 @@ export default function App() {
             { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
             { id:'vault',    label:'Vault',    Icon: NavIcoVault },
             { id:'links',    label:'Links',    Icon: NavIcoLinks },
+            { id:'countdowns', label:'Countdowns', Icon: NavIcoHourglass },
           ].map(tab => (
             <button key={tab.id}
               className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
@@ -1334,7 +1343,6 @@ export default function App() {
             { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
             { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
             { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
-            { id:'goals',    label:'Goals',         Icon: NavIcoGoalTarget },
             { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
             { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
           ].map(tab => (
@@ -1451,6 +1459,9 @@ export default function App() {
                 setProfileEmail(email);
                 setProfileAvatar(av);
               }}
+              gcalConnected={isGCalConnected()}
+              onConnectGCal={() => connectGoogleCalendar()}
+              onDisconnectGCal={() => disconnectGoogleCalendar()}
             />
           )}
 
@@ -1508,7 +1519,7 @@ export default function App() {
             />
           )}
           {activeTab === 'journal'  && <JournalView />}
-          {activeTab === 'goals'    && <GoalsView />}
+          {activeTab === 'countdowns' && <CountdownsView />}
           {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchScope === 'notes' ? searchQuery : ''} />}
           {activeTab === 'vault'    && <VaultView />}
           {activeTab === 'links'   && <LinksView />}
@@ -1685,8 +1696,8 @@ function NavIcoBookOpen() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
 }
 // Section 2 — Planning
-function NavIcoGoalTarget() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+function NavIcoHourglass() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M5 2h14"/><path d="M5 22h14"/><path d="M5 2c0 6 6 6 6 10s-6 4-6 10"/><path d="M19 2c0 6-6 6-6 10s6 4 6 10"/></svg>;
 }
 function NavIcoBarChart() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
