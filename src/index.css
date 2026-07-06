@@ -8,19 +8,19 @@
 /* ─── CSS Variables ─────────────────────────────────────────────── */
 :root {
   /* Deep background layers */
-  --bg-base:       #0b0d13;
-  --bg-surface:    #10121a;
-  --bg-elevated:   #161921;
-  --bg-card:       rgba(255,255,255,0.032);
-  --bg-hover:      rgba(255,255,255,0.055);
-  --bg-sidebar:    #0d0f16;
-  --bg-input:      #141720;
+  --bg-base:       #121212;
+  --bg-surface:    #1e1e1e;
+  --bg-elevated:   #2d2d2d;
+  --bg-card:       #1e1e1e;
+  --bg-hover:      rgba(255,255,255,0.1);
+  --bg-sidebar:    #1e1e1e;
+  --bg-input:      #2d2d2d;
 
   /* Text hierarchy */
-  --text-primary:  #e8ecf4;
-  --text-secondary:#8b96aa;
-  --text-muted:    #424d5e;
-  --text-faint:    #2e3847;
+  --text-primary:  #f5f5f5;
+  --text-secondary:#b0b0b0;
+  --text-muted:    #666666;
+  --text-faint:    #444444;
 
   /* Borders */
   --border:        rgba(255,255,255,0.065);
@@ -115,8 +115,8 @@ input, textarea, select { font-family: inherit; }
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .app-header { transition: margin-left 0.22s ease; }
 .app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; transition: margin-left 0.22s ease; }
-.sidebar-open .app-header { margin-left: 220px; }
-.sidebar-open .app-body   { margin-left: 220px; }
+.sidebar-open .app-header { margin-left: 240px; }
+.sidebar-open .app-body   { margin-left: 240px; }
 
 /* ═══════════════════════════════════════════════════════════════════
    HEADER
@@ -282,8 +282,8 @@ input, textarea, select { font-family: inherit; }
   top: 0;
   left: 0;
   height: 100vh;
-  width: 220px;
-  min-width: 220px;
+  width: 240px;
+  min-width: 240px;
   z-index: 20;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -369,12 +369,12 @@ input, textarea, select { font-family: inherit; }
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 8px 20px;
   margin: 3px 0;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-secondary);
+  color: #e0e0e0;
   font-size: 0.81rem;
   font-weight: 500;
   position: relative;
@@ -385,20 +385,21 @@ input, textarea, select { font-family: inherit; }
   letter-spacing: -0.01em;
 }
 .main-nav-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+  color: #ffffff;
+  background: #3a3a3a;
   border-color: transparent;
 }
 :root[data-theme="light"] .main-nav-btn:hover {
   background: #f3f4f6;
+  color: var(--text-primary);
 }
 
 .nav-active {
-  color: #7c3aed !important;
-  background: rgba(124, 58, 237, 0.12) !important;
+  color: #ffffff !important;
+  background: #3a3a3a !important;
   border-radius: var(--radius-md) !important;
   font-weight: 600 !important;
-  box-shadow: inset 4px 0 0 #7c3aed !important;
+  box-shadow: inset 4px 0 0 var(--accent) !important;
 }
 :root[data-theme="light"] .nav-active {
   background: rgba(124, 58, 237, 0.12) !important;
@@ -3913,8 +3914,8 @@ select.modal-input {
 :root[data-theme="light"] .main-nav {
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
-  width: 220px;
-  min-width: 220px;
+  width: 240px;
+  min-width: 240px;
   padding: 24px 16px;
 }
 :root[data-theme="light"] .main-nav-btn {

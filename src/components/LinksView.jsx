@@ -223,9 +223,9 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar, compact }) {
         onClick={openLink} role="link" tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLink(); } }}
         aria-label={`Open ${link.name}`}
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)', transition: 'background .12s' }}
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.05)', transition: 'background .12s', marginBottom: 16 }}
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}>
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
         <FaviconIcon url={link.url} size={22} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{link.name}</span>
@@ -251,7 +251,7 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar, compact }) {
       tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLink(); } }}
       aria-label={`Open ${link.name}`}
-      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 1px 4px rgba(0,0,0,.06)', cursor: 'pointer', transition: 'box-shadow .15s, transform .12s', position: 'relative' }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'none', cursor: 'pointer', transition: 'box-shadow .15s, transform .12s', position: 'relative' }}
       whileHover={{ boxShadow: '0 4px 14px rgba(0,0,0,.1)', y: -1 }}
     >
       {/* Star */}
@@ -440,7 +440,7 @@ export default function LinksView() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', overflow: 'hidden' }}>
       <style>{`
         @media (max-width: 768px) {
           .links-toolbar { flex-wrap: wrap !important; }
@@ -450,7 +450,7 @@ export default function LinksView() {
       `}</style>
 
       {/* ── Toolbar ── */}
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, marginBottom: 16 }}>
         <div className="links-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
 
           {/* Search */}
@@ -489,7 +489,7 @@ export default function LinksView() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px 24px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
         <div style={{ width: '100%' }}>
 
           {links.length === 0 ? (
