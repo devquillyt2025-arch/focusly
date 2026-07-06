@@ -135,7 +135,7 @@ function CalendarDatePicker({ value, onChange, onClose }) {
       {/* Footer */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={() => { onChange(''); onClose(); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
           Clear date
         </button>
         <button onClick={onClose}
@@ -172,10 +172,10 @@ function fmtDue(dateStr) {
   const diff  = Math.round((due - today) / 86400000);
   if (diff < 0) {
     const label = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return { text: label, overdue: true, color: '#ef4444', fontWeight: 600 };
+    return { text: label, overdue: true, color: 'var(--color-red)', fontWeight: 600 };
   }
-  if (diff === 0) return { text: 'Today',    overdue: false, color: '#f59e0b', fontWeight: 600 };
-  if (diff === 1) return { text: 'Tomorrow', overdue: false, color: '#f59e0b', fontWeight: 600 };
+  if (diff === 0) return { text: 'Today',    overdue: false, color: 'var(--color-amber)', fontWeight: 600 };
+  if (diff === 1) return { text: 'Tomorrow', overdue: false, color: 'var(--color-amber)', fontWeight: 600 };
   if (diff <= 7)  return { text: `In ${diff} days`, overdue: false, color: 'var(--text-secondary)', fontWeight: 500 };
   return {
     text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -251,7 +251,7 @@ function TaskRow({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 8px' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Delete this task?</span>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
+            <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
               onClick={e => { e.stopPropagation(); onDelete(task.id); setConfirmDeleteId(null); }}>Yes</button>
             <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
               onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}>Cancel</button>
@@ -544,7 +544,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
     <div className="yartu-card" style={{ display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '16px 20px', gap: 14, overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Completion Analytics</h3>
-        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live</span>
+        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-green)', background: 'rgba(16,185,129,0.12)', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live</span>
       </div>
 
       <div style={{ display: 'flex', gap: 3, background: 'var(--bg-base)', borderRadius: 10, padding: 3, flexShrink: 0 }}>
@@ -564,12 +564,12 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}>
             <DonutChart pendingCount={pending.length} completedCount={completed.length} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-              <div style={{ background: 'rgba(99,102,241,0.1)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div style={{ background: 'var(--accent-glow)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(99,102,241,0.2)' }}>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#818cf8', lineHeight: 1 }}>{pending.length}</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
               </div>
-              <div style={{ background: 'rgba(16,185,129,0.1)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>{completed.length}</div>
+              <div style={{ background: 'var(--color-green-bg)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-green)', lineHeight: 1 }}>{completed.length}</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Completed</div>
               </div>
             </div>
@@ -579,10 +579,10 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Overall Progress</span>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: completedPct === 100 ? '#10b981' : 'var(--text-secondary)' }}>{completedPct}%</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: completedPct === 100 ? 'var(--color-green)' : 'var(--text-secondary)' }}>{completedPct}%</span>
               </div>
               <div style={{ height: 7, background: 'var(--ring-track)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
+                <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? 'var(--color-green)' : 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
               </div>
             </div>
           )}
@@ -612,7 +612,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px', textAlign: 'center', background: 'var(--bg-base)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '1.8rem' }}>🎯</span>
               <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>Start your journey by adding your first task!</div>
-              <button onClick={onAdd} style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>＋ Add First Task</button>
+              <button onClick={onAdd} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>＋ Add First Task</button>
             </div>
           )}
         </div>
@@ -622,13 +622,13 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0 }}>
           {completed.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
-              <button onClick={onClearCompleted} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '4px 12px', borderRadius: 7, fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer' }}>Clear all</button>
+              <button onClick={onClearCompleted} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-red)', padding: '4px 12px', borderRadius: 7, fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer' }}>Clear all</button>
             </div>
           )}
           <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {completed.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '28px 16px', textAlign: 'center' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-green-bg)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
                 <div>
@@ -699,7 +699,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
     const label = name.trim();
     const key = label.toLowerCase().replace(/\s+/g, '_');
     if (!CAT_META[key]) {
-      const colors = ['#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', '#6366f1', '#ec4899'];
+      const colors = ['#8b5cf6', '#06b6d4', '#f97316', '#14b8a6', 'var(--accent)', '#ec4899'];
       const color = colors[Object.keys(CAT_META).length % colors.length];
       CAT_META[key] = { label, color };
       const updatedCustom = { ...customCats, [key]: { label, color } };
@@ -1020,7 +1020,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           </span>
           <span style={{ color: 'var(--border)' }}>·</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontWeight: 700, color: '#10b981' }}>{allCompleted.length}</span>
+            <span style={{ fontWeight: 700, color: 'var(--color-green)' }}>{allCompleted.length}</span>
             <span>done</span>
           </span>
         </div>
@@ -1028,7 +1028,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
         {/* 5. Sync button — far right */}
         <div style={{ flexShrink: 0 }}>
           {syncStatus === 'Syncing...' ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#6366f1' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: 'var(--accent)' }}>
               <svg style={{ animation: 'customSpin 1s linear infinite', width: 13, height: 13 }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25"></circle>
                 <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -1037,7 +1037,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             </span>
           ) : syncStatus === 'Not connected' ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#64748b', display: 'inline-block' }} />
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-muted)', display: 'inline-block' }} />
               Offline
             </span>
           ) : (
@@ -1045,7 +1045,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
               type="button"
               onClick={onSyncNow}
               title="Sync Now"
-              style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: '1px solid var(--border)', borderRadius: '7px', color: '#6366f1', cursor: 'pointer', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: '1px solid var(--border)', borderRadius: '7px', color: 'var(--accent)', cursor: 'pointer', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
@@ -1067,7 +1067,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
-              <button style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '0 14px', height: 30, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }} onClick={onAdd}>
+              <button style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '0 14px', height: 30, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }} onClick={onAdd}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Task
               </button>
@@ -1180,12 +1180,12 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 <>
                   {/* Sync Conflict */}
                   {local.syncConflict && (
-                    <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', padding: 12, borderRadius: 8 }}>
-                      <div style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: 4 }}>⚠️ Sync Conflict</div>
+                    <div style={{ background: 'var(--color-amber-bg)', border: '1px solid #f59e0b', padding: 12, borderRadius: 8 }}>
+                      <div style={{ color: 'var(--color-amber)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: 4 }}>⚠️ Sync Conflict</div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>{local.syncConflict}</div>
                       <button
                         type="button"
-                        style={{ background: '#f59e0b', color: '#000', border: 'none', padding: '4px 12px', borderRadius: 6, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+                        style={{ background: 'var(--color-amber)', color: '#000', border: 'none', padding: '4px 12px', borderRadius: 6, fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
                         onClick={() => {
                           const updated = { ...local, syncConflict: null, updatedAt: new Date().toISOString() };
                           setLocal(updated);
@@ -1296,20 +1296,20 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                     <label className="tdp-label">Attachments</label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
                       {(local.attachments || []).map(att => (
-                        <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
+                        <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             <span style={{ color: '#e2e8f0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
                           </div>
-                          <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                          <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: 4 }}
                             onClick={() => saveField('attachments', (local.attachments || []).filter(a => a.id !== att.id))}>
                             ×
                           </button>
                         </div>
                       ))}
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8', transition: 'all 0.15s ease' }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-hover)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)', transition: 'all 0.15s ease' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-blue)'}
                       onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1364,7 +1364,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                           <span role="button"
                             onClick={e => { e.stopPropagation(); saveField('dueDate', ''); setShowDatePicker(false); }}
                             title="Clear"
-                            style={{ color: '#ef4444', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
+                            style={{ color: 'var(--color-red)', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
                           >×</span>
                         )}
                       </button>
@@ -1481,7 +1481,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                             style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.875rem' }}
                           />
                           <button type="button"
-                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: '0 4px', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
                             onClick={() => {
                               if (sub.googleTaskId) {
                                 const delStr = localStorage.getItem('focusly_deleted_tasks');

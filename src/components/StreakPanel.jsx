@@ -83,7 +83,7 @@ export default function StreakPanel({ pomodoroLog, tasks, intentions }) {
             </div>
           ))}
         </div>
-        <div className="streak-subtitle" style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '8px' }}>Activity — last 7 days</div>
+        <div className="streak-subtitle" style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '8px' }}>Activity — last 7 days</div>
       </div>
     </div>
   );

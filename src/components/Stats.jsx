@@ -61,7 +61,7 @@ export default function Stats({ tasks, pomodoroLog, settings }) {
         <div className="cat-breakdown">
           <h4 className="breakdown-lbl">Time by Category</h4>
           {catEntries.map(([cat, secs]) => {
-            const meta = CAT_META[cat] ?? { color: '#6366f1', label: cat };
+            const meta = CAT_META[cat] ?? { color: 'var(--accent)', label: cat };
             return (
               <div key={cat} className="cat-bar-row">
                 <span className="cat-bar-name" style={{ color: meta.color }}>{meta.label}</span>

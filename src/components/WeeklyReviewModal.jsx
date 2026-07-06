@@ -106,17 +106,17 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
               
               <div style={{ marginTop: 24, display: 'flex', gap: 16 }}>
                 {bestTracker && (
-                  <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.1)', padding: 16, borderRadius: 12 }}>
-                    <h5 style={{ color: '#10b981', marginBottom: 8 }}>🏆 Top Performing</h5>
+                  <div style={{ flex: 1, background: 'var(--color-green-bg)', padding: 16, borderRadius: 12 }}>
+                    <h5 style={{ color: 'var(--color-green)', marginBottom: 8 }}>🏆 Top Performing</h5>
                     <p style={{ fontWeight: 600 }}>{bestTracker.name}</p>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{bestScore}% success rate</p>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{bestScore}% success rate</p>
                   </div>
                 )}
                 {worstTracker && worstTracker.id !== bestTracker?.id && (
-                  <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', padding: 16, borderRadius: 12 }}>
-                    <h5 style={{ color: '#ef4444', marginBottom: 8 }}>⚠️ Needs Attention</h5>
+                  <div style={{ flex: 1, background: 'var(--color-red-bg)', padding: 16, borderRadius: 12 }}>
+                    <h5 style={{ color: 'var(--color-red)', marginBottom: 8 }}>⚠️ Needs Attention</h5>
                     <p style={{ fontWeight: 600 }}>{worstTracker.name}</p>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{worstScore}% success rate</p>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{worstScore}% success rate</p>
                   </div>
                 )}
               </div>
@@ -147,7 +147,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
                 <label>Rate your week</label>
                 <div style={{ display: 'flex', gap: 8, fontSize: '1.5rem', cursor: 'pointer' }}>
                   {[1,2,3,4,5].map(star => (
-                    <span key={star} onClick={() => setRating(star)} style={{ color: rating >= star ? '#f59e0b' : '#64748b' }}>
+                    <span key={star} onClick={() => setRating(star)} style={{ color: rating >= star ? 'var(--color-amber)' : 'var(--text-muted)' }}>
                       ★
                     </span>
                   ))}
@@ -163,14 +163,14 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
               
               <div className="form-group">
                 <label>Pick 3 habits to prioritize ({selectedHabits.length}/3)</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 150, overflowY: 'auto', padding: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 150, overflowY: 'auto', padding: 8, background: 'var(--bg-hover)', borderRadius: 8 }}>
                   {trackers.filter(t => t.type === 'habit').map(t => (
                     <label key={t.id} className="custom-checkbox-wrapper">
                       <input type="checkbox" checked={selectedHabits.includes(t.id)} onChange={() => toggleHabit(t.id)} disabled={!selectedHabits.includes(t.id) && selectedHabits.length >= 3} />
                       {t.name}
                     </label>
                   ))}
-                  {trackers.filter(t => t.type === 'habit').length === 0 && <span style={{ color: '#64748b' }}>No habits found.</span>}
+                  {trackers.filter(t => t.type === 'habit').length === 0 && <span style={{ color: 'var(--text-muted)' }}>No habits found.</span>}
                 </div>
               </div>
 
@@ -185,7 +185,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
                     ...trackers.filter(t => t.type === 'target').map(t => ({ value: t.id, label: t.name })),
                   ]}
                 />
-                {trackers.filter(t => t.type === 'target').length === 0 && <span style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 4 }}>No targets found.</span>}
+                {trackers.filter(t => t.type === 'target').length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 4 }}>No targets found.</span>}
               </div>
             </div>
           )}

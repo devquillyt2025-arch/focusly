@@ -33,10 +33,10 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      labels: { color: '#94a3b8', font: { family: 'Outfit' } }
+      labels: { color: 'var(--text-secondary)', font: { family: 'Outfit' } }
     },
     tooltip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+      backgroundColor: 'var(--bg-elevated)',
       titleFont: { family: 'Outfit' },
       bodyFont: { family: 'Outfit' },
       padding: 10,
@@ -46,12 +46,12 @@ const chartOptions = {
   },
   scales: {
     x: {
-      ticks: { color: '#64748b', font: { family: 'Outfit' } },
-      grid: { color: 'rgba(255, 255, 255, 0.05)' }
+      ticks: { color: 'var(--text-muted)', font: { family: 'Outfit' } },
+      grid: { color: 'var(--border)' }
     },
     y: {
-      ticks: { color: '#64748b', font: { family: 'Outfit' } },
-      grid: { color: 'rgba(255, 255, 255, 0.05)' }
+      ticks: { color: 'var(--text-muted)', font: { family: 'Outfit' } },
+      grid: { color: 'var(--border)' }
     }
   }
 };
@@ -185,7 +185,7 @@ export function TargetProgressChart({ tracker, color }) {
       ...(targetDate ? [{
         label: 'Target Pace',
         data: paceData,
-        borderColor: '#94a3b8',
+        borderColor: 'var(--text-secondary)',
         borderDash: [5, 5],
         fill: false,
         pointRadius: 0
@@ -265,7 +265,7 @@ export function AverageRollingChart({ tracker, color }) {
       {
         label: '30-Day Rolling Avg',
         data: rolling30,
-        borderColor: '#f59e0b',
+        borderColor: 'var(--color-amber)',
         borderDash: [3, 3],
         tension: 0.4
       }
@@ -331,7 +331,7 @@ export function ProjectBurndownChart({ tracker, color }) {
       {
         label: 'Ideal Burndown',
         data: paceData,
-        borderColor: '#ef4444',
+        borderColor: 'var(--color-red)',
         borderDash: [5, 5],
         fill: false,
         pointRadius: 0

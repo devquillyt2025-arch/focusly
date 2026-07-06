@@ -47,7 +47,7 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null, e
     );
   };
 
-  const catColor = TRACKER_CATS[form.category]?.color ?? '#6366f1';
+  const catColor = TRACKER_CATS[form.category]?.color ?? 'var(--accent)';
 
   return (
     <motion.div
@@ -221,7 +221,7 @@ function HabitFields({ config, setC }) {
           <input type="time" className="form-inp" style={{ maxWidth: 150 }}
             value={config.reminderTime ?? ''}
             onChange={e => setC('reminderTime', e.target.value)} />
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Get a push notification</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Get a push notification</span>
         </div>
       </div>
     </>

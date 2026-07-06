@@ -123,8 +123,8 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
               })}
             </div>
             <div className="chart-legend">
-              <span className="legend-dot" style={{ background: '#6366f1' }} /><span>Focus sessions</span>
-              <span className="legend-dot" style={{ background: '#10b981' }} /><span>Tasks done</span>
+              <span className="legend-dot" style={{ background: 'var(--accent)' }} /><span>Focus sessions</span>
+              <span className="legend-dot" style={{ background: 'var(--color-green)' }} /><span>Tasks done</span>
             </div>
           </div>
 
@@ -133,7 +133,7 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
             <div className="chart-section">
               <h4>Time by Category</h4>
               {data.catEntries.map(([cat, secs]) => {
-                const meta = CAT_META[cat] ?? { color: '#6366f1', label: cat };
+                const meta = CAT_META[cat] ?? { color: 'var(--accent)', label: cat };
                 return (
                   <div key={cat} className="cat-bar-row">
                     <span className="cat-bar-name" style={{ color: meta.color }}>{meta.label}</span>
@@ -153,7 +153,7 @@ export default function AnalyticsModal({ tasks, pomodoroLog, settings, onClose }
               <h4>Recent Completions</h4>
               <ul className="recent-list">
                 {data.recent.map(t => {
-                  const meta = CAT_META[t.category] ?? { color: '#6366f1', label: t.category };
+                  const meta = CAT_META[t.category] ?? { color: 'var(--accent)', label: t.category };
                   const when = new Date(t.completedAt);
                   const whenStr = when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                   return (

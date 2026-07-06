@@ -248,7 +248,7 @@ export default function DailyGoalsView({
                         <div className="yartu-row-title" style={{ textDecoration: done ? 'line-through' : 'none', color: done ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                           {h.name}
                         </div>
-                        {streak > 0 && <span className="yartu-row-badge" style={{ background: '#f59e0b22', color: '#f59e0b', borderColor: '#f59e0b44' }}>🔥 {streak}d streak</span>}
+                        {streak > 0 && <span className="yartu-row-badge" style={{ background: '#f59e0b22', color: 'var(--color-amber)', borderColor: '#f59e0b44' }}>🔥 {streak}d streak</span>}
                       </div>
                       <div className="yartu-row-right">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -440,7 +440,7 @@ export default function DailyGoalsView({
                 ) : (
                   catEntries.map(([cat, mins], idx) => {
                     const pct = Math.min(100, Math.round((mins / (totalMinutesToday || 1)) * 100));
-                    const meta = TRACKER_CATS[cat] ?? { label: cat, color: '#6366f1' };
+                    const meta = TRACKER_CATS[cat] ?? { label: cat, color: 'var(--accent)' };
                     return (
                       <div key={idx} className="yartu-mini-bar-row">
                         <div className="yartu-mini-bar-hdr">
@@ -462,7 +462,7 @@ export default function DailyGoalsView({
           <div className="yartu-card">
             <div className="yartu-card-hdr stacked">
               <span className="yartu-card-title">Active Streaks</span>
-              <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>🔥 Keep going!</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-amber)', fontWeight: 600 }}>🔥 Keep going!</span>
             </div>
             <div className="yartu-streak-list">
               {habits.filter(h => habitStreak(h) > 0).length === 0 ? (

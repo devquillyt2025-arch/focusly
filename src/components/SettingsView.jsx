@@ -154,7 +154,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <div style={{ width: 88, height: 88, borderRadius: 44, background: 'var(--c-bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', overflow: 'hidden', border: '2px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}>
               {avatar.startsWith('data:image') ? <img src={avatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : avatar}
             </div>
-            <label className="upload-link" style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: '#6366f1', cursor: 'pointer', transition: 'all 0.2s' }}>
+            <label className="upload-link" style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.2s' }}>
               Upload Image
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
             </label>
@@ -164,14 +164,14 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Name</label>
               <div style={{ position: 'relative' }}>
                 <input type="text" maxLength={20} className="form-inp profile-input" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12, paddingRight: '48px' }} value={profileName} onChange={e => setProfileName(e.target.value.slice(0, 20))} placeholder="What should we call you?" />
-                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileName.length >= 20 ? '#ef4444' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileName.length}/20</div>
+                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileName.length >= 20 ? 'var(--color-red)' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileName.length}/20</div>
               </div>
             </div>
             <div>
               <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'block' }}>Email</label>
               <div style={{ position: 'relative' }}>
                 <input type="email" maxLength={50} className="form-inp profile-input" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', padding: '12px 16px', fontSize: '0.95rem', borderRadius: 12, paddingRight: '48px' }} value={profileEmail} onChange={e => setProfileEmail(e.target.value.slice(0, 50))} placeholder="yourname@example.com" />
-                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileEmail.length >= 50 ? '#ef4444' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileEmail.length}/50</div>
+                <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: profileEmail.length >= 50 ? 'var(--color-red)' : 'var(--text-muted)', pointerEvents: 'none', fontWeight: 600 }}>{profileEmail.length}/50</div>
               </div>
             </div>
           </div>
@@ -265,7 +265,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
                 <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Sync tasks with Google Tasks</div>
                 <div className="toggle-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                   {syncStatus === 'Syncing...' && (
-                    <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: '#6366f1' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg style={{ animation: 'customSpin 1s linear infinite', width: 14, height: 14, color: 'var(--accent)' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"></circle>
                       <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -279,7 +279,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <button
                 type="button"
                 className="primary-btn"
-                style={{ background: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 12, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}
+                style={{ background: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 12, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}
                 disabled={syncStatus === 'Syncing...'}
                 onClick={onSyncNow}
               >
@@ -288,7 +288,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <button
                 type="button"
                 className="secondary-btn"
-                style={{ color: '#ef4444', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
+                style={{ color: 'var(--color-red)', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
                 onClick={() => {
                   disconnectGoogleTasks();
                   onDisconnect();
@@ -328,7 +328,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Status row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'rgba(66,133,244,0.07)', border: '1px solid rgba(66,133,244,0.2)', borderRadius: 14 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px rgba(34,197,94,0.5)', flexShrink: 0 }} />
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-green)', boxShadow: '0 0 6px rgba(34,197,94,0.5)', flexShrink: 0 }} />
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>Google Calendar connected</div>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 3 }}>Events sync automatically when you open the Calendar tab.</div>
@@ -339,7 +339,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
               <button
                 type="button"
                 className="secondary-btn"
-                style={{ color: '#ef4444', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
+                style={{ color: 'var(--color-red)', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', padding: '12px 24px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
                 onClick={() => {
                   if (window.confirm('Disconnect Google Calendar?\n\nThis will hide all Google Calendar events from Focusly. You can reconnect at any time.')) {
                     onDisconnectGCal();
@@ -392,7 +392,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             {PRESETS.map(p => (
               <button key={p.label} type="button" className="preset-btn" onClick={() => applyPreset(p)} style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--c-bg-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', transition: 'all 0.2s' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{p.label}</span>
-                <small style={{ color: '#6366f1', fontWeight: 600, fontSize: '0.78rem' }}>{p.sub}</small>
+                <small style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.78rem' }}>{p.sub}</small>
               </button>
             ))}
           </div>
@@ -417,7 +417,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         </div>
         
         <div style={{ marginTop: 8 }}>
-          <button className="primary-btn" style={{ padding: '14px 28px', borderRadius: 14, fontWeight: 600, fontSize: '0.95rem', background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }} onClick={submitSettings}>Save Timer Preferences</button>
+          <button className="primary-btn" style={{ padding: '14px 28px', borderRadius: 14, fontWeight: 600, fontSize: '0.95rem', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }} onClick={submitSettings}>Save Timer Preferences</button>
         </div>
       </section>
 
@@ -436,7 +436,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
           </label>
           
-          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', color: '#ef4444', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={onClearData}>
+          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.05)', color: 'var(--color-red)', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={onClearData}>
             🗑 Clear All Data
           </button>
         </div>
@@ -447,7 +447,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         <div style={{ fontSize: '2.2rem', marginBottom: 12 }}>🌱</div>
         <div style={{ fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)' }}>My Workspace v3.0</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: 8 }}>A beautiful Pomodoro timer and task manager.</p>
-        <a href="mailto:bugs@focusly.app" style={{ color: '#6366f1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block', marginTop: 16 }}>Report a bug</a>
+        <a href="mailto:bugs@focusly.app" style={{ color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block', marginTop: 16 }}>Report a bug</a>
       </section>
     </div>
   );

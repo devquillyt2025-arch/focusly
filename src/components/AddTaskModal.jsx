@@ -169,7 +169,7 @@ export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existin
           <div className="modal-footer">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-submit"
-              style={{ '--submit-c': selectedCat?.color ?? '#6366f1' }}
+              style={{ '--submit-c': selectedCat?.color ?? 'var(--accent)' }}
               disabled={!form.name.trim()}>
               {isEditing ? 'Save Changes' : 'Add Task'}
             </button>

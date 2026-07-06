@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 
 export const GOAL_CATS = {
-  work:     { label: 'Work',     color: '#3b82f6' },
-  health:   { label: 'Health',   color: '#10b981' },
-  finance:  { label: 'Finance',  color: '#f59e0b' },
+  work:     { label: 'Work',     color: 'var(--color-blue)' },
+  health:   { label: 'Health',   color: 'var(--color-green)' },
+  finance:  { label: 'Finance',  color: 'var(--color-amber)' },
   personal: { label: 'Personal', color: '#ec4899' },
 };
 
@@ -137,7 +137,7 @@ function GoalCard({ goal, onUpdate, onDelete }) {
       <h4 className="goal-title">{goal.title}</h4>
 
       {goal.targetDate && (
-        <div className="goal-date" style={{ color: isOverdue && !isComplete ? '#ef4444' : 'var(--text-muted)' }}>
+        <div className="goal-date" style={{ color: isOverdue && !isComplete ? 'var(--color-red)' : 'var(--text-muted)' }}>
           📅 {goal.targetDate}{isOverdue && !isComplete ? '  ·  Overdue' : ''}
         </div>
       )}
@@ -174,7 +174,7 @@ function CheckInCard({ checkIn }) {
         <span className="checkin-week-lbl">Week of {checkIn.weekStart}</span>
         <span className="checkin-stars">
           {Array.from({ length: 5 }, (_, i) => (
-            <span key={i} style={{ color: i < checkIn.rating ? '#f59e0b' : 'var(--border-strong)' }}>★</span>
+            <span key={i} style={{ color: i < checkIn.rating ? 'var(--color-amber)' : 'var(--border-strong)' }}>★</span>
           ))}
         </span>
       </div>

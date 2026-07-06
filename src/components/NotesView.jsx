@@ -20,18 +20,18 @@ const NOTE_COLORS = [
 ];
 
 const COLOR_DOTS = [
-  '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#a855f7','#ec4899',
+  'var(--color-red)','#f97316','#eab308','var(--color-green)','#14b8a6','var(--color-blue)','#a855f7','#ec4899',
 ];
 
 // Solid accent color per note color id — used for tag pill text and toolbar swatch
 const COLOR_ACCENT = {
   default: null,
-  red:     '#ef4444',
+  red:     'var(--color-red)',
   orange:  '#f97316',
   yellow:  '#eab308',
-  green:   '#22c55e',
+  green:   'var(--color-green)',
   teal:    '#14b8a6',
-  blue:    '#3b82f6',
+  blue:    'var(--color-blue)',
   purple:  '#a855f7',
   pink:    '#ec4899',
 };
@@ -233,7 +233,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={handleCopy} title="Copy"
               className="hover:opacity-80"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '6px', display: 'flex', alignItems: 'center' }}>
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '6px', display: 'flex', alignItems: 'center' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -300,7 +300,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
             {!isNew && (
               <button onClick={() => { onDelete(note.id); onClose(); }} title="Delete note"
                 className="hover:opacity-80"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px', display: 'flex', alignItems: 'center' }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', padding: '6px', display: 'flex', alignItems: 'center' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
                 </svg>
@@ -435,7 +435,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
                   <button onClick={e => { e.stopPropagation(); onDelete(note.id); }}
                     aria-label="Delete note"
                     title="Delete"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', color: '#ef4444', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    style={{ background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', color: 'var(--color-red)', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                   </button>
                 </>
@@ -762,7 +762,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
         {notes.length === 0 ? (
           /* Empty state */
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 16, textAlign: 'center' }}>
-            <div style={{ width: 80, height: 80, background: 'rgba(99,102,241,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 80, height: 80, background: 'var(--accent-glow)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
               </svg>

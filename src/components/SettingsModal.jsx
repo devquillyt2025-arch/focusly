@@ -95,7 +95,7 @@ export default function SettingsModal({ settings, onSave, onClose }) {
 
           <div className="modal-footer">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-submit" style={{ '--submit-c': '#6366f1' }}>Apply</button>
+            <button type="submit" className="btn-submit" style={{ '--submit-c': 'var(--accent)' }}>Apply</button>
           </div>
         </form>
       </div>

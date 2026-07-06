@@ -220,7 +220,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   };
 
   const getCategoryColor = cat => {
-    const M = { learning: { bg: 'rgba(59,130,246,.15)', text: '#60a5fa', border: '#3b82f6' }, fitness: { bg: 'rgba(16,185,129,.15)', text: '#34d399', border: '#10b981' }, mental: { bg: 'rgba(168,85,247,.15)', text: '#c084fc', border: '#a855f7' }, work: { bg: 'rgba(120,105,252,.15)', text: '#9d93ff', border: '#7869fc' }, finance: { bg: 'rgba(245,158,11,.15)', text: '#fbbf24', border: '#f59e0b' } };
+    const M = { learning: { bg: 'rgba(59,130,246,.15)', text: 'var(--color-blue)', border: 'var(--color-blue)' }, fitness: { bg: 'rgba(16,185,129,.15)', text: '#34d399', border: 'var(--color-green)' }, mental: { bg: 'rgba(168,85,247,.15)', text: 'var(--color-purple)', border: '#a855f7' }, work: { bg: 'rgba(120,105,252,.15)', text: '#9d93ff', border: '#7869fc' }, finance: { bg: 'rgba(245,158,11,.15)', text: '#fbbf24', border: 'var(--color-amber)' } };
     return M[cat] || { bg: 'rgba(236,72,153,.15)', text: '#f472b6', border: '#ec4899' };
   };
   const getEventStyle = ev => ev.type === 'gcal' ? (c => ({ bg: `${c}1a`, text: c, border: c }))(gcalColor(ev.colorId)) : getCategoryColor(ev.category);
@@ -319,7 +319,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
               {/* Status dot */}
               <span style={{
                 width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: gcalError ? '#ef4444' : gcalSyncing ? '#f59e0b' : '#22c55e',
+                background: gcalError ? 'var(--color-red)' : gcalSyncing ? 'var(--color-amber)' : 'var(--color-green)',
                 boxShadow: gcalSyncing ? '0 0 4px rgba(245,158,11,.6)' : gcalError ? '0 0 4px rgba(239,68,68,.6)' : '0 0 4px rgba(34,197,94,.5)',
               }}/>
               {gcalSyncing && (
@@ -340,7 +340,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
             Create Event
           </button>
 
-          <button onClick={() => setShowUnscheduled(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: showUnscheduled ? 'rgba(99,102,241,.1)' : 'var(--bg-input)', border: `1px solid ${showUnscheduled ? 'rgba(99,102,241,.4)' : 'var(--border)'}`, borderRadius: 10, cursor: 'pointer', color: showUnscheduled ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, transition: 'all .15s ease' }}>
+          <button onClick={() => setShowUnscheduled(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: showUnscheduled ? 'var(--accent-glow)' : 'var(--bg-input)', border: `1px solid ${showUnscheduled ? 'rgba(99,102,241,.4)' : 'var(--border)'}`, borderRadius: 10, cursor: 'pointer', color: showUnscheduled ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, transition: 'all .15s ease' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
             Inbox
             {unscheduledTasks.length > 0 && <span style={{ background: 'var(--accent)', color: '#fff', padding: '1px 7px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 700 }}>{unscheduledTasks.length}</span>}
@@ -532,12 +532,12 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                     {/* Time label */}
                     <span
                       ref={nowLabelRef}
-                      style={{ position: 'absolute', left: 2, top: -9, fontSize: '0.6rem', fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}
+                      style={{ position: 'absolute', left: 2, top: -9, fontSize: '0.6rem', fontWeight: 700, color: 'var(--color-red)', whiteSpace: 'nowrap', background: 'var(--bg-surface)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}
                     />
                     {/* Dot at the column boundary */}
-                    <div style={{ position: 'absolute', left: 59, top: -5, width: 10, height: 10, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px rgba(239,68,68,.6)' }}/>
+                    <div style={{ position: 'absolute', left: 59, top: -5, width: 10, height: 10, borderRadius: '50%', background: 'var(--color-red)', boxShadow: '0 0 8px rgba(239,68,68,.6)' }}/>
                     {/* Horizontal line */}
-                    <div style={{ position: 'absolute', left: 64, right: 0, top: 0, height: 2, background: '#ef4444' }}/>
+                    <div style={{ position: 'absolute', left: 64, right: 0, top: 0, height: 2, background: 'var(--color-red)' }}/>
                   </div>
                 )}
 
@@ -564,7 +564,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           {ev.type === 'gcal' && <GCalIcon size={11}/>}
                           <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', textDecoration: ev.completed?'line-through':'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</span>
-                          {ev.completed && <span style={{ color: '#10b981', fontSize: '0.68rem', marginLeft: 'auto' }}>✓</span>}
+                          {ev.completed && <span style={{ color: 'var(--color-green)', fontSize: '0.68rem', marginLeft: 'auto' }}>✓</span>}
                         </div>
                         {ht >= 38 && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: 3 }}>{formatTime(sM)} – {formatTime(eM)}</span>}
                         {ev.type !== 'gcal' && <div onMouseDown={e => handleResizeStart(e,ev,sM,eM,'bottom')} style={{ position:'absolute',bottom:0,left:0,right:0,height:7,cursor:'ns-resize',zIndex:20 }}/>}
@@ -660,7 +660,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
               onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(99,102,241,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                   </div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>New Event</h3>
@@ -748,11 +748,11 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                     style={INPUT_STYLE} />
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '11px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 11 }}>
-                  <input type="checkbox" checked={!!detailEvent.completed} onChange={e => setDetailEvent({ ...detailEvent, completed: e.target.checked })} style={{ width: 17, height: 17, accentColor: '#10b981' }} />
+                  <input type="checkbox" checked={!!detailEvent.completed} onChange={e => setDetailEvent({ ...detailEvent, completed: e.target.checked })} style={{ width: 17, height: 17, accentColor: 'var(--color-green)' }} />
                   <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)' }}>Mark as Completed</span>
                 </label>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button type="button" onClick={() => { updateEventSchedule(detailEvent.id, detailEvent.type, null, null, null, false); setDetailEvent(null); }} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: '#ef4444', fontWeight: 600, cursor: 'pointer' }}>Unschedule</button>
+                  <button type="button" onClick={() => { updateEventSchedule(detailEvent.id, detailEvent.type, null, null, null, false); setDetailEvent(null); }} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--color-red)', fontWeight: 600, cursor: 'pointer' }}>Unschedule</button>
                   <button type="button" onClick={() => {
                     if (detailEvent.type === 'task') { const task = tasks?.find(t => t.id === detailEvent.id); if (task && onUpdateTask) onUpdateTask({ ...task, name: detailEvent.title, time: detailEvent.time, endTime: detailEvent.endTime, isAllDay: detailEvent.isAllDay, category: detailEvent.category, completed: detailEvent.completed }); }
                     else updateEventSchedule(detailEvent.id, detailEvent.type, toISO(currentDate), detailEvent.time, detailEvent.endTime, detailEvent.isAllDay);

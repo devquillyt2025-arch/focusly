@@ -7,10 +7,10 @@ const SIZE   = 200;
 const CIRC   = 2 * Math.PI * RADIUS;
 
 const MODE_META = {
-  focus:  { label: 'Focus',       color: '#ef4444', hint: '1' },
-  short:  { label: 'Short Break', color: '#10b981', hint: '2' },
-  long:   { label: 'Long Break',  color: '#3b82f6', hint: '3' },
-  custom: { label: 'Custom',      color: '#f59e0b', hint: '4' },
+  focus:  { label: 'Focus',       color: 'var(--color-red)', hint: '1' },
+  short:  { label: 'Short Break', color: 'var(--color-green)', hint: '2' },
+  long:   { label: 'Long Break',  color: 'var(--color-blue)', hint: '3' },
+  custom: { label: 'Custom',      color: 'var(--color-amber)', hint: '4' },
 };
 
 const LONG_BREAK_AFTER = 4;

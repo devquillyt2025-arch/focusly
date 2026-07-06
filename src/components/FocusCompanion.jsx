@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { CAT_META } from '../utils/categoryMeta';
 
 const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
-const PRIO_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#3b82f6', none: '#94a3b8' };
-const MODE_COLOR = { focus: '#ef4444', short: '#10b981', long: '#3b82f6', custom: '#f59e0b' };
+const PRIO_COLOR = { high: 'var(--color-red)', medium: 'var(--color-amber)', low: 'var(--color-blue)', none: 'var(--text-secondary)' };
+const MODE_COLOR = { focus: 'var(--color-red)', short: 'var(--color-green)', long: 'var(--color-blue)', custom: 'var(--color-amber)' };
 const LONG_BREAK_AFTER = 4;
 
 function localDateStr(d = new Date()) {
@@ -18,7 +18,7 @@ export default function FocusCompanion({
   tasks, activeTaskId, onSelectTask, onToggle,
   pomodoroLog, timerState, timerSeconds, timerMode,
 }) {
-  const modeColor  = MODE_COLOR[timerMode] ?? '#ef4444';
+  const modeColor  = MODE_COLOR[timerMode] ?? 'var(--color-red)';
   const activeTask = tasks.find(t => t.id === activeTaskId) ?? null;
 
   const quickTasks = useMemo(() => {
@@ -55,7 +55,7 @@ export default function FocusCompanion({
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
-              background: timerState === 'running' ? '#22c55e' : '#94a3b8',
+              background: timerState === 'running' ? 'var(--color-green)' : 'var(--text-secondary)',
               transition: 'background 0.3s',
               boxShadow: timerState === 'running' ? '0 0 6px #22c55e88' : 'none',
             }} />
@@ -149,7 +149,7 @@ export default function FocusCompanion({
                   className="quick-task-focus-btn"
                   onClick={() => onSelectTask(task.id)}
                   style={{
-                    color:       task.id === activeTaskId ? modeColor        : '#6366f1',
+                    color:       task.id === activeTaskId ? modeColor        : 'var(--accent)',
                     borderColor: task.id === activeTaskId ? modeColor + '55' : '#d1d5db',
                     background:  task.id === activeTaskId ? modeColor + '12' : 'transparent',
                   }}
@@ -211,7 +211,7 @@ export default function FocusCompanion({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flex: 1 }}>
               <div style={{
                 width: 10, height: 10, borderRadius: 2,
-                background: '#3b82f6',
+                background: 'var(--color-blue)',
                 opacity: cyclePos === 0 && totalCycles > 0 ? 1 : cyclePos === LONG_BREAK_AFTER ? 1 : 0.22,
                 transition: 'opacity 0.3s ease',
               }} />

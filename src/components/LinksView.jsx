@@ -22,7 +22,7 @@ function FaviconIcon({ url, size = 28 }) {
   const src = faviconSrc(url);
   if (!src || err) {
     return (
-      <div style={{ width: size, height: size, borderRadius: 7, background: 'rgba(99,102,241,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <div style={{ width: size, height: size, borderRadius: 7, background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <svg width={size * .56} height={size * .56} viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
       </div>
     );
@@ -39,7 +39,7 @@ function CopyBtn({ text }) {
   };
   return (
     <button onClick={copy} aria-label="Copy URL" title="Copy URL"
-      style={{ background: 'none', border: 'none', cursor: 'pointer', color: ok ? '#10b981' : 'var(--text-muted)', padding: 6, display: 'flex', borderRadius: 6, flexShrink: 0, transition: 'color .15s' }}>
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: ok ? 'var(--color-green)' : 'var(--text-muted)', padding: 6, display: 'flex', borderRadius: 6, flexShrink: 0, transition: 'color .15s' }}>
       {ok
         ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -50,14 +50,14 @@ function CopyBtn({ text }) {
 
 // ── Category colour map ───────────────────────────────────────────
 const CAT_COLORS = {
-  personal:      { bg: 'rgba(99,102,241,.1)',  color: '#6366f1' },
-  work:          { bg: 'rgba(245,158,11,.1)',  color: '#d97706' },
+  personal:      { bg: 'var(--accent-glow)',  color: 'var(--accent)' },
+  work:          { bg: 'rgba(245,158,11,.1)',  color: 'var(--color-amber)' },
   finance:       { bg: 'rgba(16,185,129,.1)',  color: '#059669' },
   'read later':  { bg: 'rgba(236,72,153,.1)',  color: '#db2777' },
-  entertainment: { bg: 'rgba(239,68,68,.1)',   color: '#dc2626' },
+  entertainment: { bg: 'var(--color-red-bg)',   color: '#dc2626' },
 };
 function catStyle(cat) {
-  return CAT_COLORS[(cat || '').toLowerCase()] || { bg: 'rgba(107,114,128,.1)', color: '#6b7280' };
+  return CAT_COLORS[(cat || '').toLowerCase()] || { bg: 'rgba(107,114,128,.1)', color: 'var(--text-secondary)' };
 }
 
 // ── Custom Category Dropdown ──────────────────────────────────────
@@ -189,18 +189,18 @@ function LinkCard({ link, onEdit, onDelete, onToggleStar, compact }) {
     <button onClick={e => { e.stopPropagation(); onToggleStar(link.id); }}
       aria-label={link.starred ? 'Unstar' : 'Star'}
       title={link.starred ? 'Remove from favourites' : 'Add to favourites'}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', color: link.starred ? '#f59e0b' : 'var(--text-muted)', padding: compact ? 5 : 4, display: 'flex', borderRadius: 5, transition: 'color .15s', flexShrink: 0 }}>
+      style={{ background: 'none', border: 'none', cursor: 'pointer', color: link.starred ? 'var(--color-amber)' : 'var(--text-muted)', padding: compact ? 5 : 4, display: 'flex', borderRadius: 5, transition: 'color .15s', flexShrink: 0 }}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill={link.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </button>
   );
 
   const deleteSection = confirmDel ? (
-    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.1)', borderRadius: 6, padding: '2px 7px' }}>
-      <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>Delete?</span>
-      <button onClick={e => { e.stopPropagation(); onDelete(link.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: '0.7rem', padding: '2px 3px' }}>Yes</button>
+    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--color-red-bg)', borderRadius: 6, padding: '2px 7px' }}>
+      <span style={{ fontSize: '0.7rem', color: 'var(--color-red)', fontWeight: 600 }}>Delete?</span>
+      <button onClick={e => { e.stopPropagation(); onDelete(link.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', fontWeight: 700, fontSize: '0.7rem', padding: '2px 3px' }}>Yes</button>
       <button onClick={e => { e.stopPropagation(); setConfirmDel(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '2px 3px' }}>No</button>
     </div>
-  ) : iconBtn('Delete', 'var(--text-muted)', 'rgba(239,68,68,.08)', '#ef4444',
+  ) : iconBtn('Delete', 'var(--text-muted)', 'var(--color-red-bg)', 'var(--color-red)',
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>,
       () => setConfirmDel(true)
     );
@@ -310,7 +310,7 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
     onClose();
   };
 
-  const inp = { style: { width: '100%', padding: '11px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color .13s' }, onFocus: e => (e.target.style.borderColor = '#6366f1'), onBlur: e => (e.target.style.borderColor = 'var(--border)') };
+  const inp = { style: { width: '100%', padding: '11px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color .13s' }, onFocus: e => (e.target.style.borderColor = 'var(--accent)'), onBlur: e => (e.target.style.borderColor = 'var(--border)') };
   const lbl = { style: { display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' } };
 
   return (
@@ -360,7 +360,7 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
                 <button type="button" onClick={() => { setAddingCat(true); setCatSel(''); }}
                   aria-label="Add new category"
                   style={{ width: 40, flexShrink: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700, transition: 'background .12s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,.1)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-glow)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-input)')}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -369,9 +369,9 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
-            <button type="submit" style={{ flex: 1, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', transition: 'background .13s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+            <button type="submit" style={{ flex: 1, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', transition: 'background .13s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-dark)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}>
               {entry ? 'Save Changes' : 'Add Link'}
             </button>
             <button type="button" onClick={onClose} style={{ flex: 1, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 0', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer' }}>
@@ -479,9 +479,9 @@ export default function LinksView() {
           </div>
 
           <button onClick={() => setModal('add')}
-            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-dark)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Link
           </button>
@@ -494,7 +494,7 @@ export default function LinksView() {
 
           {links.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', gap: 16, textAlign: 'center' }}>
-              <div style={{ width: 68, height: 68, background: 'rgba(99,102,241,.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 68, height: 68, background: 'var(--accent-glow)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
               </div>
               <div>
@@ -502,7 +502,7 @@ export default function LinksView() {
                 <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: 300, lineHeight: 1.55 }}>Save your favourite websites, tools, and resources here for quick one-click access.</div>
               </div>
               <button onClick={() => setModal('add')}
-                style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}>
+                style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}>
                 Add First Link
               </button>
             </div>

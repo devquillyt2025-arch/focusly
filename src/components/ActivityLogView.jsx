@@ -3,20 +3,20 @@ import { loadActivityLog, clearActivityLog } from '../utils/activityLog';
 
 // ── Verb/dot colors per action ────────────────────────────────────
 function dotColor(action, status) {
-  if (status === 'failed') return '#ef4444';
-  if (action === 'deleted')   return '#ef4444';
-  if (action === 'completed') return '#22c55e';
-  if (action === 'created')   return '#3b82f6';
-  if (action === 'updated')   return '#f59e0b';
-  return '#6b7280';
+  if (status === 'failed') return 'var(--color-red)';
+  if (action === 'deleted')   return 'var(--color-red)';
+  if (action === 'completed') return 'var(--color-green)';
+  if (action === 'created')   return 'var(--color-blue)';
+  if (action === 'updated')   return 'var(--color-amber)';
+  return 'var(--text-secondary)';
 }
 function verbColor(action, status) {
-  if (status === 'failed') return '#ef4444';
-  if (action === 'deleted')   return '#ef4444';
-  if (action === 'completed') return '#22c55e';
-  if (action === 'created')   return '#3b82f6';
-  if (action === 'updated')   return '#f59e0b';
-  return '#6b7280';
+  if (status === 'failed') return 'var(--color-red)';
+  if (action === 'deleted')   return 'var(--color-red)';
+  if (action === 'completed') return 'var(--color-green)';
+  if (action === 'created')   return 'var(--color-blue)';
+  if (action === 'updated')   return 'var(--color-amber)';
+  return 'var(--text-secondary)';
 }
 
 // ── Module metadata ───────────────────────────────────────────────

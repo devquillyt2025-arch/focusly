@@ -59,9 +59,9 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
 
   return (
     <div className="reports-view">
-      <div className="view-mode-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', width: 'max-content', margin: '0 auto 24px' }}>
-        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'trackers' ? '#6366f1' : 'transparent', color: viewMode === 'trackers' ? '#fff' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('trackers')}>Trackers</button>
-        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'analytics' ? '#6366f1' : 'transparent', color: viewMode === 'analytics' ? '#fff' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('analytics')}>Analytics</button>
+      <div className="view-mode-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--bg-card)', padding: 6, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', width: 'max-content', margin: '0 auto 24px' }}>
+        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'trackers' ? 'var(--accent)' : 'transparent', color: viewMode === 'trackers' ? '#fff' : 'var(--text-secondary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('trackers')}>Trackers</button>
+        <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'analytics' ? 'var(--accent)' : 'transparent', color: viewMode === 'analytics' ? '#fff' : 'var(--text-secondary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('analytics')}>Analytics</button>
       </div>
 
       {viewMode === 'analytics' ? (
@@ -185,7 +185,7 @@ function TrackerReportRow({ tracker, onClick }) {
     pct   = s.progress;
   }
 
-  const dotColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const dotColor = pct >= 80 ? 'var(--color-green)' : pct >= 50 ? 'var(--color-amber)' : 'var(--color-red)';
 
   return (
     <button className="report-row" onClick={onClick}>
@@ -194,8 +194,8 @@ function TrackerReportRow({ tracker, onClick }) {
       <div className="report-row-info">
         <div className="report-row-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {tracker.name}
-          {tracker.trend === 'improving' && <span title="Improving" style={{ color: '#10b981', fontSize: '0.8rem' }}>↑</span>}
-          {tracker.trend === 'declining' && <span title="Declining" style={{ color: '#ef4444', fontSize: '0.8rem' }}>↓</span>}
+          {tracker.trend === 'improving' && <span title="Improving" style={{ color: 'var(--color-green)', fontSize: '0.8rem' }}>↑</span>}
+          {tracker.trend === 'declining' && <span title="Declining" style={{ color: 'var(--color-red)', fontSize: '0.8rem' }}>↓</span>}
         </div>
         <div className="report-row-sub">
           <span className="mini-cat-badge"
@@ -299,7 +299,7 @@ function TrackerDetail({ tracker, onClose, onDelete, onEdit, onUpdateTracker }) 
           <div className="detail-hdr-actions no-print">
             <button className="hdr-btn" onClick={handleShare} title="Share Image">📸 Share</button>
             <button className="hdr-btn" onClick={onEdit} title="Edit">✏️</button>
-            <button className="hdr-btn" onClick={() => { if (confirm(`Delete "${tracker.name}"?`)) onDelete(); }} title="Delete" style={{ color: '#ef4444' }}>🗑</button>
+            <button className="hdr-btn" onClick={() => { if (confirm(`Delete "${tracker.name}"?`)) onDelete(); }} title="Delete" style={{ color: 'var(--color-red)' }}>🗑</button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
@@ -351,8 +351,8 @@ function HabitDetail({ tracker, onLog }) {
       <div className="detail-section-lbl" style={{ marginBottom: 8 }}>Activity (last 13 weeks)</div>
       <HabitHeatmap tracker={tracker} />
 
-      <HabitStreakChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || '#6366f1'} />
-      <HabitDayOfWeekChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || '#6366f1'} />
+      <HabitStreakChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+      <HabitDayOfWeekChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
     </>
   );
 }
@@ -430,7 +430,7 @@ function TargetDetail({ tracker, onLog }) {
     setVal('');
   };
 
-  const PACE_COLOR = { behind: '#ef4444', 'on-track': '#10b981', ahead: '#3b82f6' };
+  const PACE_COLOR = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', ahead: 'var(--color-blue)' };
 
   return (
     <>
@@ -443,7 +443,7 @@ function TargetDetail({ tracker, onLog }) {
 
       {/* Progress bar */}
       <div className="detail-progress-bar-wrap">
-        <div className="detail-progress-bar" style={{ width: `${progress}%`, background: TRACKER_CATS[tracker.category]?.color ?? '#6366f1' }} />
+        <div className="detail-progress-bar" style={{ width: `${progress}%`, background: TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)' }} />
       </div>
 
       {/* Log today */}
@@ -462,8 +462,8 @@ function TargetDetail({ tracker, onLog }) {
       {tracker.logs.length > 0 && (
         <>
           <div className="detail-section-lbl" style={{ marginBottom: 8, marginTop: 16 }}>Progress vs Pace</div>
-          <TargetProgressChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || '#6366f1'} />
-          <TargetVelocityChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || '#6366f1'} />
+          <TargetProgressChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+          <TargetVelocityChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
         </>
       )}
     </>
@@ -505,7 +505,7 @@ function AverageDetail({ tracker, onLog }) {
         <>
           <div className="detail-section-lbl" style={{ marginBottom: 8, marginTop: 16 }}>Last 30 Days</div>
           <AverageBarChart tracker={tracker} />
-          <AverageRollingChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || '#6366f1'} />
+          <AverageRollingChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
         </>
       )}
     </>
@@ -516,8 +516,8 @@ function AverageDetail({ tracker, onLog }) {
 function ProjectDetail({ tracker, onToggle }) {
   const { done, total, progress, pace } = computeProjectStats(tracker);
   const { milestones = [], targetDate = '' } = tracker.config;
-  const catColor = TRACKER_CATS[tracker.category]?.color ?? '#6366f1';
-  const PACE_COLOR = { behind: '#ef4444', 'on-track': '#10b981', complete: '#6366f1' };
+  const catColor = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
+  const PACE_COLOR = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', complete: 'var(--accent)' };
 
   return (
     <>
@@ -555,7 +555,7 @@ function ProjectDetail({ tracker, onToggle }) {
 function TargetLineChart({ tracker }) {
   const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
   const { startValue = 0, targetValue = 100 } = tracker.config;
-  const color = TRACKER_CATS[tracker.category]?.color ?? '#6366f1';
+  const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   const data = [{ value: startValue }, ...logs];
 
   const W = 100, H = 80;
@@ -596,7 +596,7 @@ function AverageBarChart({ tracker }) {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const { targetAverage = 0, unit = '' } = tracker.config;
-  const color = TRACKER_CATS[tracker.category]?.color ?? '#6366f1';
+  const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   if (!logs.length) return null;
 
   const W = 100, H = 80;

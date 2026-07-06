@@ -83,7 +83,7 @@ export default function OnboardingFlow({ onComplete }) {
           <div className="fade-in">
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>🌱</div>
             <h1 style={{ marginBottom: 12 }}>Welcome to My Workspace</h1>
-            <p style={{ color: '#94a3b8', marginBottom: 32, lineHeight: 1.6 }}>Your all-in-one productivity companion.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>Your all-in-one productivity companion.</p>
             <ul style={{ textAlign: 'left', display: 'inline-block', marginBottom: 40, color: '#e2e8f0' }}>
               <li style={{ marginBottom: 12 }}>🍅 Focus with Pomodoro timers</li>
               <li style={{ marginBottom: 12 }}>📈 Track habits & hit your targets</li>
@@ -96,7 +96,7 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 2 && (
           <div className="fade-in">
             <h2 style={{ marginBottom: 12 }}>What should we call you?</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 24 }}>Let's personalize your experience.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Let's personalize your experience.</p>
             <input type="text" className="form-inp" style={{ textAlign: 'center', fontSize: '1.2rem', padding: '16px', marginBottom: 16, width: '100%' }} value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" autoFocus onKeyDown={e => e.key === 'Enter' && name.trim() && setStep(3)} />
             <input type="email" className="form-inp" style={{ textAlign: 'center', fontSize: '1.1rem', padding: '16px', marginBottom: 32, width: '100%' }} value={email} onChange={e => setEmail(e.target.value)} placeholder="yourname@gmail.com" onKeyDown={e => e.key === 'Enter' && name.trim() && setStep(3)} />
             <button className="primary-btn" style={{ width: '100%' }} disabled={!name.trim()} onClick={() => setStep(3)}>Continue</button>
@@ -106,10 +106,10 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 3 && (
           <div className="fade-in">
             <h2 style={{ marginBottom: 12 }}>Pick your focus areas</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 24 }}>What areas of life do you want to track?</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>What areas of life do you want to track?</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 32 }}>
               {FOCUS_AREAS.map(a => (
-                <button key={a.id} onClick={() => toggleArea(a.id)} style={{ padding: '20px', borderRadius: 16, background: areas.includes(a.id) ? '#6366f1' : 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <button key={a.id} onClick={() => toggleArea(a.id)} style={{ padding: '20px', borderRadius: 16, background: areas.includes(a.id) ? 'var(--accent)' : 'var(--border)', border: 'none', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', transition: 'all 0.2s' }}>
                   <div style={{ fontSize: '2rem', marginBottom: 8 }}>{a.icon}</div>
                   {a.label}
                 </button>
@@ -122,12 +122,12 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 4 && (
           <div className="fade-in">
             <h2 style={{ marginBottom: 12 }}>Create your first tracker</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 24 }}>Pick a starter template or skip for now.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Pick a starter template or skip for now.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32, maxHeight: '40vh', overflowY: 'auto', paddingRight: 8 }}>
               {areas.flatMap(a => TEMPLATES[a] || []).map((t, i) => (
-                <button key={i} onClick={() => setSelectedTemplate(t)} style={{ padding: '16px', borderRadius: 12, background: selectedTemplate === t ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)', border: selectedTemplate === t ? '1px solid #6366f1' : '1px solid transparent', color: '#fff', textAlign: 'left', cursor: 'pointer' }}>
+                <button key={i} onClick={() => setSelectedTemplate(t)} style={{ padding: '16px', borderRadius: 12, background: selectedTemplate === t ? 'rgba(99, 102, 241, 0.2)' : 'var(--border)', border: selectedTemplate === t ? '1px solid #6366f1' : '1px solid transparent', color: '#fff', textAlign: 'left', cursor: 'pointer' }}>
                   <div style={{ fontWeight: 600 }}>{t.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 4 }}>{t.type} • {t.category}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>{t.type} • {t.category}</div>
                 </button>
               ))}
             </div>
@@ -142,7 +142,7 @@ export default function OnboardingFlow({ onComplete }) {
           <div className="fade-in">
             <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔔</div>
             <h2 style={{ marginBottom: 12 }}>Enable notifications?</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 32, lineHeight: 1.5 }}>Get a morning briefing and streak reminders so you never miss a day.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.5 }}>Get a morning briefing and streak reminders so you never miss a day.</p>
             <div style={{ display: 'flex', gap: 12 }}>
               <button className="secondary-btn" style={{ flex: 1 }} onClick={() => setStep(6)}>Maybe Later</button>
               <button className="primary-btn" style={{ flex: 2 }} onClick={requestNotif}>Allow Notifications</button>
@@ -154,7 +154,7 @@ export default function OnboardingFlow({ onComplete }) {
           <div className="fade-in">
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎉</div>
             <h2 style={{ marginBottom: 12 }}>You're all set!</h2>
-            <p style={{ color: '#94a3b8', marginBottom: 32 }}>Let's build some great habits.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 32 }}>Let's build some great habits.</p>
             <button className="primary-btn" style={{ width: '100%' }} onClick={handleFinish}>Go to Dashboard</button>
           </div>
         )}

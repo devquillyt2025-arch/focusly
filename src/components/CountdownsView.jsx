@@ -24,15 +24,15 @@ function savePinned(id) {
 // ─── Category / Priority meta ───────────────────────────────────────
 const PRESET_CATEGORIES = ['Personal', 'Work', 'Health', 'Learning', 'Travel'];
 const CATEGORY_COLORS = {
-  Personal: '#a855f7', Work: '#3b82f6', Health: '#10b981',
-  Learning: '#6366f1', Travel: '#f59e0b', Other: '#6b7280',
+  Personal: '#a855f7', Work: 'var(--color-blue)', Health: 'var(--color-green)',
+  Learning: 'var(--accent)', Travel: 'var(--color-amber)', Other: 'var(--text-secondary)',
 };
 function categoryColor(cat) { return CATEGORY_COLORS[cat] || '#8b5cf6'; }
 
 const PRIORITY_META = {
-  low:    { label: 'Low',    color: '#22c55e' },
+  low:    { label: 'Low',    color: 'var(--color-green)' },
   medium: { label: 'Medium', color: '#eab308' },
-  high:   { label: 'High',   color: '#ef4444' },
+  high:   { label: 'High',   color: 'var(--color-red)' },
 };
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
@@ -89,7 +89,7 @@ const STATUS_META = {
   active:    { label: 'On Track',  color: '#16a34a', bg: 'rgba(34,197,94,0.14)' },
   overdue:   { label: 'Overdue',   color: '#dc2626', bg: 'rgba(239,68,68,0.14)' },
   completed: { label: 'Completed', color: '#2563eb', bg: 'rgba(59,130,246,0.14)' },
-  upcoming:  { label: 'Upcoming',  color: '#64748b', bg: 'rgba(148,163,184,0.16)' },
+  upcoming:  { label: 'Upcoming',  color: 'var(--text-muted)', bg: 'rgba(148,163,184,0.16)' },
 };
 
 function makeCountdown(data) {
@@ -307,7 +307,7 @@ function Ring({ pct, size = 56, stroke = 5, color = 'var(--accent)', children })
 function StatCard({ icon, label, value, sub, warn }) {
   return (
     <div className="cdp-stat">
-      <span className="cdp-stat-icon" style={{ background: warn ? 'rgba(239,68,68,0.12)' : 'var(--accent-glow)', color: warn ? '#ef4444' : 'var(--accent)' }}>{icon}</span>
+      <span className="cdp-stat-icon" style={{ background: warn ? 'rgba(239,68,68,0.12)' : 'var(--accent-glow)', color: warn ? 'var(--color-red)' : 'var(--accent)' }}>{icon}</span>
       <div className="cdp-stat-body">
         <span className="cdp-stat-label">{label}</span>
         <div className="cdp-stat-numrow">
@@ -350,7 +350,7 @@ function CountdownRow({ cd, pinned, onEdit, onDelete, onToggleComplete, onToggle
   const meta = STATUS_META[status];
   const priority = PRIORITY_META[cd.priority] || PRIORITY_META.medium;
   const catColor = categoryColor(cd.category);
-  const ringColor = status === 'overdue' ? '#ef4444' : status === 'completed' ? '#2563eb' : 'var(--accent)';
+  const ringColor = status === 'overdue' ? 'var(--color-red)' : status === 'completed' ? '#2563eb' : 'var(--accent)';
 
   const notes = cd.notes || '';
   const notesTruncated = notes.length > 60 ? notes.slice(0, 60) + '…' : notes;
