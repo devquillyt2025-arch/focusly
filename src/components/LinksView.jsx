@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logActivity } from '../utils/activityLog';
 
 const STORAGE_KEY = 'focusly_links';
 const BASE_CATS = ['Personal', 'Work', 'Finance', 'Read Later', 'Entertainment'];
@@ -398,17 +399,26 @@ export default function LinksView() {
     setLinks(prev => {
       const exists = prev.find(l => l.id === link.id);
       const next = exists ? prev.map(l => l.id === link.id ? link : l) : [link, ...prev];
+      logActivity({ module: 'links', entity_type: 'link', entity_id: link.id, action: exists ? 'updated' : 'created', title: link.name || link.url });
       save(next); return next;
     });
   };
 
   const deleteLink = (id) => {
-    setLinks(prev => { const next = prev.filter(l => l.id !== id); save(next); return next; });
+    setLinks(prev => { 
+      const existing = prev.find(l => l.id === id);
+      if (existing) logActivity({ module: 'links', entity_type: 'link', entity_id: id, action: 'deleted', title: existing.name || existing.url });
+      const next = prev.filter(l => l.id !== id); 
+      save(next); 
+      return next; 
+    });
   };
 
   const toggleStar = (id) => {
     setLinks(prev => {
       const next = prev.map(l => l.id === id ? { ...l, starred: !l.starred } : l);
+      const existing = next.find(l => l.id === id);
+      if (existing) logActivity({ module: 'links', entity_type: 'link', entity_id: id, action: 'updated', title: `Star ${existing.starred ? 'added' : 'removed'}: ${existing.name || existing.url}` });
       save(next); return next;
     });
   };

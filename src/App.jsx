@@ -502,6 +502,7 @@ export default function App() {
     }
 
     if (mode==='focus') {
+      logActivity({ module: 'focus', entity_type: 'focus_session', entity_id: new Date().getTime().toString(), action: 'completed', title: 'Focus Session Completed' });
       setPomodoroLog(prev=>[...prev, new Date().toISOString()]);
       if (activeTaskRef.current) {
         setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,pomodorosCompleted:(t.pomodorosCompleted||0)+1}:t));
@@ -773,14 +774,28 @@ export default function App() {
 
   // ── Intention callbacks ──
   const updateIntention = useCallback((id, text) => {
-    setIntentions(prev=>({...prev, items:prev.items.map(i=>i.id===id?{...i,text}:i)}));
+    setIntentions(prev => {
+      const existing = prev.items.find(i => i.id === id);
+      const isNew = !existing?.text && text;
+      if (isNew || (existing && existing.text !== text)) {
+        logActivity({ module: 'intentions', entity_type: 'intention', entity_id: id, action: isNew ? 'created' : 'updated', title: text });
+      }
+      return {...prev, items:prev.items.map(i=>i.id===id?{...i,text}:i)};
+    });
   }, []);
   const toggleIntention = useCallback((id) => {
-    setIntentions(prev=>({...prev, items:prev.items.map(i=>i.id===id?{...i,done:!i.done}:i)}));
+    setIntentions(prev => {
+      const intention = prev.items.find(i => i.id === id);
+      if (intention && intention.text) {
+        logActivity({ module: 'intentions', entity_type: 'intention', entity_id: id, action: intention.done ? 'updated' : 'completed', title: intention.text, field_changes: intention.done ? [{ field: 'done', from: 'true', to: 'false' }] : null });
+      }
+      return {...prev, items:prev.items.map(i=>i.id===id?{...i,done:!i.done}:i)};
+    });
   }, []);
 
   // ── Tracker callbacks ──
   const addTracker = useCallback((t) => {
+    logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: t.id, action: 'created', title: t.name });
     setTrackers(prev=>[t,...prev]);
     showToast(`"${t.name}" tracker created ✓`,'success');
   }, [showToast]);
@@ -791,9 +806,15 @@ export default function App() {
         const today = localDateStr();
         const oldLog = (oldTracker.logs || []).find(l => l.date === today);
         const newLog = (newTracker.logs || []).find(l => l.date === today);
+        
+        // General update
+        if (oldTracker.name !== newTracker.name || oldTracker.target !== newTracker.target) {
+           logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: newTracker.id, action: 'updated', title: newTracker.name });
+        }
 
         // Habit logged or Target/Average updated
         if (!oldLog && newLog) {
+          logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: newTracker.id, action: 'completed', title: newTracker.name });
           if (navigator.vibrate) navigator.vibrate(50);
           showToast(`Logged "${newTracker.name}"`, 'success');
           
@@ -824,7 +845,11 @@ export default function App() {
     });
   }, [showToast]);
   const deleteTracker = useCallback((id) => {
-    setTrackers(prev=>prev.filter(t=>t.id!==id));
+    setTrackers(prev => {
+      const t = prev.find(x => x.id === id);
+      if (t) logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: id, action: 'deleted', title: t.name });
+      return prev.filter(x => x.id !== id);
+    });
     showToast('Tracker deleted','info');
   }, [showToast]);
 

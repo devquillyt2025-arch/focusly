@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logActivity } from '../utils/activityLog';
 
 const STORAGE_KEY = 'focusly_vault';
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -290,12 +291,19 @@ export default function VaultView() {
     setEntries(prev => {
       const exists = prev.find(e => e.id === entry.id);
       const next = exists ? prev.map(e => e.id === entry.id ? entry : e) : [entry, ...prev];
+      logActivity({ module: 'vault', entity_type: 'vault_item', entity_id: entry.id, action: exists ? 'updated' : 'created', title: entry.title });
       save(next); return next;
     });
   };
 
   const deleteEntry = (id) => {
-    setEntries(prev => { const next = prev.filter(e => e.id !== id); save(next); return next; });
+    setEntries(prev => { 
+      const existing = prev.find(e => e.id === id);
+      if (existing) logActivity({ module: 'vault', entity_type: 'vault_item', entity_id: id, action: 'deleted', title: existing.title });
+      const next = prev.filter(e => e.id !== id); 
+      save(next); 
+      return next; 
+    });
   };
 
   // All unique service names (for datalist autocomplete)
