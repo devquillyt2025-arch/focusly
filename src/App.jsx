@@ -196,7 +196,7 @@ export default function App() {
   const [tasks,       setTasks]       = useState(loadTasks);
   const [syncStatus,  setSyncStatus]  = useState(() => localStorage.getItem('focusly_sync_enabled') === 'true' ? 'Synced' : 'Not connected');
 
-  const [theme,       setTheme]       = useState(() => { try { const t = localStorage.getItem(SK.theme); return (t && t !== '"dark"') ? JSON.parse(t) : 'light'; } catch { return 'light'; } });
+  const [theme,       setTheme]       = useState(() => { try { const t = localStorage.getItem(SK.theme); return t ? JSON.parse(t) : 'dark'; } catch { return 'dark'; } });
   const [settings,    setSettings]    = useState(initSettings);
   const [pomodoroLog, setPomodoroLog] = useState(loadPomoLog);
 
