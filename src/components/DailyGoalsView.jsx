@@ -12,6 +12,7 @@ import {
   HABIT_CATS, isScheduledToday as isHabitScheduledToday,
   isCompletedToday as isHabitCompletedToday, calcStreak as habitStreak, fmtFrequency,
 } from '../habitsStore';
+import { CAT_META } from '../utils/categoryMeta';
 
 // ─── Local Storage Helpers for Preview Cards ─────────────────────────
 function loadRecentJournalEntries() {
@@ -25,6 +26,26 @@ function loadRecentJournalEntries() {
     } catch {}
   }
   return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+}
+
+function getJournalPreview(content) {
+  if (!content) return 'No entry yet';
+  const text = content.replace(/<\/?[^>]+(>|$)/g, '').trim();
+  if (!text) return 'No entry yet';
+  return text.length > 50 ? text.slice(0, 50) + '...' : text;
+}
+
+function fmtTaskDueDate(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(dateStr + 'T00:00:00');
+  const diff = Math.round((due - today) / 86400000);
+  if (diff < 0) {
+    return { text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'var(--color-red)' };
+  }
+  if (diff === 0) return { text: 'Today', color: 'var(--color-amber)' };
+  if (diff === 1) return { text: 'Tomorrow', color: 'var(--color-amber)' };
+  return { text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'var(--text-secondary)' };
 }
 
 function loadActiveGoals() {
@@ -136,33 +157,38 @@ export default function DailyGoalsView({
           <div className="yartu-summary-strip">
             <span className="yartu-summary-prefix">Today you have:</span>
             <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-blue)' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               <span className="yartu-summary-num">{eventsCount}</span>
               <span className="yartu-summary-label">{eventsCount === 1 ? 'event to do' : 'events to do'}</span>
             </div>
             <span className="yartu-summary-divider">·</span>
             <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               <span className="yartu-summary-num">{pendingTasksCount}</span>
               <span className="yartu-summary-label">{pendingTasksCount === 1 ? 'task to complete' : 'tasks to complete'}</span>
             </div>
             <span className="yartu-summary-divider">·</span>
             <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-amber)' }}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
               <span className="yartu-summary-num">{dueHabitsCount}</span>
               <span className="yartu-summary-label">{dueHabitsCount === 1 ? 'habit due' : 'habits due'}</span>
             </div>
             <span className="yartu-summary-divider">·</span>
             <div className="yartu-summary-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-purple)' }}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
               <span className="yartu-summary-num">{journalPendingCount}</span>
               <span className="yartu-summary-label">{journalPendingCount === 1 ? 'journal entry pending' : 'journal entries pending'}</span>
             </div>
           </div>
         </div>
-        <div className="yartu-mode-toggle">
-          <button className={`yartu-mode-btn${mode === 'viewing' ? ' active' : ''}`} onClick={() => setMode('viewing')}>Viewing</button>
-          <button className={`yartu-mode-btn${mode === 'editing' ? ' active' : ''}`} onClick={() => setMode('editing')}>Editing</button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div className="yartu-mode-toggle" title="Switch to Editing mode to manage tasks directly from the dashboard.">
+            <button className={`yartu-mode-btn${mode === 'viewing' ? ' active' : ''}`} onClick={() => setMode('viewing')} title="View dashboard summary">Viewing</button>
+            <button className={`yartu-mode-btn${mode === 'editing' ? ' active' : ''}`} onClick={() => setMode('editing')} title="Enable dashboard task management">Editing</button>
+          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }} title="In Editing mode, you can quickly edit tasks and add new tasks directly from here.">
+            {mode === 'editing' ? 'Editing: task controls enabled' : 'Viewing: toggle editing to manage'}
+          </span>
         </div>
       </div>
 
@@ -196,23 +222,41 @@ export default function DailyGoalsView({
               />
             </div>
             <div className="yartu-list">
+              <div className="yartu-card-summary" style={{ padding: '0 4px 12px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 6 }}>
+                  <span>{doneTasks} / {tasks.length} tasks completed</span>
+                  <span>{taskPct}%</span>
+                </div>
+                <div className="yartu-mini-bar-track" style={{ height: 6 }}>
+                  <div className="yartu-mini-bar-fill" style={{ width: `${taskPct}%` }} />
+                </div>
+              </div>
               {displayedTasks.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>No pending tasks</div>
+                <div style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pending tasks</div>
               ) : (
-                displayedTasks.map(task => (
-                  <div key={task.id} className="yartu-compact-row">
-                    <div className="yartu-row-left">
-                      <div className={`sunsama-checkbox${task.completed ? ' checked' : ''}`} onClick={() => toggleComplete?.(task.id)}>
+                displayedTasks.slice(0, 2).map(task => (
+                  <div key={task.id} className="yartu-compact-row" onClick={() => { if (mode !== 'editing') selectTask?.(task.id); }} style={{ cursor: mode === 'editing' ? 'default' : 'pointer' }}>
+                    <div className="yartu-row-left" style={{ flexWrap: 'wrap', gap: '8px 12px' }}>
+                      <div className={`sunsama-checkbox${task.completed ? ' checked' : ''}`} onClick={e => { e.stopPropagation(); toggleComplete?.(task.id); }}>
                         {task.completed ? '✓' : ''}
                       </div>
                       <div className="yartu-row-title" style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                         {task.name}
                       </div>
                       {task.timeEstimate > 0 && <span className="yartu-row-badge">{Math.round(task.timeEstimate / 25)} pomo</span>}
+                      {(() => {
+                        const meta = CAT_META[task.category] ?? CAT_META.work;
+                        return (
+                          <span className="linear-cat-badge" style={{ background: meta.color + '16', color: meta.color, margin: 0 }}>
+                            <span className="linear-cat-badge-dot" style={{ background: meta.color }} />
+                            {meta.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="yartu-row-right">
                       {mode === 'editing' ? (
-                        <button onClick={() => setEditingTask?.(task)} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>Edit</button>
+                        <button onClick={e => { e.stopPropagation(); setEditingTask?.(task); }} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>Edit</button>
                       ) : (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                       )}
@@ -220,6 +264,9 @@ export default function DailyGoalsView({
                   </div>
                 ))
               )}
+              <button className="yartu-card-action" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={() => setActiveTab?.('tasks')}>
+                View All Tasks →
+              </button>
               {mode === 'editing' && (
                 <button className="yartu-card-action" style={{ width: '100%', marginTop: 8 }} onClick={() => setOpenModal?.('add')}>＋ Add New Task</button>
               )}
@@ -233,10 +280,19 @@ export default function DailyGoalsView({
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Today</span>
             </div>
             <div className="yartu-list">
+              <div className="yartu-card-summary" style={{ padding: '0 4px 12px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 6 }}>
+                  <span>{doneHabits} / {schedHabits.length} habits completed</span>
+                  <span>{habitPct}%</span>
+                </div>
+                <div className="yartu-mini-bar-track" style={{ height: 6 }}>
+                  <div className="yartu-mini-bar-fill" style={{ width: `${habitPct}%` }} />
+                </div>
+              </div>
               {schedHabits.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>No habits scheduled for today</div>
+                <div style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No habits scheduled for today</div>
               ) : (
-                schedHabits.map(h => {
+                schedHabits.slice(0, 2).map(h => {
                   const done = isHabitCompletedToday(h);
                   const streak = habitStreak(h);
                   return (
@@ -257,6 +313,9 @@ export default function DailyGoalsView({
                   );
                 })
               )}
+              <button className="yartu-card-action" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={() => setActiveTab?.('habits')}>
+                View All Habits →
+              </button>
             </div>
           </div>
 
@@ -270,7 +329,7 @@ export default function DailyGoalsView({
               {activeGoals.length === 0 ? (
                 <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>No active goals</div>
               ) : (
-                activeGoals.map(g => {
+                activeGoals.slice(0, 2).map(g => {
                   const prog = calcGoalProgress(g);
                   return (
                     <div key={g.id} className="yartu-mini-bar-row" style={{ background: 'var(--bg-base)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -304,11 +363,11 @@ export default function DailyGoalsView({
               {journalEntries.length === 0 ? (
                 <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>No recent journal entries</div>
               ) : (
-                journalEntries.map((e, idx) => (
+                journalEntries.slice(0, 1).map((e, idx) => (
                   <div key={idx} className="yartu-compact-row" onClick={() => setActiveTab?.('journal')} style={{ cursor: 'pointer' }}>
                     <div className="yartu-row-left" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
                       <div className="yartu-row-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{e.date === todayDateStr ? 'Today' : e.date}</div>
-                      <div className="yartu-row-sub" style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 500 }}>{e.wins?.[0] || e.tomorrowFocus || 'Focused entry'}</div>
+                      <div className="yartu-row-sub" style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 500, lineHeight: 1.4 }}>{getJournalPreview(e.content)}</div>
                     </div>
                     <div className="yartu-row-right">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -316,6 +375,9 @@ export default function DailyGoalsView({
                   </div>
                 ))
               )}
+              <button className="yartu-card-action" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={() => setActiveTab?.('journal')}>
+                Open Journal →
+              </button>
             </div>
           </div>
 

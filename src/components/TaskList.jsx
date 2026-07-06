@@ -507,7 +507,7 @@ function DonutChart({ pendingCount, completedCount }) {
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
         <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--ring-track)" strokeWidth={SW} />
         {total > 0 && pendingCount > 0 && (
-          <circle cx={cx} cy={cy} r={R} fill="none" stroke="#6366f1" strokeWidth={SW}
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--accent)" strokeWidth={SW}
             strokeDasharray={`${pendingArc} ${C - pendingArc}`} strokeDashoffset={0} strokeLinecap="butt" />
         )}
         {completedCount > 0 && (
@@ -515,7 +515,7 @@ function DonutChart({ pendingCount, completedCount }) {
             strokeDasharray={`${completedArc} ${C - completedArc}`} strokeDashoffset={-pendingArc} strokeLinecap="butt" />
         )}
         {total === 0 && (
-          <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(99,102,241,0.2)" strokeWidth={SW} />
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--border-accent)" strokeWidth={SW} />
         )}
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
@@ -564,8 +564,8 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}>
             <DonutChart pendingCount={pending.length} completedCount={completed.length} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-              <div style={{ background: 'var(--accent-glow)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(99,102,241,0.2)' }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#818cf8', lineHeight: 1 }}>{pending.length}</div>
+              <div style={{ background: 'var(--accent-glow)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-accent)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-light)', lineHeight: 1 }}>{pending.length}</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
               </div>
               <div style={{ background: 'var(--color-green-bg)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(16,185,129,0.2)' }}>
@@ -582,7 +582,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: completedPct === 100 ? 'var(--color-green)' : 'var(--text-secondary)' }}>{completedPct}%</span>
               </div>
               <div style={{ height: 7, background: 'var(--ring-track)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? 'var(--color-green)' : 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
+                <div style={{ height: '100%', width: `${completedPct}%`, background: completedPct === 100 ? 'var(--color-green)' : 'var(--accent-gradient)', borderRadius: 99, transition: 'width 0.5s ease', minWidth: completedPct > 0 ? 6 : 0 }} />
               </div>
             </div>
           )}
@@ -977,13 +977,13 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                 return (
                   <button
                     key={opt.value}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', width: '100%', background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 14px', width: '100%', background: isActive ? 'var(--accent-glow)' : 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                     onClick={() => { setSortBy(opt.value); localStorage.setItem(LS_SORT_KEY, opt.value); setSortOpen(false); }}
                     onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
                   >
                     <span>{opt.label}</span>
-                    {isActive && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    {isActive && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                   </button>
                 );
               })}
@@ -1067,7 +1067,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
             <span className="yartu-card-title">Pending Tasks ({pending.length})</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button className="yartu-card-action" onClick={() => { setInlineAddCat('top'); setInlineAddText(''); }}>＋ Quick Add</button>
-              <button style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '0 14px', height: 30, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }} onClick={onAdd}>
+              <button style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '0 14px', height: 30, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px var(--accent-glow)' }} onClick={onAdd}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Task
               </button>
@@ -1076,7 +1076,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
           <div className="yartu-list tasks-scroll-list" style={{ padding: '4px 0 0 0', gap: 0, overflowY: 'auto', maxHeight: '60vh' }}>
 
             {inlineAddCat === 'top' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.1)', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid var(--accent)', boxShadow: '0 4px 12px var(--accent-glow)', marginBottom: 8 }}>
                 <input
                   autoFocus
                   type="text"
@@ -1447,11 +1447,11 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
 
                     {/* Progress bar */}
                     {(local.subtasks?.length ?? 0) > 0 && (
-                      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+                      <div style={{ height: 4, background: 'var(--ring-track)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
                         <div style={{
                           height: '100%',
                           width: `${(local.subtasks.filter(s=>s.completed).length / local.subtasks.length) * 100}%`,
-                          background: 'linear-gradient(90deg, #6366f1, #10b981)',
+                          background: 'linear-gradient(90deg, var(--accent), var(--color-green))',
                           borderRadius: 99, transition: 'width 0.35s ease',
                         }} />
                       </div>
@@ -1478,7 +1478,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                               setLocal({ ...local, subtasks: nextSubs });
                             }}
                             onBlur={() => { (onQuickUpdate || onUpdate)(local); showSaved(); }}
-                            style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : '#fff', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+                            style={{ background: 'transparent', border: 'none', color: sub.completed ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: sub.completed ? 'line-through' : 'none', width: '100%', outline: 'none', fontSize: '0.875rem' }}
                           />
                           <button type="button"
                             style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: '0 4px', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
@@ -1496,7 +1496,7 @@ export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, 
                     </div>
 
                     <div className="tdp-subtask-add-row">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       <input
                         id="subtask-input"
                         type="text"

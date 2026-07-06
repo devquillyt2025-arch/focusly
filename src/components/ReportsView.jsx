@@ -639,7 +639,7 @@ function StatCard({ val, lbl, color }) {
 // ─── Icons ─────────────────────────────────────────────────────────
 function IconPlusCircle() {
   return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2d2d44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/>
       <line x1="12" y1="8" x2="12" y2="16"/>
       <line x1="8" y1="12" x2="16" y2="12"/>

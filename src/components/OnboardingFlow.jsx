@@ -76,8 +76,8 @@ export default function OnboardingFlow({ onComplete }) {
   };
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--c-bg)' }}>
-      <div className="onboarding-card" style={{ background: 'var(--c-bg-card)', padding: 40, borderRadius: 24, maxWidth: 500, width: '90%', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+    <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }}>
+      <div className="onboarding-card" style={{ background: 'var(--bg-card)', padding: 40, borderRadius: 24, maxWidth: 500, width: '90%', textAlign: 'center', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
         
         {step === 1 && (
           <div className="fade-in">
@@ -125,7 +125,7 @@ export default function OnboardingFlow({ onComplete }) {
             <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Pick a starter template or skip for now.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32, maxHeight: '40vh', overflowY: 'auto', paddingRight: 8 }}>
               {areas.flatMap(a => TEMPLATES[a] || []).map((t, i) => (
-                <button key={i} onClick={() => setSelectedTemplate(t)} style={{ padding: '16px', borderRadius: 12, background: selectedTemplate === t ? 'rgba(99, 102, 241, 0.2)' : 'var(--border)', border: selectedTemplate === t ? '1px solid #6366f1' : '1px solid transparent', color: '#fff', textAlign: 'left', cursor: 'pointer' }}>
+                <button key={i} onClick={() => setSelectedTemplate(t)} style={{ padding: '16px', borderRadius: 12, background: selectedTemplate === t ? 'var(--accent-glow)' : 'var(--border)', border: selectedTemplate === t ? '1px solid var(--accent)' : '1px solid transparent', color: 'var(--text-primary)', textAlign: 'left', cursor: 'pointer' }}>
                   <div style={{ fontWeight: 600 }}>{t.name}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>{t.type} • {t.category}</div>
                 </button>

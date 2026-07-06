@@ -214,7 +214,7 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
 
           <div style={{ padding: '0 24px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
             {tags.map(t => (
-              <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600 }}>
+              <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600 }}>
                 #{t}
                 <button onClick={() => setTags(prev => prev.filter(x => x !== t))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, fontSize: '0.8rem', lineHeight: 1, marginLeft: 2 }}>×</button>
               </span>
@@ -415,7 +415,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
                   <button onClick={e => { e.stopPropagation(); onPin(note.id); }}
                     aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
                     title={note.pinned ? 'Unpin' : 'Pin'}
-                    style={{ background: 'rgba(99,102,241,0.08)', border: 'none', cursor: 'pointer', color: note.pinned ? 'var(--accent)' : 'var(--text-muted)', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    style={{ background: 'var(--accent-glow2)', border: 'none', cursor: 'pointer', color: note.pinned ? 'var(--accent)' : 'var(--text-muted)', width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill={note.pinned?'currentColor':'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </button>
                   <button onClick={e => { e.stopPropagation(); setShowColors(true); }}
@@ -635,7 +635,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           <button
             type="button"
             onClick={() => openNew()}
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,0.25)', flexShrink: 0, fontSize: '0.8rem', fontWeight: 500, whiteSpace: 'nowrap' }}
+            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', boxShadow: '0 2px 8px var(--accent-glow)', flexShrink: 0, fontSize: '0.8rem', fontWeight: 500, whiteSpace: 'nowrap' }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New Note
@@ -649,9 +649,9 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
               aria-label="Show all colors"
               aria-pressed={!activeColor}
               title="All Colors"
-              style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-surface)', border: !activeColor ? '2px solid #6366f1' : '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, padding: 0 }}
+              style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-surface)', border: !activeColor ? '2px solid var(--accent)' : '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, padding: 0 }}
             >
-              {!activeColor && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>}
+              {!activeColor && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>}
             </button>
             {NOTE_COLORS.slice(1).map(c => {
               const isActive = activeColor === c.id;
@@ -771,7 +771,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
               <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>No notes yet</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 280 }}>Capture ideas, reminders, and things to remember. Click "New Note" to get started.</div>
             </div>
-            <button onClick={() => openNew()} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 12, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}>
+            <button onClick={() => openNew()} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 12, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px var(--accent-glow)' }}>
               Create your first note
             </button>
           </div>

@@ -1057,6 +1057,43 @@ export default function App() {
       } catch {}
     }
 
+    try {
+      JSON.parse(localStorage.getItem('focusly_vault') || '[]').forEach(v => {
+        if (v.name?.toLowerCase().includes(q) || v.username?.toLowerCase().includes(q) || v.url?.toLowerCase().includes(q)) {
+          results.push({ type: 'vault', id: v.id, title: v.name, sub: v.username || v.url, tab: 'vault' });
+        }
+      });
+    } catch {}
+
+    try {
+      JSON.parse(localStorage.getItem('focusly_links') || '[]').forEach(l => {
+        if (l.title?.toLowerCase().includes(q) || l.url?.toLowerCase().includes(q) || l.category?.toLowerCase().includes(q)) {
+          results.push({ type: 'link', id: l.id, title: l.title, sub: l.url, tab: 'links' });
+        }
+      });
+    } catch {}
+
+    const allTabs = [
+      { id: 'daily', label: 'Today' },
+      { id: 'tasks', label: 'Tasks' },
+      { id: 'notes', label: 'Notes' },
+      { id: 'calendar', label: 'Calendar' },
+      { id: 'vault', label: 'Vault' },
+      { id: 'links', label: 'Links' },
+      { id: 'countdowns', label: 'Countdowns' },
+      { id: 'habits', label: 'Habits' },
+      { id: 'timer', label: 'Focus Timer' },
+      { id: 'journal', label: 'Journal' },
+      { id: 'reports', label: 'Reports' },
+      { id: 'activity', label: 'Activity Log' },
+      { id: 'settings', label: 'Settings' }
+    ];
+    allTabs.forEach(t => {
+      if (t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)) {
+        results.push({ type: 'tab', id: 'nav-' + t.id, title: `Go to ${t.label}`, sub: 'Navigation', tab: t.id });
+      }
+    });
+
     return results.slice(0, 8);
   }, [searchQuery, tasks, habits]);
 
@@ -1133,6 +1170,10 @@ export default function App() {
                       {r.type === 'goal'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
                       {r.type === 'habit'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>}
                       {r.type === 'journal' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}
+                      {r.type === 'countdown' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>}
+                      {r.type === 'vault'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+                      {r.type === 'link'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+                      {r.type === 'tab'     && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>}
                     </span>
                     <div className="search-result-text">
                       <span className="search-result-title">{r.title}</span>
@@ -1212,29 +1253,29 @@ export default function App() {
                             onClick={() => { if (item.type === 'analytics' && pomodoroLog.length === 0) { setActiveTab('timer'); setNotifOpen(false); } }}
                           >{item.desc}</div>
                           {item.progressPct !== undefined && (
-                            <div style={{ marginTop: 7, width: '100%', height: 5, background: '#e5e7eb', borderRadius: 9999, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${Math.min(100, item.progressPct)}%`, background: '#6366f1', borderRadius: 9999, transition: 'width 0.4s ease' }} />
+                            <div style={{ marginTop: 7, width: '100%', height: 5, background: 'var(--ring-track)', borderRadius: 9999, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(100, item.progressPct)}%`, background: 'var(--accent)', borderRadius: 9999, transition: 'width 0.4s ease' }} />
                             </div>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 6, padding: '6px 10px 8px', borderTop: '1px solid var(--border)' }}>
                           {item.type === 'task' && (<>
                             <button
-                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
                               onClick={() => { if (quickestTask) { toggleComplete(quickestTask.id); showToast(`"${quickestTask.name}" done ✓`, 'success'); } }}
                             >Mark Quickest Done</button>
                             <button
-                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
                               onClick={() => { setActiveTab('tasks'); setNotifOpen(false); }}
                             >View All</button>
                           </>)}
                           {item.type === 'habit' && (<>
                             <button
-                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
                               onClick={() => { setActiveTab('habits'); setNotifOpen(false); }}
                             >Log Habit</button>
                             <button
-                              style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
                               onClick={() => {
                                 setSnoozedIds(prev => new Set([...prev, item.id]));
                                 setTimeout(() => setSnoozedIds(prev => { const n = new Set(prev); n.delete(item.id); return n; }), 15 * 60 * 1000);
@@ -1243,7 +1284,7 @@ export default function App() {
                           </>)}
                           {item.type === 'analytics' && (
                             <button
-                              style={{ background: 'transparent', color: '#6366f1', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid #d1d5db', cursor: 'pointer' }}
+                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
                               onClick={() => { switchMode('focus'); setActiveTab('timer'); setNotifOpen(false); }}
                             >Start 25-min Timer</button>
                           )}
@@ -1577,19 +1618,19 @@ export default function App() {
         {showInstallBanner && (
           <div className="install-banner" style={{
             position: 'fixed', bottom: 20, left: 20, right: 20, zIndex: 999,
-            background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 16,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: 16,
-            border: '1px solid rgba(255,255,255,0.1)'
+            background: 'var(--bg-card)', padding: '16px 20px', borderRadius: 16,
+            boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: 16,
+            border: '1px solid var(--border-strong)'
           }}>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 192 192" fill="none"><circle cx="96" cy="96" r="50" stroke="#fff" strokeWidth="12"/><circle cx="96" cy="96" r="24" fill="#fff"/></svg>
               </div>
               <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Install My Workspace for quick access</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleInstallClick} style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Install</button>
-              <button onClick={dismissInstallBanner} style={{ background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>×</button>
+              <button onClick={handleInstallClick} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Install</button>
+              <button onClick={dismissInstallBanner} style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)', border: 'none', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>×</button>
             </div>
           </div>
         )}

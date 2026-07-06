@@ -105,7 +105,7 @@ export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDelete
         </div>
 
         {/* ── Divider ── */}
-        <div className="hv-stat-divider" style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '0 16px', alignSelf: 'stretch' }} />
+        <div className="hv-stat-divider" style={{ width: 1, background: 'var(--border)', margin: '0 16px', alignSelf: 'stretch' }} />
 
         {/* ── Compact Sparkline (Recent Activity) ── */}
         <div className="hv-sparkline">
@@ -422,7 +422,7 @@ function HabitHeatmap({ grid, color }) {
 function HabitsEmptyState({ onAdd }) {
   return (
     <div className="hv-empty">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2d2d44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="17 1 21 5 17 9"/>
         <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
         <polyline points="7 23 3 19 7 15"/>

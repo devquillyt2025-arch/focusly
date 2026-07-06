@@ -151,7 +151,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         <h3 className="settings-card-title">Profile</h3>
         <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', marginTop: 16, flexWrap: 'wrap' }}>
           <div className="avatar-picker" style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ width: 88, height: 88, borderRadius: 44, background: 'var(--c-bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', overflow: 'hidden', border: '2px solid #6366f1', boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}>
+            <div style={{ width: 88, height: 88, borderRadius: 44, background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', overflow: 'hidden', border: '2px solid var(--accent)', boxShadow: '0 4px 12px var(--accent-glow)' }}>
               {avatar.startsWith('data:image') ? <img src={avatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : avatar}
             </div>
             <label className="upload-link" style={{ display: 'block', marginTop: 10, fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.2s' }}>
@@ -181,7 +181,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
           <label className="form-lbl" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14, display: 'block' }}>Choose Emoji</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 14 }}>
             {EMOJI_AVATARS.map(em => (
-              <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? 'rgba(99,102,241,0.15)' : 'var(--c-bg-card)', border: avatar === em ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 16, width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: avatar === em ? '0 4px 12px rgba(99,102,241,0.15)' : 'none' }}>
+              <button key={em} onClick={() => setAvatar(em)} style={{ background: avatar === em ? 'var(--accent-glow)' : 'var(--bg-card)', border: avatar === em ? '2px solid var(--accent)' : '2px solid transparent', borderRadius: 16, width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: avatar === em ? '0 4px 12px var(--accent-glow)' : 'none' }}>
                 {em}
               </button>
             ))}
@@ -204,7 +204,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         </label>
 
         <div style={{ opacity: notifMaster ? 1 : 0.5, pointerEvents: notifMaster ? 'auto' : 'none', display: 'flex', flexDirection: 'column', gap: 20, marginTop: 24, marginLeft: 24, paddingLeft: 20, borderLeft: '2px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Morning Briefing</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Daily summary of pending trackers</div>
@@ -215,7 +215,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             </div>
           </div>
 
-          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
+          <label className="toggle-row" onClick={() => setNotifStreak(!notifStreak)} style={{ background: 'var(--bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Streak at-risk alerts (8 PM)</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Alert if you're about to lose a 3+ day streak</div>
@@ -223,7 +223,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <div className="toggle-track" data-on={notifStreak ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
           </label>
 
-          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
+          <label className="toggle-row" onClick={() => setNotifPomo(!notifPomo)} style={{ background: 'var(--bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
             <div>
               <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Pomodoro timer alerts</div>
               <div className="toggle-sub" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>Notify when focus/break sessions end</div>
@@ -260,7 +260,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <style>{`@keyframes customSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            <label className="toggle-row" onClick={() => onSyncToggle(localStorage.getItem('focusly_sync_enabled') !== 'true')} style={{ background: 'var(--c-bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            <label className="toggle-row" onClick={() => onSyncToggle(localStorage.getItem('focusly_sync_enabled') !== 'true')} style={{ background: 'var(--bg-card)', padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <div>
                 <div className="toggle-lbl" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Sync tasks with Google Tasks</div>
                 <div className="toggle-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
@@ -390,7 +390,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
           <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'block' }}>Timer Presets</label>
           <div className="preset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             {PRESETS.map(p => (
-              <button key={p.label} type="button" className="preset-btn" onClick={() => applyPreset(p)} style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--c-bg-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <button key={p.label} type="button" className="preset-btn" onClick={() => applyPreset(p)} style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', transition: 'all 0.2s' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{p.label}</span>
                 <small style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.78rem' }}>{p.sub}</small>
               </button>
@@ -429,9 +429,9 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         </p>
         
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--c-bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={exportData}>💾 Export All Data</button>
+          <button className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={exportData}>💾 Export All Data</button>
           
-          <label className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--c-bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label className="secondary-btn" style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             📥 Import Data
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
           </label>
