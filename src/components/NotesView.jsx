@@ -336,7 +336,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
       animate={{
         opacity: 1, scale: hovered ? 1.05 : 1,
         y: 0,
-        boxShadow: hovered ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
+        boxShadow: hovered ? '0 4px 14px rgba(0,0,0,.1)' : 'none',
       }}
       exit={{ opacity: 0, scale: 0.98, y: 4 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
@@ -359,7 +359,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
         alignItems: viewMode === 'list' ? 'center' : undefined,
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: isColored ? 'none' : 'var(--shadow-sm)',
+        boxShadow: 'none',
       }}>
 
       {/* Pinned indicator */}
@@ -610,7 +610,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
 
   return (
     <ErrorBoundary title="Notes failed to load" message="An unexpected error occurred in the Notes view. Try refreshing.">
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', overflow: 'hidden' }}>
 
       {/* ── Top Bar ── */}
       <div style={{ padding: '8px 24px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
