@@ -933,7 +933,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
       `}</style>
 
       {/* ── UNIFIED COMPACT TOOLBAR: Search → Sort → Filter → Overview → Sync ── */}
-      <div className="yartu-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', width: '100%', boxSizing: 'border-box', flexShrink: 0 }}>
+      <div className="yartu-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', width: '100%', boxSizing: 'border-box', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 20 }}>
 
         {/* 1. Search — grows to fill */}
         <div className="task-search-wrap" style={{ position: 'relative', flex: 1, minWidth: 150, maxWidth: 280 }}>
