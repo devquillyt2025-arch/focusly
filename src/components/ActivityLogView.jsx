@@ -180,12 +180,12 @@ export default function ActivityLogView({ setActiveTab }) {
     let content, filename, mime;
     if (fmt === 'json') {
       content = JSON.stringify(filtered, null, 2);
-      filename = `focusly-activity-${new Date().toISOString().slice(0, 10)}.json`;
+      filename = `nook-activity-${new Date().toISOString().slice(0, 10)}.json`;
       mime = 'application/json';
     } else {
       const cols = ['id', 'module', 'entity_type', 'entity_id', 'action', 'title', 'status', 'created_at'];
       content = [cols.join(','), ...filtered.map(e => cols.map(c => JSON.stringify(e[c] ?? '')).join(','))].join('\n');
-      filename = `focusly-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+      filename = `nook-activity-${new Date().toISOString().slice(0, 10)}.csv`;
       mime = 'text/csv';
     }
     const url = URL.createObjectURL(new Blob([content], { type: mime }));
@@ -205,7 +205,7 @@ export default function ActivityLogView({ setActiveTab }) {
   };
   const handleUndo = () => {
     if (!undoBackupRef.current) return;
-    localStorage.setItem('focusly-activity-log', JSON.stringify(undoBackupRef.current));
+    localStorage.setItem('nook-activity-log', JSON.stringify(undoBackupRef.current));
     setLog(undoBackupRef.current); undoBackupRef.current = null;
     clearInterval(undoIntervalRef.current); setUndoVisible(false);
   };

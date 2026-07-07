@@ -107,13 +107,13 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   const [gcalError,     setGcalError]     = useState(null);
 
   const [customEvents, setCustomEvents] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('focusly-calendar-events') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('nook-calendar-events') || '[]'); } catch { return []; }
   });
 
   const saveCustomEvent = ev => {
     const u = [...customEvents, ev];
     setCustomEvents(u);
-    localStorage.setItem('focusly-calendar-events', JSON.stringify(u));
+    localStorage.setItem('nook-calendar-events', JSON.stringify(u));
   };
 
   const fetchGCalRange = useCallback(async () => {
@@ -151,7 +151,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
       if (task && onUpdateTask) onUpdateTask({ ...task, dueDate: newDate, time: newTime, endTime: newEndTime, isAllDay });
     } else if (type === 'event') {
       const u = customEvents.map(e => e.id === id ? { ...e, date: newDate, time: newTime, endTime: newEndTime, isAllDay } : e);
-      setCustomEvents(u); localStorage.setItem('focusly-calendar-events', JSON.stringify(u));
+      setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
     }
   }, [tasks, customEvents, onUpdateTask]);
 

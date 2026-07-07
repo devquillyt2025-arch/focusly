@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'focusly-activity-log';
+const STORAGE_KEY = 'nook-activity-log';
 const MAX_ENTRIES = 2000;
 
 function genId() {

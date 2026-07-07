@@ -3,8 +3,8 @@
  * 
  * LIMITATION TO NOTE:
  * This sync only works on the device/browser where Google Tasks was connected, since all sync state lives in localStorage. 
- * If the user opens Focusly on another device, it will not see previously synced data and may create duplicates.
- * Note: Tokens are stored in localStorage (`focusly_google_tokens`). This should move to httpOnly cookies or a backend if multi-device support is ever added.
+ * If the user opens Nook on another device, it will not see previously synced data and may create duplicates.
+ * Note: Tokens are stored in localStorage (`nook_google_tokens`). This should move to httpOnly cookies or a backend if multi-device support is ever added.
  * This integration is scoped to the tasks/tracker module only (habits, goals, and journal modules are untouched).
  */
 
@@ -33,7 +33,7 @@ export async function connectGoogleTasks() {
   }
 
   const verifier = generateRandomString(64);
-  localStorage.setItem('focusly_pkce_verifier', verifier);
+  localStorage.setItem('nook_pkce_verifier', verifier);
 
   const challenge = await generateCodeChallenge(verifier);
   const redirectUri = window.location.origin + window.location.pathname;
@@ -62,7 +62,7 @@ export async function handleAuthCallback() {
   const code = params.get('code');
   if (!code) return false;
 
-  const verifier = localStorage.getItem('focusly_pkce_verifier');
+  const verifier = localStorage.getItem('nook_pkce_verifier');
   if (!verifier) {
     console.warn('[Google Tasks Sync] OAuth code found in URL, but no PKCE verifier found in localStorage (likely already processed).');
     return false;
@@ -70,7 +70,7 @@ export async function handleAuthCallback() {
 
   authCallbackInProgress = true;
   // Immediately remove verifier to prevent React StrictMode double-execution
-  localStorage.removeItem('focusly_pkce_verifier');
+  localStorage.removeItem('nook_pkce_verifier');
 
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
   const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
@@ -109,12 +109,12 @@ export async function handleAuthCallback() {
     const expiresAt = Date.now() + (data.expires_in || 3600) * 1000;
 
 
-    localStorage.setItem('focusly_google_tokens', JSON.stringify({
+    localStorage.setItem('nook_google_tokens', JSON.stringify({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt
     }));
-    localStorage.setItem('focusly_sync_enabled', 'true');
+    localStorage.setItem('nook_sync_enabled', 'true');
 
     // Clean up URL
     window.history.replaceState({}, document.title, window.location.pathname);
@@ -129,7 +129,7 @@ export async function handleAuthCallback() {
 }
 
 export async function getValidAccessToken(onStatusChange) {
-  const tokensStr = localStorage.getItem('focusly_google_tokens');
+  const tokensStr = localStorage.getItem('nook_google_tokens');
   if (!tokensStr) {
     return null;
   }
@@ -187,7 +187,7 @@ export async function getValidAccessToken(onStatusChange) {
       expiresAt
     };
 
-    localStorage.setItem('focusly_google_tokens', JSON.stringify(newTokens));
+    localStorage.setItem('nook_google_tokens', JSON.stringify(newTokens));
     return newTokens.accessToken;
   } catch (err) {
     console.error('[Google Tasks Sync] Refresh token error:', err);
@@ -197,7 +197,7 @@ export async function getValidAccessToken(onStatusChange) {
 }
 
 // ─── Task Model Mapping ─────────────────────────────────────────────────────────────────
-export function focuslyToGoogleTask(task) {
+export function nookToGoogleTask(task) {
   const res = {
     title: task.name || 'Untitled',
     notes: task.notes || '',
@@ -213,8 +213,8 @@ export function focuslyToGoogleTask(task) {
 
 // ─── Offline Queue & Rate Limiting ───────────────────────────────────────────────────────
 export function pushSyncQueue(action) {
-  if (localStorage.getItem('focusly_sync_enabled') !== 'true') return;
-  const qStr = localStorage.getItem('focusly_sync_queue');
+  if (localStorage.getItem('nook_sync_enabled') !== 'true') return;
+  const qStr = localStorage.getItem('nook_sync_queue');
   let q = [];
   try { q = qStr ? JSON.parse(qStr) : []; } catch {}
   
@@ -223,17 +223,17 @@ export function pushSyncQueue(action) {
     q = q.filter(item => item.taskId !== action.taskId);
   } else if (action.type === 'DELETE') {
     q = q.filter(item => item.taskId !== action.taskId);
-    const delStr = localStorage.getItem('focusly_deleted_tasks');
+    const delStr = localStorage.getItem('nook_deleted_tasks');
     let deletedIds = [];
     try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
     if (action.googleTaskId && !deletedIds.includes(action.googleTaskId)) {
       deletedIds.push(action.googleTaskId);
-      localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds));
+      localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
     }
   }
 
   q.push(action);
-  localStorage.setItem('focusly_sync_queue', JSON.stringify(q));
+  localStorage.setItem('nook_sync_queue', JSON.stringify(q));
 }
 
 // ─── Two-Way Sync Engine ────────────────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ let syncInProgress = false;
 let lastSyncTimestamp = 0; // For debouncing window focus triggers
 
 export async function pushLocalChangesToGoogle(tasks, token) {
-  const qStr = localStorage.getItem('focusly_sync_queue');
+  const qStr = localStorage.getItem('nook_sync_queue');
   let q = [];
   try { q = qStr ? JSON.parse(qStr) : []; } catch {}
   if (!q.length) return tasks;
@@ -259,7 +259,7 @@ export async function pushLocalChangesToGoogle(tasks, token) {
     existingGTasks = d.items || [];
   }
 
-  const delStr = localStorage.getItem('focusly_deleted_tasks');
+  const delStr = localStorage.getItem('nook_deleted_tasks');
   let deletedIds = [];
   try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
 
@@ -277,7 +277,7 @@ export async function pushLocalChangesToGoogle(tasks, token) {
         const res = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(focuslyToGoogleTask(localTask))
+          body: JSON.stringify(nookToGoogleTask(localTask))
         });
 
         if (res.ok) {
@@ -301,7 +301,7 @@ export async function pushLocalChangesToGoogle(tasks, token) {
         const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${parentGoogleTaskId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(focuslyToGoogleTask(localTask))
+          body: JSON.stringify(nookToGoogleTask(localTask))
         });
 
         if (res.ok) {
@@ -402,7 +402,7 @@ export async function pushLocalChangesToGoogle(tasks, token) {
     }
   }
 
-  localStorage.setItem('focusly_sync_queue', JSON.stringify(remainingQ));
+  localStorage.setItem('nook_sync_queue', JSON.stringify(remainingQ));
   return updatedTasks;
 }
 
@@ -434,7 +434,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
   let updatedTasks = [...tasks];
   let taskStateChanged = false;
 
-  const delStr = localStorage.getItem('focusly_deleted_tasks');
+  const delStr = localStorage.getItem('nook_deleted_tasks');
   let deletedIds = [];
   try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
 
@@ -566,14 +566,14 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
     }
   }
 
-  localStorage.setItem('focusly_last_pull_sync', nowIso);
+  localStorage.setItem('nook_last_pull_sync', nowIso);
   if (taskStateChanged) {
     setTasks(updatedTasks);
   }
 }
 
 export async function syncTasks(tasks, setTasks, onStatusChange, isFocusTrigger = false) {
-  if (localStorage.getItem('focusly_sync_enabled') !== 'true') {
+  if (localStorage.getItem('nook_sync_enabled') !== 'true') {
     if (onStatusChange) onStatusChange('Not connected');
     return;
   }
@@ -647,9 +647,9 @@ export async function directGoogleTaskDelete(googleTaskId) {
 }
 
 export function disconnectGoogleTasks() {
-  localStorage.removeItem('focusly_google_tokens');
-  localStorage.removeItem('focusly_sync_enabled');
-  localStorage.removeItem('focusly_sync_queue');
-  localStorage.removeItem('focusly_last_pull_sync');
-  localStorage.removeItem('focusly_deleted_tasks');
+  localStorage.removeItem('nook_google_tokens');
+  localStorage.removeItem('nook_sync_enabled');
+  localStorage.removeItem('nook_sync_queue');
+  localStorage.removeItem('nook_last_pull_sync');
+  localStorage.removeItem('nook_deleted_tasks');
 }

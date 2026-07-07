@@ -5,7 +5,7 @@ import { logActivity } from '../utils/activityLog';
 import Select from './Select';
 import ErrorBoundary from './ErrorBoundary';
 
-const STORAGE_KEY = 'focusly_notes';
+const STORAGE_KEY = 'nook_notes';
 
 const NOTE_COLORS = [
   { id: 'default', label: 'Default', bg: 'var(--bg-input)',       border: 'var(--border)' },

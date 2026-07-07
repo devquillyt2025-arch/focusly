@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focusly-v1';
+const CACHE_NAME = 'nook-v1';
 const urlsToCache = [
   '/',
   '/index.html',

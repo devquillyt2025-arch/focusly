@@ -1,8 +1,8 @@
 // ─── Habits data layer ────────────────────────────────────────────
 // Separate from the trackers system; stores per-habit completion dates.
 
-const HABITS_KEY    = 'focusly_habits';
-const MIGRATED_FLAG = 'focusly_habits_migrated';
+const HABITS_KEY    = 'nook_habits';
+const MIGRATED_FLAG = 'nook_habits_migrated';
 
 // ─── Category / color meta ─────────────────────────────────────────
 export const HABIT_CATS = {

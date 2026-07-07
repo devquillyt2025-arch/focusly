@@ -1,16 +1,16 @@
 /*
  * GOOGLE CALENDAR SYNC
  * Uses the same OAuth client as Google Tasks (same project) but requests
- * calendar.events scope. Tokens are stored separately under focusly_gcal_tokens
+ * calendar.events scope. Tokens are stored separately under nook_gcal_tokens
  * so Tasks and Calendar auth are fully independent.
  *
  * OAuth flow: PKCE (same as Tasks). The `state=gcal` param + separate verifier key
  * ensures Tasks and Calendar callbacks don't conflict.
  */
 
-const GCAL_TOKEN_KEY    = 'focusly_gcal_tokens';
-const GCAL_VERIFIER_KEY = 'focusly_gcal_pkce_verifier';
-const GCAL_ENABLED_KEY  = 'focusly_gcal_enabled';
+const GCAL_TOKEN_KEY    = 'nook_gcal_tokens';
+const GCAL_VERIFIER_KEY = 'nook_gcal_pkce_verifier';
+const GCAL_ENABLED_KEY  = 'nook_gcal_enabled';
 const CALENDAR_ID       = 'primary';
 
 // Google Calendar event colorId → hex

@@ -17,7 +17,6 @@ import Timer from './components/Timer';
 import Stats from './components/Stats';
 import AddTaskModal from './components/AddTaskModal';
 import SettingsView from './components/SettingsView';
-import OnboardingFlow from './components/OnboardingFlow';
 import ShortcutsModal from './components/ShortcutsModal';
 import WeeklyReviewModal from './components/WeeklyReviewModal';
 import DailyGoalsView from './components/DailyGoalsView';
@@ -80,9 +79,9 @@ function playAlarm() {
 
 // ─── Storage keys ────────────────────────────────────────────────
 const SK = {
-  tasks: 'focusly-tasks', settings: 'focusly-settings',
-  theme: 'focusly-theme', pomoLog: 'focusly-pomo-log',
-  intentions: 'focusly-intentions',
+  tasks: 'nook-tasks', settings: 'nook-settings',
+  theme: 'nook-theme', pomoLog: 'nook-pomo-log',
+  intentions: 'nook-intentions',
 };
 
 function persist(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
@@ -138,7 +137,7 @@ function loadSettings() {
 function loadPomoLog() {
   try {
     const r=localStorage.getItem(SK.pomoLog); if(r) return JSON.parse(r);
-    const ar=localStorage.getItem('focusly-analytics'); if(!ar) return [];
+    const ar=localStorage.getItem('nook-analytics'); if(!ar) return [];
     const analytics=JSON.parse(ar); const log=[];
     for(const [ds,data] of Object.entries(analytics)) {
       const c=data.pomodoros||0;
@@ -189,7 +188,7 @@ export default function App() {
 
   // ── Existing state ──
   const [tasks,       setTasks]       = useState(loadTasks);
-  const [syncStatus,  setSyncStatus]  = useState(() => localStorage.getItem('focusly_sync_enabled') === 'true' ? 'Synced' : 'Not connected');
+  const [syncStatus,  setSyncStatus]  = useState(() => localStorage.getItem('nook_sync_enabled') === 'true' ? 'Synced' : 'Not connected');
 
   const [theme,       setTheme]       = useState(() => { try { const t = localStorage.getItem(SK.theme); return t ? JSON.parse(t) : 'dark'; } catch { return 'dark'; } });
   const [settings,    setSettings]    = useState(initSettings);
@@ -208,7 +207,7 @@ export default function App() {
           showToast('Connected to Google Tasks!', 'success');
           setSyncStatus('Syncing...');
           syncTasks(tasks, setTasks, setSyncStatus);
-        } else if (localStorage.getItem('focusly_sync_enabled') === 'true') {
+        } else if (localStorage.getItem('nook_sync_enabled') === 'true') {
           syncTasks(tasks, setTasks, setSyncStatus);
         }
       });
@@ -217,7 +216,7 @@ export default function App() {
 
   // ── One-Time Cleanup for Keystroke Bug Duplicates ──
   useEffect(() => {
-    if (localStorage.getItem('focusly_cleaned_w_duplicates') !== 'true') {
+    if (localStorage.getItem('nook_cleaned_w_duplicates') !== 'true') {
       const badNames = ["W", "Wo", "Wor", "Work", "Work ", "Work O", "Work On", "Work On.", "Work On..", "Work On..."];
       setTasks(prev => {
         const toDelete = prev.filter(t => badNames.includes(t.name) && t.completed === false);
@@ -231,14 +230,14 @@ export default function App() {
         setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 1000);
         return next;
       });
-      localStorage.setItem('focusly_cleaned_w_duplicates', 'true');
+      localStorage.setItem('nook_cleaned_w_duplicates', 'true');
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Window Focus Sync Trigger ──
   useEffect(() => {
     const handleFocus = () => {
-      if (localStorage.getItem('focusly_sync_enabled') === 'true') {
+      if (localStorage.getItem('nook_sync_enabled') === 'true') {
         syncTasks(tasks, setTasks, setSyncStatus, true);
       }
     };
@@ -270,8 +269,6 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
-  // ── Onboarding State ──
-  const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem('focusly-onboarding-complete') === 'true');
 
   const handleImportData = (data) => {
     if (confirm("This will replace your current data. Are you sure?")) {
@@ -286,7 +283,7 @@ export default function App() {
     if (confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
-        if (localStorage.key(i).startsWith('focusly-')) keys.push(localStorage.key(i));
+        if (localStorage.key(i).startsWith('nook-')) keys.push(localStorage.key(i));
       }
       keys.forEach(k => localStorage.removeItem(k));
       window.location.reload();
@@ -351,17 +348,17 @@ export default function App() {
 
   // ── PWA Install tracking ──
   useEffect(() => {
-    let visits = parseInt(localStorage.getItem('focusly-visits') || '0', 10);
-    if (!sessionStorage.getItem('focusly-session-visited')) {
+    let visits = parseInt(localStorage.getItem('nook-visits') || '0', 10);
+    if (!sessionStorage.getItem('nook-session-visited')) {
       visits += 1;
-      localStorage.setItem('focusly-visits', visits.toString());
-      sessionStorage.setItem('focusly-session-visited', 'true');
+      localStorage.setItem('nook-visits', visits.toString());
+      sessionStorage.setItem('nook-session-visited', 'true');
     }
     
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      if (visits >= 3 && localStorage.getItem('focusly-install-dismissed') !== 'true') {
+      if (visits >= 3 && localStorage.getItem('nook-install-dismissed') !== 'true') {
         setShowInstallBanner(true);
       }
     };
@@ -376,20 +373,20 @@ export default function App() {
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setShowInstallBanner(false);
-      localStorage.setItem('focusly-install-dismissed', 'true');
+      localStorage.setItem('nook-install-dismissed', 'true');
     }
     setDeferredPrompt(null);
   };
 
   const dismissInstallBanner = () => {
     setShowInstallBanner(false);
-    localStorage.setItem('focusly-install-dismissed', 'true');
+    localStorage.setItem('nook-install-dismissed', 'true');
   };
 
   // ── Scheduled Notifications Engine ──
   useEffect(() => {
     const checkNotifications = () => {
-      const masterEnabled = localStorage.getItem('focusly-notif-master') !== 'false';
+      const masterEnabled = localStorage.getItem('nook-notif-master') !== 'false';
       if (!masterEnabled) return;
 
       const now = new Date();
@@ -398,7 +395,7 @@ export default function App() {
 
       let notifState = { date: today, triggered: {} };
       try {
-        const savedState = JSON.parse(localStorage.getItem('focusly-notif-state'));
+        const savedState = JSON.parse(localStorage.getItem('nook-notif-state'));
         if (savedState && savedState.date === today) {
           notifState = savedState;
         }
@@ -407,12 +404,12 @@ export default function App() {
       let updated = false;
 
       // 1. Morning Briefing
-      const briefingEnabled = localStorage.getItem('focusly-notif-morning') !== 'false';
-      const briefingTime = localStorage.getItem('focusly-notif-morning-time') || '08:00';
+      const briefingEnabled = localStorage.getItem('nook-notif-morning') !== 'false';
+      const briefingTime = localStorage.getItem('nook-notif-morning-time') || '08:00';
       if (briefingEnabled && currentTime === briefingTime && !notifState.triggered.briefing) {
         const scheduled = trackers.filter(t => isScheduledToday(t) && !isLoggedToday(t));
         if (scheduled.length > 0) {
-          const profileName = localStorage.getItem('focusly-profile-name') || 'there';
+          const profileName = localStorage.getItem('nook-profile-name') || 'there';
           sendNotification(`Good morning, ${profileName}!`, {
             body: `You have ${scheduled.length} tracker${scheduled.length > 1 ? 's' : ''} to log today. Let's get started!`
           });
@@ -436,7 +433,7 @@ export default function App() {
       });
 
       // 3. Streak At-Risk Alerts
-      const streakAlertsEnabled = localStorage.getItem('focusly-notif-streak') !== 'false';
+      const streakAlertsEnabled = localStorage.getItem('nook-notif-streak') !== 'false';
       if (streakAlertsEnabled && currentTime === '20:00' && !notifState.triggered.streak_alerts) {
         trackers.forEach(t => {
           if (t.type === 'habit' && isScheduledToday(t) && !isLoggedToday(t)) {
@@ -453,7 +450,7 @@ export default function App() {
       }
 
       if (updated) {
-        localStorage.setItem('focusly-notif-state', JSON.stringify(notifState));
+        localStorage.setItem('nook-notif-state', JSON.stringify(notifState));
       }
     };
 
@@ -487,7 +484,7 @@ export default function App() {
     if (sett.sound) playAlarm();
     
     // Push notification if enabled
-    const pomoAlertsEnabled = localStorage.getItem('focusly-notif-pomo') !== 'false';
+    const pomoAlertsEnabled = localStorage.getItem('nook-notif-pomo') !== 'false';
     if (pomoAlertsEnabled) {
       if (mode === 'focus') {
         sendNotification('Focus session complete!', { body: 'Time for a break.' });
@@ -654,7 +651,7 @@ export default function App() {
   }, []);
 
   const toggleComplete = useCallback(async (id) => {
-    const isSyncEnabled = localStorage.getItem('focusly_sync_enabled') === 'true';
+    const isSyncEnabled = localStorage.getItem('nook_sync_enabled') === 'true';
     const currentTask = tasks.find(t => t.id === id);
     if (!currentTask) return;
 
@@ -734,7 +731,7 @@ export default function App() {
   }, [activeTaskId, timerState, pauseTimer]);
 
   const clearCompleted = useCallback(async () => {
-    const isSyncEnabled = localStorage.getItem('focusly_sync_enabled') === 'true';
+    const isSyncEnabled = localStorage.getItem('nook_sync_enabled') === 'true';
     const completedTasks = tasks.filter(t => t.completed || t.status === 'completed');
     if (!completedTasks.length) return;
 
@@ -744,12 +741,12 @@ export default function App() {
         if (t.googleTaskId) {
            await directGoogleTaskDelete(t.googleTaskId);
            // Also track it in local deleted tasks to prevent re-pull
-           const delStr = localStorage.getItem('focusly_deleted_tasks');
+           const delStr = localStorage.getItem('nook_deleted_tasks');
            let deletedIds = [];
            try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
            if (!deletedIds.includes(t.googleTaskId)) {
              deletedIds.push(t.googleTaskId);
-             localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds));
+             localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
            }
         }
       }
@@ -894,16 +891,16 @@ export default function App() {
   const notifRef  = useRef(null);
   const [isPushEnabled, setIsPushEnabled] = useState(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return false;
-    return localStorage.getItem('focusly-push-enabled') === 'true' && Notification.permission === 'granted';
+    return localStorage.getItem('nook-push-enabled') === 'true' && Notification.permission === 'granted';
   });
-  const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
+  const [profileName, setProfileName] = useState(() => localStorage.getItem('nook-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
-    const saved = localStorage.getItem('focusly-profile-email');
+    const saved = localStorage.getItem('nook-profile-email');
     if (saved && saved !== 'estherH@gmail.com') return saved;
-    const name = localStorage.getItem('focusly-profile-name') || 'user';
+    const name = localStorage.getItem('nook-profile-name') || 'user';
     return `${name.toLowerCase().replace(/\s+/g, '')}@gmail.com`;
   });
-  const [profileAvatar, setProfileAvatar] = useState(() => localStorage.getItem('focusly-profile-avatar') || '😎');
+  const [profileAvatar, setProfileAvatar] = useState(() => localStorage.getItem('nook-profile-avatar') || '😎');
 
   // Push notification helper
   const triggerDesktopNotification = (title, body) => {
@@ -922,19 +919,19 @@ export default function App() {
     }
     if (isPushEnabled) {
       setIsPushEnabled(false);
-      localStorage.setItem('focusly-push-enabled', 'false');
+      localStorage.setItem('nook-push-enabled', 'false');
     } else {
       Notification.requestPermission().then(permission => {
         if (permission === 'granted') {
           setIsPushEnabled(true);
-          localStorage.setItem('focusly-push-enabled', 'true');
-          new Notification('My Workspace Notifications Enabled', {
+          localStorage.setItem('nook-push-enabled', 'true');
+          new Notification('Nook Notifications Enabled', {
             body: 'You will receive task reminders and updates here.',
             icon: '/favicon.ico',
           });
         } else {
           setIsPushEnabled(false);
-          localStorage.setItem('focusly-push-enabled', 'false');
+          localStorage.setItem('nook-push-enabled', 'false');
         }
       });
     }
@@ -986,10 +983,10 @@ export default function App() {
 
   // Automated trigger for notifications when enabled
   useEffect(() => {
-    if (localStorage.getItem('focusly-notif-master') !== 'false') {
+    if (localStorage.getItem('nook-notif-master') !== 'false') {
       const timer = setTimeout(() => {
         if ('Notification' in window && Notification.permission === 'granted') {
-          triggerDesktopNotification('My Workspace Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount || 4} active habits`);
+          triggerDesktopNotification('Nook Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount || 4} active habits`);
         }
       }, 5000);
       return () => clearTimeout(timer);
@@ -1013,7 +1010,7 @@ export default function App() {
     });
 
     try {
-      JSON.parse(localStorage.getItem('focusly_notes') || '[]').forEach(n => {
+      JSON.parse(localStorage.getItem('nook_notes') || '[]').forEach(n => {
         if (n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q)) {
           results.push({ type: 'note', id: n.id, title: n.title || 'Untitled note', sub: n.content?.slice(0, 60), tab: 'notes' });
         }
@@ -1021,7 +1018,7 @@ export default function App() {
     } catch {}
 
     try {
-      JSON.parse(localStorage.getItem('focusly_countdowns') || '[]').forEach(c => {
+      JSON.parse(localStorage.getItem('nook_countdowns') || '[]').forEach(c => {
         if (c.name?.toLowerCase().includes(q)) {
           results.push({ type: 'countdown', id: c.id, title: c.name, sub: `${c.startDate} – ${c.endDate}`, tab: 'countdowns' });
         }
@@ -1036,7 +1033,7 @@ export default function App() {
 
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key?.startsWith('focusly_journal_')) continue;
+      if (!key?.startsWith('nook_journal_')) continue;
       try {
         const e = JSON.parse(localStorage.getItem(key));
         const content = e?.content || '';
@@ -1049,7 +1046,7 @@ export default function App() {
     }
 
     try {
-      JSON.parse(localStorage.getItem('focusly_vault') || '[]').forEach(v => {
+      JSON.parse(localStorage.getItem('nook_vault') || '[]').forEach(v => {
         if (v.name?.toLowerCase().includes(q) || v.username?.toLowerCase().includes(q) || v.url?.toLowerCase().includes(q)) {
           results.push({ type: 'vault', id: v.id, title: v.name, sub: v.username || v.url, tab: 'vault' });
         }
@@ -1057,7 +1054,7 @@ export default function App() {
     } catch {}
 
     try {
-      JSON.parse(localStorage.getItem('focusly_links') || '[]').forEach(l => {
+      JSON.parse(localStorage.getItem('nook_links') || '[]').forEach(l => {
         if (l.title?.toLowerCase().includes(q) || l.url?.toLowerCase().includes(q) || l.category?.toLowerCase().includes(q)) {
           results.push({ type: 'link', id: l.id, title: l.title, sub: l.url, tab: 'links' });
         }
@@ -1098,16 +1095,6 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  if (!onboardingComplete) {
-    return (
-      <OnboardingFlow onComplete={() => {
-        localStorage.setItem('focusly-onboarding-complete', 'true');
-        setOnboardingComplete(true);
-        // Refresh to load newly created trackers/settings
-        window.location.reload();
-      }} />
-    );
-  }
 
   return (
     <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -1354,7 +1341,7 @@ export default function App() {
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
           <div className="sidebar-brand">
-            <span className="sidebar-brand-name">My Workspace</span>
+            <span className="sidebar-brand-name">Nook</span>
             <button className="hdr-btn sidebar-close-btn" onClick={() => setSidebarOpen(false)} title="Close Sidebar">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
@@ -1419,10 +1406,10 @@ export default function App() {
         <motion.div
           key={activeTab}
           className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}${activeTab === 'calendar' ? ' calendar-tab-active' : ''}`}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.13, ease: 'easeOut' }}
         >
           <Suspense fallback={<TabFallback />}>
           {activeTab === 'daily' && (
@@ -1484,11 +1471,11 @@ export default function App() {
               syncStatus={syncStatus}
               onSyncToggle={(enabled) => {
                 if (enabled) {
-                  localStorage.setItem('focusly_sync_enabled', 'true');
+                  localStorage.setItem('nook_sync_enabled', 'true');
                   setSyncStatus('Syncing...');
                   syncTasks(tasks, setTasks, setSyncStatus);
                 } else {
-                  localStorage.setItem('focusly_sync_enabled', 'false');
+                  localStorage.setItem('nook_sync_enabled', 'false');
                   setSyncStatus('Not connected');
                 }
               }}
@@ -1606,7 +1593,7 @@ export default function App() {
               <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 192 192" fill="none"><circle cx="96" cy="96" r="50" stroke="#fff" strokeWidth="12"/><circle cx="96" cy="96" r="24" fill="#fff"/></svg>
               </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Install My Workspace for quick access</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Install Nook for quick access</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={handleInstallClick} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Install</button>
@@ -1642,8 +1629,8 @@ export default function App() {
             trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog}
             onClose={() => setOpenModal(null)}
             onSave={(reviewData) => {
-              const currentReviews = JSON.parse(localStorage.getItem('focusly-weekly-reviews') || '[]');
-              localStorage.setItem('focusly-weekly-reviews', JSON.stringify([reviewData, ...currentReviews]));
+              const currentReviews = JSON.parse(localStorage.getItem('nook-weekly-reviews') || '[]');
+              localStorage.setItem('nook-weekly-reviews', JSON.stringify([reviewData, ...currentReviews]));
               showToast('Weekly review saved!', 'success');
               setOpenModal(null);
             }}

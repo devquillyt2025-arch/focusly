@@ -3411,48 +3411,94 @@ select.modal-input {
 .settings-view {
   flex: 1;
   width: 100%;
-  padding: 32px 40px 80px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 32px;
-  box-sizing: border-box;
-  align-items: start;
-}
-@media (min-width: 1440px) {
-  .settings-view {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.settings-card {
-  width: 100%;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 40px 48px;
-  box-shadow: var(--shadow-sm);
+  padding: 4px 0 32px;
   display: flex;
   flex-direction: column;
+  gap: 20px;
   box-sizing: border-box;
-  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+/* Masonry columns pack cards tightly with no wasted row gaps */
+.settings-grid {
+  columns: 2;
+  column-gap: 18px;
+}
+@media (max-width: 1080px) { .settings-grid { columns: 1; } }
+
+.settings-card {
+  break-inside: avoid;
+  margin: 0 0 18px;
+  width: 100%;
+  background: var(--surface-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  transition: border-color var(--ease), box-shadow var(--ease), transform var(--ease);
 }
 .settings-card:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .settings-card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 750;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  margin: 0 0 8px 0;
+  margin: 0 0 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.settings-card-title::before {
+  content: '';
+  width: 4px; height: 15px; border-radius: 3px; flex-shrink: 0;
+  background: linear-gradient(var(--accent), var(--accent-light));
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* Compact reusable row for settings toggles/fields */
+.set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-radius: 11px;
+  background: var(--surface-nested); border: 1px solid var(--border);
+  box-sizing: border-box; width: 100%; cursor: pointer;
+  transition: border-color var(--ease), background var(--ease);
+}
+.set-row:hover { border-color: var(--border-strong); }
+.set-row-lbl { font-size: 0.86rem; font-weight: 650; color: var(--text-primary); }
+.set-row-sub { font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.set-field-lbl {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: block;
 }
 
 @media (max-width: 768px) {
-  .settings-card { padding: 24px 20px; }
-  .settings-view { padding: 0 0 60px; gap: 24px; }
+  .settings-card { padding: 16px 16px; }
 }
+
+.settings-logout-btn {
+  align-self: center;
+  display: inline-flex; align-items: center; gap: 9px;
+  margin: 2px auto 8px;
+  padding: 11px 28px; border-radius: 12px;
+  font-family: inherit; font-size: 0.88rem; font-weight: 700;
+  color: var(--color-red); cursor: pointer;
+  background: var(--color-red-bg);
+  border: 1px solid rgba(248,113,113,0.32);
+  transition: transform 0.18s var(--ease-spring), box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.settings-logout-btn:hover {
+  background: rgba(248,113,113,0.16);
+  border-color: rgba(248,113,113,0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px -12px rgba(248,113,113,0.7);
+}
+.settings-logout-btn:active { transform: translateY(0) scale(0.98); }
+@media (prefers-reduced-motion: reduce) { .settings-logout-btn { transition: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════
    HABITS PAGE
@@ -4295,7 +4341,8 @@ select.modal-input {
   100% { opacity: 1; transform: translateY(0); }
 }
 .sunsama-tab-transition {
-  animation: sunsamaFadeSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Enter/exit is driven by framer-motion in App.jsx — no CSS animation here
+     (running both caused the two to fight and jank on every page switch). */
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
@@ -5947,12 +5994,19 @@ select.modal-input {
 }
 .tab-content::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
 
-/* ─── Ambient accent glow behind every view ─── */
-.tab-content {
+/* ─── Ambient accent glow — painted ONCE on the non-scrolling body ─── */
+.app-body {
   background:
-    radial-gradient(1100px 420px at 78% -140px, var(--accent-glow2), transparent 60%),
-    radial-gradient(900px 360px at 0% 100%, rgba(157,147,255,0.05), transparent 62%),
-    var(--bg-base) !important;
+    radial-gradient(1100px 460px at 80% -80px, var(--accent-glow2), transparent 60%),
+    radial-gradient(860px 380px at 2% 106%, rgba(157,147,255,0.045), transparent 62%),
+    var(--bg-base);
+}
+/* Scroll container stays transparent so the fixed glow shows through without
+   repainting on every scroll frame. Contain scroll + momentum for smoothness. */
+.tab-content {
+  background: transparent !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ══════ Sidebar navigation — glassy accent rail ══════ */

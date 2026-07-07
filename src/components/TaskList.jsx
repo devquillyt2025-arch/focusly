@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CAT_META } from '../utils/categoryMeta';
 import { PRI_META } from '../utils/priorityMeta';
 import ErrorBoundary from './ErrorBoundary';
+import Select from './Select';
 
 // ── Calendar Date Picker ────────────────────────────────────────────────────
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -156,7 +157,7 @@ const SORT_OPTIONS = [
   { value: 'created',  label: 'Created'   },
   { value: 'az',       label: 'A → Z'     },
 ];
-const LS_SORT_KEY = 'focusly_task_sort';
+const LS_SORT_KEY = 'nook_task_sort';
 
 function fmtTime(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -651,7 +652,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
 function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
   const [customCats, setCustomCats] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('focusly_custom_categories') || '{}');
+      const saved = JSON.parse(localStorage.getItem('nook_custom_categories') || '{}');
       Object.assign(CAT_META, saved);
       return saved;
     } catch (e) { return {}; }
@@ -703,7 +704,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
       const color = colors[Object.keys(CAT_META).length % colors.length];
       CAT_META[key] = { label, color };
       const updatedCustom = { ...customCats, [key]: { label, color } };
-      localStorage.setItem('focusly_custom_categories', JSON.stringify(updatedCustom));
+      localStorage.setItem('nook_custom_categories', JSON.stringify(updatedCustom));
       setCustomCats(updatedCustom);
     }
     if (taskToMove) {
@@ -991,25 +992,20 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
           )}
         </div>
 
-        {/* 3. Category filter dropdown */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <select
-            className="task-cat-select"
+        {/* 3. Category filter dropdown — themed Select (native <select> popup rendered
+              unreadable on Windows) */}
+        <div style={{ flexShrink: 0 }}>
+          <Select
             value={catFilter}
             onChange={e => setCatFilter(e.target.value)}
-            style={{ color: catFilter !== 'all' ? (CAT_META[catFilter]?.color ?? 'var(--text-primary)') : 'var(--text-primary)' }}
-          >
-            <option value="all">All Tasks ({tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length})</option>
-            {ALL_CATS.map(cat => {
-              const meta = CAT_META[cat];
-              const count = catCounts[cat] || 0;
-              if (!count && catFilter !== cat) return null;
-              return <option key={cat} value={cat}>{meta.label} ({count})</option>;
-            })}
-          </select>
-          <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-secondary)' }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+            options={[
+              { value: 'all', label: `All Tasks (${tasks.filter(t => t.status === 'needsAction' || (!t.status && !t.completed)).length})` },
+              ...ALL_CATS
+                .filter(cat => (catCounts[cat] || 0) > 0 || catFilter === cat)
+                .map(cat => ({ value: cat, label: `${CAT_META[cat].label} (${catCounts[cat] || 0})`, color: CAT_META[cat].color })),
+            ]}
+            style={{ height: 34, minWidth: 152, padding: '0 12px', fontSize: '0.82rem', fontWeight: 600, borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', boxSizing: 'border-box' }}
+          />
         </div>
 
         {/* 4. Overview stats — right side */}
@@ -1484,9 +1480,9 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                             style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: '0 4px', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
                             onClick={() => {
                               if (sub.googleTaskId) {
-                                const delStr = localStorage.getItem('focusly_deleted_tasks');
+                                const delStr = localStorage.getItem('nook_deleted_tasks');
                                 let deletedIds = delStr ? JSON.parse(delStr) : [];
-                                if (!deletedIds.includes(sub.googleTaskId)) { deletedIds.push(sub.googleTaskId); localStorage.setItem('focusly_deleted_tasks', JSON.stringify(deletedIds)); }
+                                if (!deletedIds.includes(sub.googleTaskId)) { deletedIds.push(sub.googleTaskId); localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds)); }
                               }
                               saveField('subtasks', (local.subtasks || []).filter(s => s.id !== sub.id));
                             }}

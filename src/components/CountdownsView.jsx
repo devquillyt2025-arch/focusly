@@ -4,8 +4,8 @@ import { genId } from '../trackers/trackerUtils';
 import { logActivity, diffObjects } from '../utils/activityLog';
 
 // ─── Storage ───────────────────────────────────────────────────────
-const CD_KEY = 'focusly_countdowns';
-const PINNED_KEY = 'focusly_countdown_pinned';
+const CD_KEY = 'nook_countdowns';
+const PINNED_KEY = 'nook_countdown_pinned';
 
 function loadCountdowns() {
   try { return JSON.parse(localStorage.getItem(CD_KEY) || '[]'); }

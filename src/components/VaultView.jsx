@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { genId } from '../utils/id';
 
-const STORAGE_KEY = 'focusly_vault';
+const STORAGE_KEY = 'nook_vault';
 function load()   { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
 function save(e)  { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); }
 

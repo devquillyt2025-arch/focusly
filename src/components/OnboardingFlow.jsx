@@ -40,8 +40,8 @@ export default function OnboardingFlow({ onComplete }) {
   };
 
   const handleFinish = () => {
-    localStorage.setItem('focusly-profile-name', name || 'Friend');
-    localStorage.setItem('focusly-profile-email', email || `${(name || 'friend').toLowerCase().replace(/\s+/g, '')}@gmail.com`);
+    localStorage.setItem('nook-profile-name', name || 'Friend');
+    localStorage.setItem('nook-profile-email', email || `${(name || 'friend').toLowerCase().replace(/\s+/g, '')}@gmail.com`);
     if (selectedTemplate) {
       const tracker = {
         id: genId(),
@@ -50,8 +50,8 @@ export default function OnboardingFlow({ onComplete }) {
         logs: [],
         createdAt: new Date().toISOString()
       };
-      const existing = JSON.parse(localStorage.getItem('focusly-trackers') || '[]');
-      localStorage.setItem('focusly-trackers', JSON.stringify([...existing, tracker]));
+      const existing = JSON.parse(localStorage.getItem('nook-trackers') || '[]');
+      localStorage.setItem('nook-trackers', JSON.stringify([...existing, tracker]));
     }
     
     // Confetti
@@ -68,8 +68,8 @@ export default function OnboardingFlow({ onComplete }) {
     if ('Notification' in window) {
       const p = await Notification.requestPermission();
       if (p === 'granted') {
-        localStorage.setItem('focusly-notif-master', 'true');
-        localStorage.setItem('focusly-notif-morning', 'true');
+        localStorage.setItem('nook-notif-master', 'true');
+        localStorage.setItem('nook-notif-morning', 'true');
       }
     }
     setStep(6);
@@ -82,7 +82,7 @@ export default function OnboardingFlow({ onComplete }) {
         {step === 1 && (
           <div className="fade-in">
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>🌱</div>
-            <h1 style={{ marginBottom: 12 }}>Welcome to My Workspace</h1>
+            <h1 style={{ marginBottom: 12 }}>Welcome to Nook</h1>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>Your all-in-one productivity companion.</p>
             <ul style={{ textAlign: 'left', display: 'inline-block', marginBottom: 40, color: '#e2e8f0' }}>
               <li style={{ marginBottom: 12 }}>🍅 Focus with Pomodoro timers</li>

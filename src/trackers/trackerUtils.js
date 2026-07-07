@@ -1,5 +1,5 @@
 // ─── Storage ──────────────────────────────────────────────────────
-const SK = 'focusly-trackers';
+const SK = 'nook-trackers';
 
 export function loadTrackers() {
   try {
@@ -286,7 +286,7 @@ export function exportTrackerData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `focusly-trackers-${todayStr()}.json`;
+  a.download = `nook-trackers-${todayStr()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

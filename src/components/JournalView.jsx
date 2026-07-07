@@ -4,8 +4,8 @@ import { logActivity } from '../utils/activityLog';
 import { localDateStr } from '../utils/date';
 
 // ─── Storage helpers ────────────────────────────────────────────────
-const jKey = d => `focusly_journal_${d}`;
-const ICONS_KEY = 'focusly_journal_icons';
+const jKey = d => `nook_journal_${d}`;
+const ICONS_KEY = 'nook_journal_icons';
 
 function emptyEntry(date) {
   return { date, content: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -23,7 +23,7 @@ function loadAllEntries() {
   const out = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key?.startsWith('focusly_journal_')) continue;
+    if (!key?.startsWith('nook_journal_')) continue;
     try { const e = JSON.parse(localStorage.getItem(key)); if (e?.date) out.push(e); } catch {}
   }
   return out.sort((a, b) => b.date.localeCompare(a.date));

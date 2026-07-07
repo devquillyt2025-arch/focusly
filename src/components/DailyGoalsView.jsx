@@ -19,7 +19,7 @@ function loadRecentJournalEntries() {
   const out = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key?.startsWith('focusly_journal_')) continue;
+    if (!key?.startsWith('nook_journal_')) continue;
     try {
       const e = JSON.parse(localStorage.getItem(key));
       if (e?.date) out.push(e);
@@ -50,7 +50,7 @@ function fmtTaskDueDate(dateStr) {
 
 function loadActiveGoals() {
   try {
-    const list = JSON.parse(localStorage.getItem('focusly_goals') || '[]');
+    const list = JSON.parse(localStorage.getItem('nook_goals') || '[]');
     return list.filter(g => !g.completed).slice(0, 3);
   } catch { return []; }
 }
@@ -153,7 +153,7 @@ export default function DailyGoalsView({
       {/* ── GREETING ROW ── */}
       <div className="yartu-greeting-row">
         <div className="yartu-greeting-left">
-          <h1 className="yartu-greeting-title">Welcome back, {localStorage.getItem('focusly-profile-name') || 'Friend'} 👋</h1>
+          <h1 className="yartu-greeting-title">Welcome back, {localStorage.getItem('nook-profile-name') || 'Friend'} 👋</h1>
           <div className="yartu-summary-strip">
             <span className="yartu-summary-prefix">Today you have:</span>
             <div className="yartu-summary-item">

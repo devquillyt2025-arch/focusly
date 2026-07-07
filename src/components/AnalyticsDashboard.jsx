@@ -130,7 +130,7 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
   // Journal (Weekly Reviews) - from localStorage
   const getWeeklyReviews = () => {
     try {
-      return JSON.parse(localStorage.getItem('focusly-weekly-reviews') || '[]');
+      return JSON.parse(localStorage.getItem('nook-weekly-reviews') || '[]');
     } catch {
       return [];
     }
@@ -151,7 +151,7 @@ export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `focusly-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `nook-export-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

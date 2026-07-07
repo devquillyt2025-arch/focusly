@@ -1,6 +1,6 @@
 {
-  "name": "Focusly",
-  "short_name": "Focusly",
+  "name": "Nook",
+  "short_name": "Nook",
   "description": "A beautiful Pomodoro timer and task manager.",
   "start_url": "/",
   "scope": "/",
