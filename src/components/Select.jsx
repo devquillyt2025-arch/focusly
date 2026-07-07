@@ -109,6 +109,8 @@ export default function Select({
           gap: '8px',
           cursor: disabled ? 'not-allowed' : 'pointer',
           textAlign: 'left',
+          color: 'var(--text-primary)',
+          fontFamily: 'inherit',
           ...style
         }}
       >

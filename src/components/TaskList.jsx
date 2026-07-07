@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CAT_META } from '../utils/categoryMeta';
@@ -108,12 +108,12 @@ function CalendarDatePicker({ value, onChange, onClose }) {
 
       {/* Day grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '0 10px 14px', gap: '2px 0' }}>
-        {grid.map((cell, i) => {
+        {grid.map((cell) => {
           const isSelected = cell.iso === value;
           const isToday    = cell.iso === today;
           const isPast     = cell.iso < today;
           return (
-            <button key={i} onClick={() => { onChange(cell.iso); onClose(); }}
+            <button key={cell.iso} onClick={() => { onChange(cell.iso); onClose(); }}
               style={{
                 width: 36, height: 36, margin: '0 auto', borderRadius: '50%', border: 'none',
                 background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-glow)' : 'transparent',
@@ -648,7 +648,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
   );
 }
 
-export default function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
+function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
   const [customCats, setCustomCats] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('focusly_custom_categories') || '{}');
@@ -1571,3 +1571,5 @@ function TdpIconChevron() {
     </svg>
   );
 }
+
+export default memo(TaskList);

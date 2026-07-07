@@ -1,12 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { logActivity } from '../utils/activityLog';
+import { localDateStr } from '../utils/date';
 
 // ─── Storage helpers ────────────────────────────────────────────────
-function localDateStr(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-}
-
 const jKey = d => `focusly_journal_${d}`;
 const ICONS_KEY = 'focusly_journal_icons';
 

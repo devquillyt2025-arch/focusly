@@ -36,10 +36,12 @@ export const TRACKER_TYPES = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
-export function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
+// genId is single-sourced in utils/id.js; re-exported here so existing
+// importers (CountdownsView, OnboardingFlow) keep working unchanged.
+export { genId } from '../utils/id';
 
+// NOTE: this todayStr is UTC-based (toISOString) and intentionally distinct
+// from the local-date todayStr in utils/date.js — do not merge them.
 export function todayStr() {
   return new Date().toISOString().split('T')[0];
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   HABIT_CATS, ACCENT_COLORS, localDateStr,
   isScheduledToday, isScheduledOn, isCompletedToday, isCompletedOn,
@@ -9,7 +9,7 @@ import {
 const DOW_LABELS = ['S','M','T','W','T','F','S'];
 
 // ─── Main view ─────────────────────────────────────────────────────
-export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
+function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
   const [filterFreq,   setFilterFreq]   = useState('all');
   const [filterCat,    setFilterCat]    = useState('all');
   const [showModal,    setShowModal]    = useState(false);
@@ -41,6 +41,23 @@ export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDelete
   const todayRate   = totalDue > 0 ? Math.round((doneToday / totalDue) * 100) : 0;
   const longestStreak = habits.reduce((max, h) => Math.max(max, calcBestStreak(h)), 0);
 
+  // ── Real 14-day activity (completion rate per day) ──
+  const activity14 = useMemo(() => {
+    const out = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+      const ds   = localDateStr(d);
+      const due  = habits.filter(h => isScheduledOn(h, ds));
+      const done = due.filter(h => isCompletedOn(h, ds));
+      out.push({ ds, offset: i, due: due.length, done: done.length,
+        rate: due.length ? done.length / due.length : 0 });
+    }
+    return out;
+  }, [habits]);
+
+  const RING_R = 20;
+  const RING_C = 2 * Math.PI * RING_R;
+
   // ── Callbacks ──
   const handleToggle = useCallback((habit) => {
     onUpdateHabit(toggleCompletion(habit));
@@ -71,52 +88,88 @@ export default function HabitsView({ habits, onAddHabit, onUpdateHabit, onDelete
   return (
     <div className="hv">
 
-      {/* ── Header ── */}
+      {/* ── Hero header ── */}
       <div className="hv-hdr">
         <div className="hv-hdr-left">
-          <h2 className="hv-title">Habits</h2>
-          <span className="hv-date">{dateLabel}</span>
+          <div className="hv-hdr-badge" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+          </div>
+          <div className="hv-hdr-text">
+            <h2 className="hv-title">Habits</h2>
+            <span className="hv-date">{dateLabel}</span>
+          </div>
         </div>
-        <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ New Habit</button>
+        <button className="hv-new-btn" onClick={() => setShowModal(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Habit
+        </button>
       </div>
 
-      {/* ── Stat Bar ── */}
+      {/* ── Command bar ── */}
       <div className="hv-stat-bar">
-        <div className="hv-stat-group">
-          <div className="hv-stat-item">
-            <span className="hv-stat-label">Total</span>
-            <span className="hv-stat-value">{habits.length}</span>
-          </div>
-          <div className="hv-stat-item">
-            <span className="hv-stat-label">Completed</span>
-            <span className="hv-stat-value">{doneToday}/{totalDue}</span>
-          </div>
-          <div className="hv-stat-item">
-            <span className="hv-stat-label">Streak</span>
-            <span className="hv-stat-value streak-color">{longestStreak > 0 ? `${longestStreak}d` : '—'}</span>
-          </div>
-          <div className="hv-stat-item hv-stat-rate">
-            <div className="hv-rate-header">
-              <span className="hv-stat-label">Rate</span>
-              <span className="hv-stat-value">{todayRate}%</span>
+        {/* Today progress ring */}
+        <div className="hv-ring-wrap">
+          <div className="hv-ring">
+            <svg viewBox="0 0 44 44">
+              <defs>
+                <linearGradient id="hvRingGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="var(--accent)" />
+                  <stop offset="100%" stopColor="var(--accent-light)" />
+                </linearGradient>
+              </defs>
+              <circle className="hv-ring-track" cx="22" cy="22" r={RING_R} />
+              <circle className="hv-ring-fill" cx="22" cy="22" r={RING_R}
+                strokeDasharray={RING_C}
+                strokeDashoffset={RING_C * (1 - todayRate / 100)} />
+            </svg>
+            <div className="hv-ring-center">
+              <span className="hv-ring-pct">{todayRate}<i>%</i></span>
             </div>
-            {totalDue > 0 && <div className="hv-rate-bar-slim"><div className="hv-rate-fill" style={{ width: `${todayRate}%` }} /></div>}
+          </div>
+          <div className="hv-ring-meta">
+            <span className="hv-ring-title">Today</span>
+            <span className="hv-ring-sub">{doneToday} of {totalDue} done</span>
           </div>
         </div>
 
-        {/* ── Divider ── */}
-        <div className="hv-stat-divider" style={{ width: 1, background: 'var(--border)', margin: '0 16px', alignSelf: 'stretch' }} />
+        <div className="hv-stat-divider" />
 
-        {/* ── Compact Sparkline (Recent Activity) ── */}
+        {/* Stat tiles */}
+        <div className="hv-stat-group">
+          <div className="hv-stat-item">
+            <span className="hv-stat-value">{habits.length}</span>
+            <span className="hv-stat-label">Habits</span>
+          </div>
+          <div className="hv-stat-item">
+            <span className="hv-stat-value streak-color">{longestStreak}<i>d</i></span>
+            <span className="hv-stat-label">Best streak</span>
+          </div>
+          <div className="hv-stat-item">
+            <span className="hv-stat-value">{doneToday}<i>/{totalDue}</i></span>
+            <span className="hv-stat-label">Completed</span>
+          </div>
+        </div>
+
+        <div className="hv-stat-divider" />
+
+        {/* Real 14-day activity heat-strip */}
         <div className="hv-sparkline">
-          <span className="hv-spark-label">Activity</span>
+          <span className="hv-spark-label">14-day activity</span>
           <div className="hv-spark-dots">
-            {Array.from({ length: 14 }).map((_, i) => {
-              const isToday = i === 13;
-              const intensity = isToday ? (todayRate > 0 ? todayRate / 100 : 0.1) : (((13-i) * 7) % 100) / 100;
-              const alpha = Math.max(0.05, intensity);
+            {activity14.map((day) => {
+              const isToday = day.offset === 0;
+              const lvl = day.due === 0 ? 0
+                : day.rate >= 1    ? 4
+                : day.rate >= 0.66 ? 3
+                : day.rate >= 0.33 ? 2
+                : day.rate > 0     ? 1 : 0;
               return (
-                <div key={i} className={`hv-spark-dot ${isToday ? 'hv-spark-dot-today' : ''}`} style={{ background: `rgba(99, 102, 241, ${alpha})` }} title={`Day ${i-13}`} />
+                <div key={day.ds}
+                  className={`hv-spark-dot hv-spark-l${lvl}${isToday ? ' hv-spark-dot-today' : ''}`}
+                  title={`${day.ds} · ${day.done}/${day.due} done`} />
               );
             })}
           </div>
@@ -243,12 +296,12 @@ function HabitCard({ habit, onToggle, onOpenDetail, today }) {
   return (
     <div
       className={`hc${done ? ' hc-done' : ''}`}
-      style={{ borderLeftColor: habit.color }}
+      style={{ '--hc-color': habit.color }}
       onClick={onOpenDetail}
     >
       {/* Left: icon + info */}
       <div className="hc-left">
-        <span className="hc-icon" style={{ color: cat.color }}>
+        <span className="hc-icon">
           <HCatIcon category={habit.category} />
         </span>
         <div className="hc-info">
@@ -422,15 +475,20 @@ function HabitHeatmap({ grid, color }) {
 function HabitsEmptyState({ onAdd }) {
   return (
     <div className="hv-empty">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="17 1 21 5 17 9"/>
-        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-        <polyline points="7 23 3 19 7 15"/>
-        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-      </svg>
-      <p className="hv-empty-title">No habits yet</p>
+      <div className="hv-empty-orb" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="17 1 21 5 17 9"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+      </div>
+      <p className="hv-empty-title">Build your first habit</p>
       <p className="hv-empty-sub">Small daily actions compound into big results</p>
-      <button className="add-task-btn" onClick={onAdd}>＋ New Habit</button>
+      <button className="hv-new-btn hv-empty-btn" onClick={onAdd}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Habit
+      </button>
     </div>
   );
 }
@@ -638,3 +696,5 @@ function HIcoFlame() {
     </svg>
   );
 }
+
+export default memo(HabitsView);

@@ -331,27 +331,28 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.98, y: 4 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{
-        opacity: 1, scale: hovered ? 1.05 : 1,
-        y: 0,
-        boxShadow: hovered ? '0 4px 14px rgba(0,0,0,.1)' : 'none',
+        opacity: 1,
+        y: hovered ? -5 : 0,
+        boxShadow: hovered
+          ? `0 18px 36px -16px ${accent || 'var(--accent)'}, 0 8px 20px -12px rgba(0,0,0,0.55)`
+          : '0 1px 2px rgba(0,0,0,0.18)',
       }}
-      exit={{ opacity: 0, scale: 0.98, y: 4 }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
+      exit={{ opacity: 0, y: 4 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setShowColors(false); }}
       onPointerLeave={() => { setHovered(false); setShowColors(false); }}
       onClick={() => onOpen(note)}
       style={{
         background: isColored ? colStyle.bg : 'var(--bg-card)',
-        border: `1px solid ${isColored ? colStyle.border : 'var(--border)'}`,
-        borderRadius: 12,
-        padding: '12px',
+        border: `1px solid ${hovered ? (accent || 'var(--border-accent)') : (isColored ? colStyle.border : 'var(--border)')}`,
+        borderRadius: 14,
+        padding: '14px',
         cursor: 'pointer',
-        height: viewMode === 'list' ? 'auto' : 178,
-        minHeight: viewMode === 'list' ? 60 : undefined,
+        height: viewMode === 'list' ? 'auto' : 182,
+        minHeight: viewMode === 'list' ? 62 : undefined,
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: viewMode === 'list' ? 'row' : 'column',
@@ -359,8 +360,16 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
         alignItems: viewMode === 'list' ? 'center' : undefined,
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: 'none',
+        transition: 'border-color 0.18s ease',
       }}>
+
+      {/* Colored accent bar */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: accent || 'var(--accent)',
+        opacity: isColored ? 0.9 : (hovered ? 0.6 : 0.28),
+        transition: 'opacity 0.2s ease',
+      }} />
 
       {/* Pinned indicator */}
       {note.pinned && (
@@ -612,11 +621,34 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
     <ErrorBoundary title="Notes failed to load" message="An unexpected error occurred in the Notes view. Try refreshing.">
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', overflow: 'hidden' }}>
 
-      {/* ── Top Bar ── */}
-      <div style={{ padding: '8px 24px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      {/* ── Hero header (inline styles guarantee layout regardless of CSS cache) ── */}
+      <div className="page-hero ntv-hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: '26px 24px 14px' }}>
+        <div className="page-hero-left" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="page-hero-badge" aria-hidden="true" style={{ width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div className="page-hero-text" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <h2 className="page-hero-title" style={{ margin: 0, fontSize: '1.9rem', fontWeight: 850, lineHeight: 1, letterSpacing: '-0.035em' }}>Notes</h2>
+            <span className="page-hero-sub" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+              {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+              {notes.filter(n => n.pinned).length > 0 && ` · ${notes.filter(n => n.pinned).length} pinned`}
+            </span>
+          </div>
+        </div>
+        <button type="button" className="hv-new-btn" onClick={() => openNew()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', border: 'none', borderRadius: 13, fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Note
+        </button>
+      </div>
 
-        {/* ROW 1: search → new note → palette → all tags → date range → count */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap' }}>
+      {/* ── Top Bar ── */}
+      <div style={{ padding: '8px 24px 12px', flexShrink: 0 }}>
+
+        {/* ROW 1: search → palette → all tags → date range → view toggle → count */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0 }}>
 
           {/* 1. Search */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 190, flexShrink: 0 }}>
@@ -631,18 +663,8 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
             />
           </div>
 
-          {/* 2. New Note — labeled button */}
-          <button
-            type="button"
-            onClick={() => openNew()}
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', boxShadow: '0 2px 8px var(--accent-glow)', flexShrink: 0, fontSize: '0.8rem', fontWeight: 500, whiteSpace: 'nowrap' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New Note
-          </button>
-
           {/* 3. Color palette — compact 22 px swatches */}
-          <div role="group" aria-label="Filter by color" style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg-input)', padding: '4px 6px', borderRadius: 9999, border: '1px solid var(--border)', flexShrink: 0 }}>
+          <div role="group" aria-label="Filter by color" style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg-input)', padding: '0 8px', height: 34, borderRadius: 9999, border: '1px solid var(--border)', flexShrink: 0, boxSizing: 'border-box' }}>
             <button
               type="button"
               onClick={() => setActiveColor(null)}
@@ -678,7 +700,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
             value={activeTag || 'all'}
             options={[{value:'all',label:'All Tags'}, ...allTags.map(t => ({value:t, label:`#${t}`}))]}
             onChange={e => setActiveTag(e.target.value === 'all' ? null : e.target.value)}
-            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 10px', fontSize: '0.78rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, height: 34, padding: '0 12px', fontSize: '0.8rem', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box' }}
           />
 
           {/* 5. Date range */}
@@ -687,7 +709,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
               ref={dateBtnRef}
               type="button"
               onClick={() => setDateOpen(!dateOpen)}
-              style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ height: 34, padding: '0 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap', boxSizing: 'border-box' }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               {fmtRangeLabel(dateRange)}
@@ -703,14 +725,14 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           </div>
 
           {/* 5b. View mode toggle */}
-          <div role="group" aria-label="View mode" style={{ display: 'flex', gap: 0, background: 'var(--bg-input)', borderRadius: 7, border: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden' }}>
+          <div role="group" aria-label="View mode" style={{ display: 'flex', gap: 0, background: 'var(--bg-input)', borderRadius: 8, height: 34, border: '1px solid var(--border)', flexShrink: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
             <button
               type="button"
               onClick={() => setViewMode('grid')}
               aria-label="Grid view"
               aria-pressed={viewMode === 'grid'}
               title="Grid view"
-              style={{ padding: '5px 8px', background: viewMode === 'grid' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'grid' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
+              style={{ padding: '0 11px', height: '100%', background: viewMode === 'grid' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'grid' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             </button>
@@ -720,7 +742,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
               aria-label="List view"
               aria-pressed={viewMode === 'list'}
               title="List view"
-              style={{ padding: '5px 8px', background: viewMode === 'list' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
+              style={{ padding: '0 11px', height: '100%', background: viewMode === 'list' ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'list' ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             </button>
@@ -734,26 +756,6 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
           </span>
         </div>
 
-        {/* ROW 2: Quick create input */}
-        <form onSubmit={handleQuickCreate} style={{ marginTop: 10 }}>
-          <div className="new-note-container" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px' }}>
-            <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>✏️</span>
-            <input
-              ref={quickRef}
-              type="text"
-              value={quickTitle}
-              onChange={e => setQuickTitle(e.target.value)}
-              placeholder="Write a new note... (press Enter to create)"
-              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.875rem', color: 'var(--text-primary)', fontFamily: 'inherit' }}
-            />
-            {quickTitle.trim() && (
-              <button type="submit" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                Create
-              </button>
-            )}
-          </div>
-        </form>
-
       </div>
 
       {/* ── Notes Content ── */}
@@ -761,18 +763,17 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
 
         {notes.length === 0 ? (
           /* Empty state */
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 16, textAlign: 'center' }}>
-            <div style={{ width: 80, height: 80, background: 'var(--accent-glow)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="hv-empty">
+            <div className="hv-empty-orb" aria-hidden="true">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
               </svg>
             </div>
-            <div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>No notes yet</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 280 }}>Capture ideas, reminders, and things to remember. Click "New Note" to get started.</div>
-            </div>
-            <button onClick={() => openNew()} style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 12, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px var(--accent-glow)' }}>
-              Create your first note
+            <p className="hv-empty-title">Capture your first note</p>
+            <p className="hv-empty-sub">Ideas, reminders, and things worth remembering — all in one place.</p>
+            <button className="hv-new-btn hv-empty-btn" onClick={() => openNew()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Note
             </button>
           </div>
         ) : filtered.length === 0 ? (

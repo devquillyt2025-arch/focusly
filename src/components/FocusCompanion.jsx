@@ -1,14 +1,11 @@
 import { useMemo } from 'react';
 import { CAT_META } from '../utils/categoryMeta';
+import { localDateStr } from '../utils/date';
 
 const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
 const PRIO_COLOR = { high: 'var(--color-red)', medium: 'var(--color-amber)', low: 'var(--color-blue)', none: 'var(--text-secondary)' };
 const MODE_COLOR = { focus: 'var(--color-red)', short: 'var(--color-green)', long: 'var(--color-blue)', custom: 'var(--color-amber)' };
 const LONG_BREAK_AFTER = 4;
-
-function localDateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
 
 function fmtEndTime(date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });

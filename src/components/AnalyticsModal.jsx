@@ -1,13 +1,9 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { CAT_META } from '../utils/categoryMeta';
+import { localDateStr, todayStr } from '../utils/date';
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-function localDateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function todayStr() { return localDateStr(); }
 
 function fmtDur(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);

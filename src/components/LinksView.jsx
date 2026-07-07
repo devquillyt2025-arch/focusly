@@ -1,11 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
+import { genId } from '../utils/id';
 
 const STORAGE_KEY = 'focusly_links';
 const BASE_CATS = ['Personal', 'Work', 'Finance', 'Read Later', 'Entertainment'];
 
-function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function load()  { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
 function save(e) { localStorage.setItem(STORAGE_KEY, JSON.stringify(e)); }
 

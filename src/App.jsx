@@ -9,7 +9,7 @@
 // Bug 8: computeHabitStreaks — first loop (lines ~111-130) wrote into `current` which was immediately reset to 0, dead code → Fixed: removed dead loop
 // Bug 9: Timer setInterval-only countdown drifts in throttled background tabs → Fixed: record timerEndAt on start/resume, derive remaining from Date.now() delta
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TaskList from './components/TaskList';
 import { CAT_META } from './utils/categoryMeta';
@@ -18,15 +18,12 @@ import Stats from './components/Stats';
 import AddTaskModal from './components/AddTaskModal';
 import SettingsView from './components/SettingsView';
 import OnboardingFlow from './components/OnboardingFlow';
-import AnalyticsModal from './components/AnalyticsModal';
 import ShortcutsModal from './components/ShortcutsModal';
 import WeeklyReviewModal from './components/WeeklyReviewModal';
 import DailyGoalsView from './components/DailyGoalsView';
-import ReportsView from './components/ReportsView';
 import JournalView from './components/JournalView';
 import CountdownsView from './components/CountdownsView';
 import HabitsView from './components/HabitsView';
-import CalendarView from './components/CalendarView';
 import NotesView, { NoteModal } from './components/NotesView';
 import AddTrackerModal from './components/AddTrackerModal';
 import {
@@ -41,13 +38,21 @@ import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, dis
 import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { logActivity, diffObjects } from './utils/activityLog';
+import { localDateStr, todayStr } from './utils/date';
+import { genId } from './utils/id';
 import ActivityLogView from './components/ActivityLogView';
 import FocusCompanion from './components/FocusCompanion';
 import VaultView from './components/VaultView';
 import LinksView from './components/LinksView';
 
+// ── Code-split heavy, route-level views (chart.js, html2canvas load only when opened) ──
+const ReportsView    = lazy(() => import('./components/ReportsView'));
+const CalendarView   = lazy(() => import('./components/CalendarView'));
+const AnalyticsModal = lazy(() => import('./components/AnalyticsModal'));
+
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
+const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
 const DEFAULT_SETTINGS = {
   focusDuration: 25, shortDuration: 5, longDuration: 15, customDuration: 25,
   autoSwitch: false, sound: true,
@@ -83,14 +88,6 @@ const SK = {
 function persist(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 
 // ─── Helpers ─────────────────────────────────────────────────────
-function localDateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function todayStr() { return localDateStr(); }
-function getWeekStart() {
-  const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return localDateStr(d);
-}
 function makeItems() { return ['1','2','3'].map(id => ({ id, text: '', done: false })); }
 
 // ─── Loaders ─────────────────────────────────────────────────────
@@ -164,8 +161,6 @@ function loadIntentions() {
 }
 
 
-
-function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 
 // Compute next due date string (YYYY-MM-DD) for a recurring task
 function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
@@ -625,6 +620,11 @@ export default function App() {
     });
   }, []);
 
+  // Stable handlers passed to the memoized TaskList (keep its props referentially stable)
+  const openAddTaskModal = useCallback(() => setOpenModal('add'), []);
+  const openEditTask     = useCallback((task) => setEditingTask(task), []);
+  const handleSyncNow    = useCallback(() => syncTasks(tasks, setTasks, setSyncStatus), [tasks]);
+
   // ── Habit callbacks ──
   const addHabit = useCallback((h) => {
     logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action: 'created', title: h.name });
@@ -691,15 +691,13 @@ export default function App() {
 
     if (isSyncEnabled && currentTask.googleTaskId) {
       setSyncStatus('Updating Task Status...');
-      console.log('[Google Tasks Sync] Wait: Updating Task Status API for', currentTask.name);
-      
+
       const success = await directGoogleTaskUpdate(currentTask.googleTaskId, {
         status: done ? 'completed' : 'needsAction'
       });
       
       if (success) {
-        console.log('[Google Tasks Sync] Wait: Task Status API success, refreshing Task List...');
-        
+
         // Handle recurrence locally immediately
         if (done && currentTask.recurrence) {
            const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
@@ -742,7 +740,6 @@ export default function App() {
 
     if (isSyncEnabled) {
       setSyncStatus('Deleting Completed Tasks...');
-      console.log(`[Google Tasks Sync] Wait: Deleting ${completedTasks.length} tasks from API...`);
       for (const t of completedTasks) {
         if (t.googleTaskId) {
            await directGoogleTaskDelete(t.googleTaskId);
@@ -756,7 +753,6 @@ export default function App() {
            }
         }
       }
-      console.log('[Google Tasks Sync] Wait: Delete finished, refreshing Task List...');
       const filtered = tasks.filter(t => !t.completed && t.status !== 'completed');
       setTasks(filtered);
       await syncTasks(filtered, setTasks, setSyncStatus);
@@ -900,11 +896,6 @@ export default function App() {
     if (typeof window === 'undefined' || !('Notification' in window)) return false;
     return localStorage.getItem('focusly-push-enabled') === 'true' && Notification.permission === 'granted';
   });
-  const [clockNow, setClockNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setClockNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
   const [profileName, setProfileName] = useState(() => localStorage.getItem('focusly-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
     const saved = localStorage.getItem('focusly-profile-email');
@@ -927,7 +918,6 @@ export default function App() {
 
   const handlePushToggle = () => {
     if (!('Notification' in window)) {
-      console.warn('Focusly: This browser does not support desktop notifications.');
       return;
     }
     if (isPushEnabled) {
@@ -954,24 +944,25 @@ export default function App() {
   const activeHabitsCount = habits.filter(h => !h.archived).length;
 
   // ── Notification derived data ──
-  const firstName = profileName.split(' ')[0] || 'there';
   const notifYesterdayStr = localDateStr(new Date(Date.now() - 86400000));
   const yesterdayPomos = pomodoroLog.filter(ts => ts.startsWith(notifYesterdayStr)).length;
   const completedToday = tasks.filter(t => t.completed && t.completedAt?.startsWith(todayStr())).length;
   const totalTasksForPct = tasks.filter(t => !t.completed || t.completedAt?.startsWith(todayStr())).length;
   const completionPct = totalTasksForPct > 0 ? Math.round((completedToday / totalTasksForPct) * 100) : 0;
-  const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
-  const urgentTask = tasks.filter(t => !t.completed && t.dueDate)
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]
-    || tasks.filter(t => !t.completed)
-      .sort((a, b) => (PRIO_ORDER[a.priority] ?? 3) - (PRIO_ORDER[b.priority] ?? 3))[0];
-  const urgentDueHrs = urgentTask?.dueDate
-    ? Math.round((new Date(urgentTask.dueDate + 'T23:59:59') - Date.now()) / 3600000)
-    : null;
-  const quickestTask = tasks.filter(t => !t.completed)
-    .sort((a, b) => (a.timeEstimate || 25) - (b.timeEstimate || 25))[0];
+  const { urgentTask, urgentDueHrs, quickestTask } = useMemo(() => {
+    const urgent = tasks.filter(t => !t.completed && t.dueDate)
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]
+      || tasks.filter(t => !t.completed)
+        .sort((a, b) => (PRIO_ORDER[a.priority] ?? 3) - (PRIO_ORDER[b.priority] ?? 3))[0];
+    const dueHrs = urgent?.dueDate
+      ? Math.round((new Date(urgent.dueDate + 'T23:59:59') - Date.now()) / 3600000)
+      : null;
+    const quickest = tasks.filter(t => !t.completed)
+      .sort((a, b) => (a.timeEstimate || 25) - (b.timeEstimate || 25))[0];
+    return { urgentTask: urgent, urgentDueHrs: dueHrs, quickestTask: quickest };
+  }, [tasks]);
 
-  const notifItems = [
+  const notifItems = useMemo(() => [
     {
       id: 1, title: '🎯 Tasks Reminder', time: 'Just now', type: 'task',
       desc: urgentTask
@@ -991,7 +982,7 @@ export default function App() {
           : `Great focus! You've logged ${pomodoroLog.length} session${pomodoroLog.length !== 1 ? 's' : ''} today.`,
       progressPct: completionPct,
     },
-  ];
+  ], [urgentTask, urgentDueHrs, pendingTasksCount, activeHabitsCount, pomodoroLog, yesterdayPomos, completionPct]);
 
   // Automated trigger for notifications when enabled
   useEffect(() => {
@@ -1128,15 +1119,7 @@ export default function App() {
         )}
         {/* ── Timestamp on far left ── */}
         <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          {(() => {
-            const dayStr = clockNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const timeStr = clockNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            return (
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                {timeStr} • {dayStr}
-              </span>
-            );
-          })()}
+          <HeaderClock />
         </div>
 
         <div className="yartu-top-search" ref={searchRef} style={{ display: 'flex', gap: 8, flex: 1, justifyContent: 'center', margin: '0 24px' }}>
@@ -1187,16 +1170,11 @@ export default function App() {
           )}
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{
-            (() => {
-              const h = clockNow.getHours();
-              if (h >= 5  && h < 12) return 'Good Morning';
-              if (h >= 12 && h < 17) return 'Good Afternoon';
-              if (h >= 17 && h < 21) return 'Good Evening';
-              return 'Good Night';
-            })()
-          }</span>
+          <HeaderGreeting />
           <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
+          <button className="hdr-btn" title="Analytics" onClick={() => setOpenModal('analytics')}>
+            <IconChart />
+          </button>
           <div style={{ position: 'relative' }} ref={notifRef}>
             <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -1446,6 +1424,7 @@ export default function App() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
         >
+          <Suspense fallback={<TabFallback />}>
           {activeTab === 'daily' && (
             <DailyGoalsView
               trackers={trackers}
@@ -1601,16 +1580,17 @@ export default function App() {
                 onToggle={toggleComplete}
                 onDelete={deleteTask}
                 onClearCompleted={clearCompleted}
-                onAdd={()=>setOpenModal('add')}
+                onAdd={openAddTaskModal}
                 onAddTask={addTask}
-                onEdit={task => setEditingTask(task)}
+                onEdit={openEditTask}
                 onUpdate={updateTaskData}
                 onQuickUpdate={quickUpdateTask}
                 syncStatus={syncStatus}
-                onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
+                onSyncNow={handleSyncNow}
               />
             </div>
           )}
+          </Suspense>
         </motion.div>
         </AnimatePresence>
 
@@ -1654,7 +1634,7 @@ export default function App() {
         )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
         {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
-        {openModal==='analytics' && <AnalyticsModal key="analytics" tasks={tasks}      pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} />}
+        {openModal==='analytics' && <Suspense fallback={null}><AnalyticsModal key="analytics" tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} /></Suspense>}
         {openModal==='shortcuts' && <ShortcutsModal key="shortcuts" onClose={()=>setOpenModal(null)} />}
         {openModal==='weekly-review' && (
           <WeeklyReviewModal
@@ -1679,6 +1659,45 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Header clock (isolated 1s tick so the app tree doesn't re-render every second) ──
+function HeaderClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const dayStr  = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return (
+    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+      {timeStr} • {dayStr}
+    </span>
+  );
+}
+
+// ─── Header greeting (updates hourly; own slow tick keeps it out of the app re-render) ──
+function HeaderGreeting() {
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const id = setInterval(() => setHour(new Date().getHours()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const greeting = hour >= 5 && hour < 12 ? 'Good Morning'
+    : hour >= 12 && hour < 17 ? 'Good Afternoon'
+    : hour >= 17 && hour < 21 ? 'Good Evening'
+    : 'Good Night';
+  return <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{greeting}</span>;
+}
+
+// ─── Lazy-view loading fallback ───────────────────────────────────
+function TabFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240, color: 'var(--text-muted)' }}>
+      <span className="tab-fallback-spinner" aria-label="Loading" />
     </div>
   );
 }
@@ -1709,38 +1728,13 @@ function TodayBreakdown({ tasks }) {
   );
 }
 
-// ─── Placeholder page ────────────────────────────────────────────
-function PlaceholderPage({ title }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: '100%', gap: 10,
-    }}>
-      <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{title}</span>
-      <span style={{ fontSize: '0.85rem', color: '#475569' }}>Coming soon</span>
-    </div>
-  );
-}
-
 // ─── Inline SVG icons ─────────────────────────────────────────────
 const S = { fill:'none', stroke:'currentColor', strokeWidth:'1.75', strokeLinecap:'round', strokeLinejoin:'round' };
 
 // App logo — crosshair/focus mark
-function IconFocusly({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" {...S} style={{ color: 'var(--accent)' }}>
-      <circle cx="12" cy="12" r="9"/>
-      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
-      <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
-      <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-    </svg>
-  );
-}
-
 // Header action icons (16px)
 function IconChart()    { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
 function IconKeyboard() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>; }
-function IconSettings() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>; }
 function IconSun()      { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>; }
 function IconMoon()     { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>; }
 

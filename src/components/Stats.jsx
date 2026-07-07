@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { CAT_META } from '../utils/categoryMeta';
 
 function fmtDur(s) {
@@ -8,7 +8,7 @@ function fmtDur(s) {
   return `${s}s`;
 }
 
-export default function Stats({ tasks, pomodoroLog, settings }) {
+function Stats({ tasks, pomodoroLog, settings }) {
   const stats = useMemo(() => {
     // Use a UTC-based 7-day rolling window so pomo ISO timestamps and task
     // completedAt ISO strings are compared on a consistent UTC baseline.
@@ -77,3 +77,5 @@ export default function Stats({ tasks, pomodoroLog, settings }) {
     </div>
   );
 }
+
+export default memo(Stats);
