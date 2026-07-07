@@ -43,6 +43,7 @@ import ActivityLogView from './components/ActivityLogView';
 import FocusCompanion from './components/FocusCompanion';
 import VaultView from './components/VaultView';
 import LinksView from './components/LinksView';
+import nookLogo from './nook-favicon.png';
 
 // ── Code-split heavy, route-level views (chart.js, html2canvas load only when opened) ──
 const ReportsView    = lazy(() => import('./components/ReportsView'));
@@ -184,6 +185,7 @@ function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
 
 // ─── App ─────────────────────────────────────────────────────────
 export default function App() {
+  const isMac = typeof window !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
   const initSettings = useMemo(loadSettings, []); // eslint-disable-line
 
   // ── Existing state ──
@@ -887,8 +889,20 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState('notes');
   const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
   const avatarRef = useRef(null);
   const notifRef  = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [isPushEnabled, setIsPushEnabled] = useState(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return false;
     return localStorage.getItem('nook-push-enabled') === 'true' && Notification.permission === 'granted';
@@ -1095,6 +1109,8 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const activeNotifs = notifsCleared ? [] : notifItems.filter(item => !snoozedIds.has(item.id));
+  const notifCount = activeNotifs.length;
 
   return (
     <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -1109,54 +1125,57 @@ export default function App() {
           <HeaderClock />
         </div>
 
-        <div className="yartu-top-search" ref={searchRef} style={{ display: 'flex', gap: 8, flex: 1, justifyContent: 'center', margin: '0 24px' }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%', maxWidth: '600px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', left: 12 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div className="yartu-top-search-wrapper">
+          <div className="yartu-top-search" ref={searchRef}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search for anything..."
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
               onFocus={() => { if (searchQuery.length >= 2) setSearchOpen(true); }}
               onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); e.target.blur(); } }}
-              style={{ width: '100%', paddingLeft: 36 }}
             />
-            {searchQuery && (
-              <button className="search-clear-btn" onClick={() => { setSearchQuery(''); setSearchOpen(false); }} title="Clear" style={{ position: 'absolute', right: 8 }}>
+            {searchQuery ? (
+              <button className="search-clear-btn" onClick={() => { setSearchQuery(''); setSearchOpen(false); }} title="Clear">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
+            ) : (
+              <span className="search-shortcut-badge">{isMac ? '⌘K' : 'Ctrl K'}</span>
+            )}
+
+            {searchOpen && searchQuery.length >= 2 && (
+              <div className="search-dropdown" onMouseDown={e => e.stopPropagation()}>
+                {searchResults.length === 0 ? (
+                  <div className="search-empty">No results for "{searchQuery}"</div>
+                ) : (
+                  searchResults.map(r => (
+                    <button key={r.type + r.id} className="search-result-item" onMouseDown={e => e.preventDefault()} onClick={() => { setActiveTab(r.tab); setSearchOpen(false); setSearchQuery(''); }}>
+                      <span className="search-result-icon" data-type={r.type}>
+                        {r.type === 'task'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
+                        {r.type === 'note'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+                        {r.type === 'goal'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
+                        {r.type === 'habit'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>}
+                        {r.type === 'journal' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}
+                        {r.type === 'countdown' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>}
+                        {r.type === 'vault'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+                        {r.type === 'link'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+                        {r.type === 'tab'     && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>}
+                      </span>
+                      <div className="search-result-text">
+                        <span className="search-result-title">{r.title}</span>
+                        {r.sub && <span className="search-result-sub">{r.sub}</span>}
+                      </div>
+                      <span className="search-result-badge">{r.type}</span>
+                    </button>
+                  ))
+                )}
+              </div>
             )}
           </div>
-          {searchOpen && searchQuery.length >= 2 && (
-            <div className="search-dropdown" onMouseDown={e => e.stopPropagation()}>
-              {searchResults.length === 0 ? (
-                <div className="search-empty">No results for "{searchQuery}"</div>
-              ) : (
-                searchResults.map(r => (
-                  <button key={r.type + r.id} className="search-result-item" onMouseDown={e => e.preventDefault()} onClick={() => { setActiveTab(r.tab); setSearchOpen(false); setSearchQuery(''); }}>
-                    <span className="search-result-icon" data-type={r.type}>
-                      {r.type === 'task'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
-                      {r.type === 'note'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-                      {r.type === 'goal'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
-                      {r.type === 'habit'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>}
-                      {r.type === 'journal' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}
-                      {r.type === 'countdown' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>}
-                      {r.type === 'vault'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-                      {r.type === 'link'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
-                      {r.type === 'tab'     && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>}
-                    </span>
-                    <div className="search-result-text">
-                      <span className="search-result-title">{r.title}</span>
-                      {r.sub && <span className="search-result-sub">{r.sub}</span>}
-                    </div>
-                    <span className="search-result-badge">{r.type}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
         </div>
-        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="header-right">
           <HeaderGreeting />
           <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
           <button className="hdr-btn" title="Analytics" onClick={() => setOpenModal('analytics')}>
@@ -1164,8 +1183,12 @@ export default function App() {
           </button>
           <div style={{ position: 'relative' }} ref={notifRef}>
             <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} />
+              <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {notifCount > 0 ? (
+                <span className="hdr-notif-badge is-number">{notifCount}</span>
+              ) : (
+                <span className="hdr-notif-badge is-dot" />
+              )}
             </button>
 
             <AnimatePresence>
@@ -1341,6 +1364,7 @@ export default function App() {
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
           <div className="sidebar-brand">
+            <img src={nookLogo} className="sidebar-brand-logo" alt="Nook Logo" />
             <span className="sidebar-brand-name">Nook</span>
             <button className="hdr-btn sidebar-close-btn" onClick={() => setSidebarOpen(false)} title="Close Sidebar">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -1353,7 +1377,6 @@ export default function App() {
             { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
             { id:'notes',    label:'Notes',    Icon: NavIcoNotes },
             { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
-            { id:'vault',    label:'Vault',    Icon: NavIcoVault },
             { id:'links',    label:'Links',    Icon: NavIcoLinks },
             { id:'countdowns', label:'Countdowns', Icon: NavIcoHourglass },
           ].map(tab => (
@@ -1374,6 +1397,7 @@ export default function App() {
             { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
             { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
             { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
+            { id:'vault',    label:'Vault',        Icon: NavIcoVault },
             { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
             { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
           ].map(tab => (
@@ -1720,7 +1744,7 @@ const S = { fill:'none', stroke:'currentColor', strokeWidth:'1.75', strokeLineca
 
 // App logo — crosshair/focus mark
 // Header action icons (16px)
-function IconChart()    { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
+function IconChart()    { return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
 function IconKeyboard() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>; }
 function IconSun()      { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>; }
 function IconMoon()     { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>; }
