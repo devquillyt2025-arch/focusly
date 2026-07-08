@@ -802,6 +802,20 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
         }
       `}</style>
 
+      {/* ── Hero header ── */}
+      <div className="page-hero">
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Tasks</h2>
+            <span className="page-hero-sub">{pendingCount} pending · {allCompleted.length} done</span>
+          </div>
+        </div>
+        <button className="add-task-btn" onClick={onAdd}>＋ Add Task</button>
+      </div>
+
       {/* ── UNIFIED COMPACT TOOLBAR: Search → Sort → Filter → Overview → Sync ── */}
       <div className="yartu-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', width: '100%', boxSizing: 'border-box', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 20 }}>
 

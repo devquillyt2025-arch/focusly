@@ -774,7 +774,7 @@ input, textarea, select { font-family: inherit; }
   outline: none;
   transition: border-color 0.13s ease, box-shadow 0.13s ease;
 }
-.task-search-input:focus {
+.task-search-input:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow2);
 }
@@ -796,7 +796,7 @@ input, textarea, select { font-family: inherit; }
   min-width: 110px;
   transition: border-color 0.13s ease;
 }
-.task-cat-select:focus { border-color: var(--accent); }
+.task-cat-select:focus-visible { border-color: var(--accent); }
 .task-cat-select option { background: var(--bg-elevated, #1e293b); color: var(--text-primary); }
 
 .task-search-clear {
@@ -1029,7 +1029,7 @@ input, textarea, select { font-family: inherit; }
   transition: border-color 0.13s ease;
   font-family: inherit;
 }
-.tdp-title-input:focus { border-bottom-color: var(--accent); }
+.tdp-title-input:focus-visible { border-bottom-color: var(--accent); }
 .tdp-title-input::placeholder { color: var(--text-muted); font-weight: 400; }
 
 .tdp-pri-pills { display: flex; gap: 8px; }
@@ -1099,7 +1099,7 @@ input, textarea, select { font-family: inherit; }
   line-height: 1.55; transition: border-color 0.13s ease;
   font-family: inherit; overflow: hidden;
 }
-.tdp-notes:focus { border-color: var(--accent); }
+.tdp-notes:focus-visible { border-color: var(--accent); }
 .tdp-notes::placeholder { color: var(--text-muted); }
 
 .tdp-created { font-size: 0.75rem; color: var(--text-muted); padding-top: 4px; }
@@ -1188,7 +1188,7 @@ input, textarea, select { font-family: inherit; }
   color-scheme: dark;
 }
 :root[data-theme="light"] .tdp-native-select { color-scheme: light; }
-.tdp-native-select:focus { border-color: var(--accent); }
+.tdp-native-select:focus-visible { border-color: var(--accent); }
 
 /* Native datetime-local input (reminder "at a specific time") — same
    native-chrome theming issue as the select above. */
@@ -1548,7 +1548,7 @@ input, textarea, select { font-family: inherit; }
   appearance: textfield;
   transition: border-color 0.13s ease;
 }
-.timer-edit-input:focus { border-color: var(--accent); }
+.timer-edit-input:focus-visible { border-color: var(--accent); }
 .timer-edit-input::-webkit-inner-spin-button,
 .timer-edit-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .timer-edit-sep {
@@ -1680,10 +1680,10 @@ input, textarea, select { font-family: inherit; }
   transition: border-color var(--ease), box-shadow var(--ease);
   width: 100%;
 }
-.form-inp:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
+.form-inp:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 .form-inp::placeholder { color: var(--text-muted); }
 .form-inp-error { border-color: var(--color-red) !important; }
-.form-inp-error:focus { box-shadow: 0 0 0 3px rgba(248,113,113,0.12) !important; }
+.form-inp-error:focus-visible { box-shadow: 0 0 0 3px rgba(248,113,113,0.12) !important; }
 .form-error { font-size: 11px; color: var(--color-red); margin-top: 2px; }
 .form-textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
 
@@ -2247,7 +2247,7 @@ kbd {
   color: var(--text-primary); font-size: 0.8rem; outline: none;
   transition: border-color var(--ease);
 }
-.inline-log-input:focus { border-color: var(--accent); }
+.inline-log-input:focus-visible { border-color: var(--accent); }
 .inline-log-btn {
   padding: 4px 9px; border-radius: var(--radius-sm); border: none;
   background: var(--accent); color: #fff;
@@ -2503,7 +2503,7 @@ kbd {
   color: var(--text-primary); font-family: inherit;
   font-size: 0.92rem; transition: all var(--ease); outline: none; resize: vertical;
 }
-.modal-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow2); }
+.modal-input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow2); }
 .modal-input::placeholder { color: var(--text-muted); }
 .modal-input:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -2669,6 +2669,7 @@ select.modal-input {
   cursor: pointer;
   font-family: inherit;
 }
+.journal-sort-select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 
 /* Entry list */
 .journal-v2-entry-list {
@@ -2882,6 +2883,7 @@ select.modal-input {
   font-family: inherit;
   position: relative;
 }
+.journal-rich-editor:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
 .journal-rich-editor[data-empty='true']::before {
   content: attr(data-placeholder);
   color: var(--text-muted);
@@ -3137,6 +3139,7 @@ select.modal-input {
   flex: 1; background: transparent; border: none; outline: none;
   color: var(--text-primary); font-size: 0.95rem; font-family: inherit;
 }
+.jnx-palette-input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 .jnx-palette-input::placeholder { color: var(--text-muted); }
 .jnx-palette-list { overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .jnx-palette-item {
@@ -3343,9 +3346,9 @@ select.modal-input {
   transition: border-color var(--ease), box-shadow var(--ease);
 }
 .cdp-input::placeholder { color: var(--text-muted); }
-.cdp-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
+.cdp-input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 .cdp-input-error { border-color: var(--color-red); }
-.cdp-input-error:focus { box-shadow: 0 0 0 3px rgba(248,113,113,0.14); }
+.cdp-input-error:focus-visible { box-shadow: 0 0 0 3px rgba(248,113,113,0.14); }
 .cdp-textarea { resize: vertical; min-height: 78px; line-height: 1.5; }
 
 /* Category chips */
@@ -4685,7 +4688,7 @@ select.modal-input {
   min-height: 100px;
   transition: border-color 0.15s ease;
 }
-.sunsama-journal-input:focus {
+.sunsama-journal-input:focus-visible {
   outline: none;
   border-color: #2563eb;
 }
@@ -4871,6 +4874,7 @@ select.modal-input {
   cursor: pointer;
   flex-shrink: 0;
 }
+.yartu-card-select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 
 .yartu-list {
   display: flex;
@@ -5815,6 +5819,7 @@ select.modal-input {
   flex: 1; min-width: 0; border: none; background: transparent; outline: none;
   font-size: 0.85rem; color: var(--text-primary);
 }
+.al-tb-inp:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 .al-tb-inp::placeholder { color: var(--text-muted); }
 .al-tb-clear {
   background: none; border: none; cursor: pointer; padding: 0;
@@ -6040,7 +6045,7 @@ select.modal-input {
   color: var(--text-primary); font-size: 0.85rem; outline: none; box-sizing: border-box;
   transition: border-color 0.15s;
 }
-.al-confirm-inp:focus { border-color: #ef4444; }
+.al-confirm-inp:focus-visible { border-color: #ef4444; }
 .al-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .al-confirm-cancel {
   background: var(--bg-card); border: 1px solid var(--border);
@@ -6192,7 +6197,7 @@ select.modal-input {
 .yartu-top-search input {
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.yartu-top-search input:focus {
+.yartu-top-search input:focus-visible {
   border-color: var(--border-accent) !important;
   box-shadow: 0 0 0 4px var(--accent-glow2) !important;
   outline: none;

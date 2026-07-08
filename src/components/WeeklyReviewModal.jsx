@@ -82,7 +82,9 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
       >
         <div className="modal-hdr">
           <h3>Weekly Review</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
         
         <div className="modal-body" style={{ minHeight: 400, padding: 24 }}>

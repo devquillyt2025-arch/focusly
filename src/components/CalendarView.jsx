@@ -291,7 +291,7 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
           <button onClick={handleToday} style={{ padding: '6px 13px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Today</button>
           <div style={{ display: 'flex', gap: 2 }}>
             {[handlePrev, handleNext].map((fn, i) => (
-              <button key={i} onClick={fn} style={{ padding: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', borderRadius: 6 }}>
+              <button key={i} onClick={fn} aria-label={i === 0 ? 'Previous month' : 'Next month'} style={{ padding: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', borderRadius: 6 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   {i === 0 ? <polyline points="15 18 9 12 15 6"/> : <polyline points="9 18 15 12 9 6"/>}
                 </svg>

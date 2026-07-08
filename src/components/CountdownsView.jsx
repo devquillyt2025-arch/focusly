@@ -197,10 +197,15 @@ export default function CountdownsView() {
 
   return (
     <div className="cdp-page">
-      <div className="cdp-hdr">
-        <div className="cdp-title-group">
-          <span className="cdp-eyebrow">Time Tracking</span>
-          <h2 className="cdp-title">Countdowns</h2>
+      <div className="page-hero">
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true"><CdIcoHourglass size={22} /></div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Countdowns</h2>
+            <span className="page-hero-sub">
+              {totalCount === 0 ? 'Track time between a start and end date' : `${totalCount} countdown${totalCount === 1 ? '' : 's'}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`}
+            </span>
+          </div>
         </div>
         <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ Add Countdown</button>
       </div>
@@ -647,9 +652,9 @@ function CountdownModal({ onSave, onClose, editCd = null, onDelete }) {
 }
 
 // ─── Inline icons ──────────────────────────────────────────────────
-function CdIcoHourglass() {
+function CdIcoHourglass({ size = 40 }) {
   return (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 2h14"/><path d="M5 22h14"/>
       <path d="M5 2c0 6 6 6 6 10s-6 4-6 10"/><path d="M19 2c0 6-6 6-6 10s6 4 6 10"/>
     </svg>

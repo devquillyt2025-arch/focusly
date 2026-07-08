@@ -25,10 +25,15 @@ export default function RemindersView({ onNavigateToSource }) {
 
   return (
     <div className="cdp-page">
-      <div className="cdp-hdr">
-        <div className="cdp-title-group">
-          <span className="cdp-eyebrow">Stay on track</span>
-          <h2 className="cdp-title">Reminders</h2>
+      <div className="page-hero">
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true"><IcoBell size={22} /></div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Reminders</h2>
+            <span className="page-hero-sub">
+              {total === 0 ? 'Stay on track with your tasks' : `${total} reminder${total === 1 ? '' : 's'}${overdue.length > 0 ? ` · ${overdue.length} overdue` : ''}`}
+            </span>
+          </div>
         </div>
       </div>
 

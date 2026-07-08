@@ -459,8 +459,22 @@ export default function LinksView() {
         }
       `}</style>
 
+      {/* ── Hero header ── */}
+      <div className="page-hero" style={{ padding: '24px 24px 0' }}>
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Links</h2>
+            <span className="page-hero-sub">{countLabel}</span>
+          </div>
+        </div>
+        <button className="add-task-btn" onClick={() => setModal('add')}>＋ Add Link</button>
+      </div>
+
       {/* ── Toolbar ── */}
-      <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, marginBottom: 16 }}>
+      <div style={{ padding: '16px 24px 16px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, marginBottom: 16 }}>
         <div className="links-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
 
           {/* Search */}
@@ -487,14 +501,6 @@ export default function LinksView() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             )}
           </div>
-
-          <button onClick={() => setModal('add')}
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-dark)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add Link
-          </button>
         </div>
       </div>
 

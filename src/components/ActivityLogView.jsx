@@ -215,8 +215,14 @@ export default function ActivityLogView({ setActiveTab }) {
     <div className="al-view">
 
       {/* ── Title row ── */}
-      <div className="al-header">
-        <h2 className="al-title">Activity Log</h2>
+      <div className="page-hero al-header">
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true"><IcoHistory /></div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Activity Log</h2>
+            <span className="page-hero-sub">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} found</span>
+          </div>
+        </div>
         <div className="al-header-right">
           <div className="al-gear-wrap" ref={gearRef}>
             <button className="al-icon-btn" onClick={() => setGearOpen(o => !o)} title="Options"><IcoGear /></button>
@@ -538,6 +544,7 @@ function DropSelect({ label, value, options, onChange, width }) {
 // ── Icons ─────────────────────────────────────────────────────────
 const SI = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
 function IcoSearch()   { return <svg width="13" height="13" viewBox="0 0 24 24" {...SI}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>; }
+function IcoHistory()  { return <svg width="22" height="22" viewBox="0 0 24 24" {...SI}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>; }
 function IcoRefresh()  { return <svg width="13" height="13" viewBox="0 0 24 24" {...SI}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>; }
 function IcoChevronD() { return <svg width="10" height="10" viewBox="0 0 24 24" {...SI} style={{ flexShrink: 0 }}><polyline points="6 9 12 15 18 9"/></svg>; }
 function IcoChevronR() { return <svg width="11" height="11" viewBox="0 0 24 24" {...SI}><polyline points="9 18 15 12 9 6"/></svg>; }

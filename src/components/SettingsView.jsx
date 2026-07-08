@@ -490,15 +490,20 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         </p>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={exportData}>💾 Export</button>
+          <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={exportData}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
 
           <label className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            📥 Import
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
           </label>
 
           <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.06)', color: 'var(--color-red)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={onClearData}>
-            🗑 Clear All
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear All
           </button>
         </div>
       </section>

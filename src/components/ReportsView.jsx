@@ -59,6 +59,21 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
 
   return (
     <div className="reports-view">
+      <div className="page-hero" style={{ marginBottom: 24 }}>
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true"><IconBarChart /></div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Reports</h2>
+            <span className="page-hero-sub">
+              {global.activeTrackers} tracker{global.activeTrackers === 1 ? '' : 's'} · {successRate}% success rate
+            </span>
+          </div>
+        </div>
+        {onAddTracker && (
+          <button className="add-task-btn" onClick={onAddTracker}>＋ Add Tracker</button>
+        )}
+      </div>
+
       <div className="view-mode-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'var(--bg-card)', padding: 6, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', width: 'max-content', margin: '0 auto 24px' }}>
         <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'trackers' ? 'var(--accent)' : 'transparent', color: viewMode === 'trackers' ? '#fff' : 'var(--text-secondary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('trackers')}>Trackers</button>
         <button style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: viewMode === 'analytics' ? 'var(--accent)' : 'transparent', color: viewMode === 'analytics' ? '#fff' : 'var(--text-secondary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setViewMode('analytics')}>Analytics</button>
@@ -297,10 +312,19 @@ function TrackerDetail({ tracker, onClose, onDelete, onEdit, onUpdateTracker }) 
             </div>
           </div>
           <div className="detail-hdr-actions no-print">
-            <button className="hdr-btn" onClick={handleShare} title="Share Image">📸 Share</button>
-            <button className="hdr-btn" onClick={onEdit} title="Edit">✏️</button>
-            <button className="hdr-btn" onClick={() => { if (confirm(`Delete "${tracker.name}"?`)) onDelete(); }} title="Delete" style={{ color: 'var(--color-red)' }}>🗑</button>
-            <button className="modal-close" onClick={onClose}>×</button>
+            <button className="hdr-btn" onClick={handleShare} title="Share Image" style={{ width: 'auto', padding: '0 12px', gap: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Share
+            </button>
+            <button className="hdr-btn" onClick={onEdit} title="Edit">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button className="hdr-btn" onClick={() => { if (confirm(`Delete "${tracker.name}"?`)) onDelete(); }} title="Delete" style={{ color: 'var(--color-red)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+            <button className="modal-close" onClick={onClose} aria-label="Close">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
         </div>
 
@@ -637,6 +661,14 @@ function StatCard({ val, lbl, color }) {
 }
 
 // ─── Icons ─────────────────────────────────────────────────────────
+function IconBarChart() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
+    </svg>
+  );
+}
+
 function IconPlusCircle() {
   return (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

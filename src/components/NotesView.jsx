@@ -194,7 +194,6 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="Take a note…"
-              className="font-mono text-sm whitespace-pre-wrap"
               style={{
                 resize: 'none',
                 minHeight: 150,
@@ -204,8 +203,11 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
                 outline: 'none',
                 padding: '24px',
                 color: 'var(--text-primary)',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                fontSize: '0.875rem',
+                whiteSpace: 'pre-wrap',
                 lineHeight: 1.7,
-                boxSizing: 'border-box', 
+                boxSizing: 'border-box',
                 width: '100%',
                 flex: 1
               }}

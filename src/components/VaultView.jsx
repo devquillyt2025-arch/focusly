@@ -333,6 +333,20 @@ export default function VaultView() {
   return (
     <div style={{ width: '100%', maxWidth: 900, margin: '0 auto', boxSizing: 'border-box', padding: '32px', display: 'flex', flexDirection: 'column', gap: 20, background: 'transparent' }}>
 
+      {/* ── Hero header ── */}
+      <div className="page-hero">
+        <div className="page-hero-left">
+          <div className="page-hero-badge" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div className="page-hero-text">
+            <h2 className="page-hero-title">Saved Logins</h2>
+            <span className="page-hero-sub">{totalAccounts} account{totalAccounts !== 1 ? 's' : ''} · {groups.length} service{groups.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <button className="add-task-btn" onClick={() => setModal({ mode: 'add' })}>＋ Add Account</button>
+      </div>
+
       {/* ── Toolbar ── */}
       <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 340 }}>
@@ -347,14 +361,6 @@ export default function VaultView() {
             ? `${groups.reduce((n, [, a]) => n + a.length, 0)} of ${totalAccounts} accounts`
             : `${totalAccounts} account${totalAccounts !== 1 ? 's' : ''} · ${groups.length} service${groups.length !== 1 ? 's' : ''}`}
         </span>
-
-        <button onClick={() => setModal({ mode: 'add' })}
-          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,.3)', whiteSpace: 'nowrap', flexShrink: 0, transition: 'background .13s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-dark)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Account
-        </button>
       </div>
 
       {/* ── Grouped List ── */}
