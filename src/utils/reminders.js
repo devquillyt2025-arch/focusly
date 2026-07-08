@@ -47,12 +47,19 @@ export async function saveReminder({ sourceType, sourceId, title, targetAt, mode
     : new Date(absoluteAt);
   if (!reminderAt || isNaN(reminderAt.getTime())) throw new Error('Could not compute a valid reminder time.');
 
+  // target_at is NOT NULL in the schema — tasks without a due date have no
+  // natural "target" to reference, so fall back to the reminder's own fire
+  // time (it becomes its own reference point for Overdue/Today/Upcoming grouping).
+  const targetAtIso = targetAt
+    ? (targetAt instanceof Date ? targetAt.toISOString() : targetAt)
+    : reminderAt.toISOString();
+
   const { error } = await supabase.from('reminders').upsert({
     user_id: user.id,
     source_type: sourceType,
     source_id: sourceId,
     title,
-    target_at: targetAt instanceof Date ? targetAt.toISOString() : targetAt,
+    target_at: targetAtIso,
     reminder_at: reminderAt.toISOString(),
     reminder_offset_minutes: mode === 'offset' ? offsetMinutes : null,
     reminder_sent: false,

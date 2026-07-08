@@ -24,6 +24,19 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
+// Detects a subscription created under a since-rotated VAPID key. Push
+// services (FCM, etc.) silently reject sends signed with a different key
+// than the one the subscription was created with — reusing a stale
+// subscription looks "subscribed" in the UI but never actually delivers.
+function keyMatches(subscription, currentKeyBase64) {
+  const existingKey = subscription.options?.applicationServerKey;
+  if (!existingKey) return false;
+  const currentKey = urlBase64ToUint8Array(currentKeyBase64);
+  const existing = new Uint8Array(existingKey);
+  if (existing.length !== currentKey.length) return false;
+  return existing.every((byte, i) => byte === currentKey[i]);
+}
+
 function deviceLabel() {
   const ua = navigator.userAgent;
   const browser = ua.includes('Firefox') ? 'Firefox' : ua.includes('Edg/') ? 'Edge' : ua.includes('Chrome') ? 'Chrome' : ua.includes('Safari') ? 'Safari' : 'Browser';
@@ -52,6 +65,13 @@ export async function subscribeToPush() {
   await navigator.serviceWorker.ready;
 
   let subscription = await registration.pushManager.getSubscription();
+  if (subscription && !keyMatches(subscription, VAPID_PUBLIC_KEY)) {
+    // Stale subscription from a rotated VAPID key — sends to it would
+    // fail silently forever. Drop the old row and start fresh.
+    await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint).then(() => {}, () => {});
+    await subscription.unsubscribe().catch(() => {});
+    subscription = null;
+  }
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -92,10 +112,14 @@ export async function unsubscribeFromPush() {
 
 // Reflects actual browser subscription state — safe to call on mount to
 // resync the Settings toggle if it was enabled on a different device/session.
+// A subscription created under a since-rotated VAPID key reports as "off"
+// here so the toggle prompts a re-subscribe instead of looking fine while
+// silently never delivering (see subscribeToPush's keyMatches check).
 export async function isCurrentlySubscribed() {
   if (!isPushSupported()) return false;
   const registration = await navigator.serviceWorker.getRegistration('/sw.js');
   if (!registration) return false;
   const subscription = await registration.pushManager.getSubscription();
-  return !!subscription;
+  if (!subscription) return false;
+  return keyMatches(subscription, VAPID_PUBLIC_KEY);
 }

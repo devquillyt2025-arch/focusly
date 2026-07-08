@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksSync';
 import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
+import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
 import Select from './Select';
 
 const PRESETS = [
@@ -44,6 +45,17 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
   useEffect(() => {
     let active = true;
     isCurrentlySubscribed().then(v => { if (active) setPushEnabled(v); });
+    return () => { active = false; };
+  }, []);
+
+  // Email reminders — independent channel from push; same reminders,
+  // delivered by the same send-task-reminders Edge Function, just via
+  // email instead of (or alongside) a device push.
+  const [emailEnabled, setEmailEnabledState] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    isEmailRemindersEnabled().then(v => { if (active) setEmailEnabledState(v); }).catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -161,6 +173,20 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       alert(err.message || 'Could not update reminder settings.');
     } finally {
       setPushBusy(false);
+    }
+  };
+
+  const handleEmailRemindersToggle = async () => {
+    if (emailBusy) return;
+    setEmailBusy(true);
+    try {
+      const next = !emailEnabled;
+      await setEmailRemindersEnabled(next);
+      setEmailEnabledState(next);
+    } catch (err) {
+      alert(err.message || 'Could not update reminder settings.');
+    } finally {
+      setEmailBusy(false);
     }
   };
 
@@ -292,7 +318,7 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         {isPushSupported() ? (
           <label className="set-row" onClick={handlePushRemindersToggle} style={{ opacity: pushBusy ? 0.6 : 1, pointerEvents: pushBusy ? 'none' : 'auto' }}>
             <div>
-              <div className="set-row-lbl">Enable reminders</div>
+              <div className="set-row-lbl">Push reminders</div>
               <div className="set-row-sub">Task &amp; event reminders — delivered even when Nook is closed</div>
             </div>
             <div className="toggle-track" data-on={pushEnabled ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
@@ -300,11 +326,19 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
         ) : (
           <div className="set-row" style={{ cursor: 'default', opacity: 0.6 }}>
             <div>
-              <div className="set-row-lbl">Enable reminders</div>
+              <div className="set-row-lbl">Push reminders</div>
               <div className="set-row-sub">Not supported in this browser</div>
             </div>
           </div>
         )}
+
+        <label className="set-row" onClick={handleEmailRemindersToggle} style={{ opacity: emailBusy ? 0.6 : 1, pointerEvents: emailBusy ? 'none' : 'auto', marginTop: 8 }}>
+          <div>
+            <div className="set-row-lbl">Email reminders</div>
+            <div className="set-row-sub">Sent to your account's sign-in email — independent of push, works on any device</div>
+          </div>
+          <div className="toggle-track" data-on={emailEnabled ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
+        </label>
       </section>
 
       {/* Google Tasks Sync Section */}

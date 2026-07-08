@@ -7,15 +7,14 @@ const COL_H = ITEM_H * VISIBLE;
 const PAD = (COL_H - ITEM_H) / 2;
 
 const HOURS   = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);  // 0,5,...,55
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);      // 0..59
 const MERIDIEMS = ['AM', 'PM'];
 
 function parse24(hhmm) {
   const [h, m] = (hhmm || '09:00').split(':').map(Number);
   const meridiem = h >= 12 ? 'PM' : 'AM';
   let hour12 = h % 12; if (hour12 === 0) hour12 = 12;
-  // snap minute to nearest 5 for the wheel
-  const minute = Math.round((m ?? 0) / 5) * 5 % 60;
+  const minute = (m ?? 0) % 60;
   return { hour12, minute, meridiem };
 }
 

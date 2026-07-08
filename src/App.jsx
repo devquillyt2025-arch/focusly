@@ -1809,7 +1809,7 @@ function HeaderClock() {
     return () => clearInterval(id);
   }, []);
   const dayStr  = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   return (
     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
       {timeStr} • {dayStr}
