@@ -658,7 +658,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
       <div style={{ padding: '8px 24px 12px', flexShrink: 0 }}>
 
         {/* ROW 1: search → palette → all tags → date range → view toggle → count */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
 
           {/* 1. Search */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 190, flexShrink: 0 }}>

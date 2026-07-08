@@ -1237,7 +1237,7 @@ export default function App() {
         </div>
 
         <div className="yartu-top-search-wrapper">
-          <div className="yartu-top-search" ref={searchRef}>
+          <div className="yartu-top-search" ref={searchRef} onClick={() => searchInputRef.current?.focus()}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
               ref={searchInputRef}
@@ -1468,7 +1468,7 @@ export default function App() {
       <AnimatePresence>
         {sidebarOpen && (
           <motion.nav
-            className="main-nav"
+            className="main-nav desktop-only"
             initial={{ x: -240, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -240, opacity: 0 }}
@@ -1535,6 +1535,31 @@ export default function App() {
           </motion.nav>
         )}
       </AnimatePresence>
+
+      {/* ── Mobile Bottom Nav ── */}
+      <nav className="mobile-bottom-nav">
+        {[
+          { id:'daily',    label:'Today',    Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
+          { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
+          { id:'journal',  label:'Journal',  Icon: NavIcoBookOpen },
+          { id:'habits',   label:'Habits',   Icon: NavIcoRepeat },
+        ].map(tab => (
+          <button key={tab.id}
+            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className="nav-icon"><tab.Icon /></span>
+            <span className="nav-label">{tab.label}</span>
+            {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
+          </button>
+        ))}
+        <button className={`main-nav-btn${openModal === 'mobile-more' ? ' nav-active' : ''}`} onClick={() => setOpenModal('mobile-more')}>
+          <span className="nav-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+          </span>
+          <span className="nav-label">More</span>
+        </button>
+      </nav>
 
       {/* ── Tab content ── */}
       <div className="tab-content">
@@ -1771,6 +1796,7 @@ export default function App() {
           </Suspense>
         )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
+        {openModal==='mobile-more' && <MobileMoreModal key="mobile-more" onClose={() => setOpenModal(null)} onSelect={(id) => { setActiveTab(id); setOpenModal(null); }} />}
         {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
         {openModal==='analytics' && <Suspense fallback={null}><AnalyticsModal key="analytics" tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} /></Suspense>}
         {openModal==='shortcuts' && <ShortcutsModal key="shortcuts" onClose={()=>setOpenModal(null)} />}
@@ -1828,7 +1854,7 @@ function HeaderGreeting() {
     : hour >= 12 && hour < 17 ? 'Good Afternoon'
     : hour >= 17 && hour < 21 ? 'Good Evening'
     : 'Good Night';
-  return <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{greeting}</span>;
+  return <span className="header-greeting-text" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{greeting}</span>;
 }
 
 // ─── Lazy-view loading fallback ───────────────────────────────────
@@ -1836,6 +1862,44 @@ function TabFallback() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240, color: 'var(--text-muted)' }}>
       <span className="tab-fallback-spinner" aria-label="Loading" />
+    </div>
+  );
+}
+
+// ─── Mobile More Navigation Drawer ────────────────────────────────
+function MobileMoreModal({ onClose, onSelect }) {
+  const tabs = [
+    { id: 'notes', label: 'Notes', Icon: NavIcoNotes },
+    { id: 'calendar', label: 'Calendar', Icon: NavIcoCalendar },
+    { id: 'reminders', label: 'Reminders', Icon: NavIcoBell },
+    { id: 'links', label: 'Links', Icon: NavIcoLinks },
+    { id: 'countdowns', label: 'Countdowns', Icon: NavIcoHourglass },
+    { id: 'timer', label: 'Focus', Icon: NavIcoTimerIcon },
+    { id: 'vault', label: 'Saved Logins', Icon: NavIcoVault },
+    { id: 'reports', label: 'Reports', Icon: NavIcoBarChart },
+    { id: 'activity', label: 'Activity Log', Icon: NavIcoHistory },
+    { id: 'settings', label: 'Settings', Icon: NavIcoSettings },
+  ];
+  return (
+    <div className="mobile-more-overlay" onClick={onClose}>
+      <motion.div 
+        className="mobile-more-drawer"
+        onClick={e => e.stopPropagation()}
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      >
+        <div className="mobile-more-header">
+          <h3>More</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="mobile-more-grid">
+          {tabs.map(t => (
+            <button key={t.id} className="mobile-more-item" onClick={() => onSelect(t.id)}>
+              <span className="mobile-more-icon"><t.Icon /></span>
+              <span className="mobile-more-label">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -8,7 +8,12 @@
       "Bash(node -e \"require\\('@playwright/test'\\)\")",
       "Bash(npx vite *)",
       "Bash(Get-ChildItem -Path \"d:\\\\My Projects\\\\focusly\\\\src\\\\components\" -Force)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5199/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5199/)",
+      "Bash(cd \"d:/My Projects/nook\" && cp \"/c/Users/JEEVIT~1/AppData/Local/Temp/claude/d--My-Projects-nook/0edbd991-36e1-46a1-aa84-5659a790ea84/scratchpad/audit_full.mjs\" \"./__audit_full_tmp.mjs\" && git status --short | head -5)",
+      "Bash(cd \"d:/My Projects/nook\" && cp \"/c/Users/JEEVIT~1/AppData/Local/Temp/claude/d--My-Projects-nook/0edbd991-36e1-46a1-aa84-5659a790ea84/scratchpad/nook_mobile_audit.md\" \"./nook_mobile_audit.md\" && ls -la nook_mobile_audit.md && echo \"--- copied to project root ---\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\JEEVIT~1\\AppData\\Local\\Temp\\claude\\d--My-Projects-nook\\0edbd991-36e1-46a1-aa84-5659a790ea84\\scratchpad"
     ]
   }
 }

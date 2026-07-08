@@ -151,7 +151,7 @@ function AccountRow({ entry, onEdit, onDelete }) {
   );
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '9px 12px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', minWidth: 0 }}>
 
       {/* Username */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
