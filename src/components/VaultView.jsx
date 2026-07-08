@@ -151,7 +151,7 @@ function AccountRow({ entry, onEdit, onDelete }) {
   );
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--bg-base)', border: '1px solid var(--border)', minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', minWidth: 0 }}>
 
       {/* Username */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -331,13 +331,13 @@ export default function VaultView() {
   const totalAccounts = entries.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 900, margin: '0 auto', boxSizing: 'border-box', padding: '32px', display: 'flex', flexDirection: 'column', gap: 20, background: 'transparent' }}>
 
       {/* ── Toolbar ── */}
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 340 }}>
           <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="search" aria-label="Search vault" placeholder="Search accounts..."
+          <input type="search" aria-label="Search saved logins" placeholder="Search accounts..."
             value={query} onChange={e => setQuery(e.target.value)}
             style={{ width: '100%', height: 36, padding: '0 10px 0 32px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.84rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
         </div>
@@ -358,8 +358,7 @@ export default function VaultView() {
       </div>
 
       {/* ── Grouped List ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {totalAccounts === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', gap: 16, textAlign: 'center' }}>
@@ -367,8 +366,8 @@ export default function VaultView() {
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               </div>
               <div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Your vault is empty</div>
-                <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: 300, lineHeight: 1.55 }}>Add accounts to get started. Credentials are stored only in your browser's local storage.</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>No saved logins yet</div>
+                <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', maxWidth: 300, lineHeight: 1.55 }}>Add accounts to get started. Stored in plain text in your browser's local storage — not encrypted, so avoid your most sensitive passwords here.</div>
               </div>
               <button onClick={() => setModal({ mode: 'add' })}
                 style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}>
@@ -398,13 +397,12 @@ export default function VaultView() {
               ))}
             </AnimatePresence>
           )}
-        </div>
       </div>
 
       {/* Footer notice */}
-      <div style={{ flexShrink: 0, padding: '8px 24px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+      <div style={{ paddingTop: 8, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Credentials are stored locally in your browser only — never uploaded to any server.
+        Stored locally in this browser only, in plain text (not encrypted) — never uploaded to a server. Not recommended for highly sensitive passwords.
       </div>
 
       {/* Modal */}

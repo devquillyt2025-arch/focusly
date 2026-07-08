@@ -5,148 +5,8 @@ import { CAT_META } from '../utils/categoryMeta';
 import { PRI_META } from '../utils/priorityMeta';
 import ErrorBoundary from './ErrorBoundary';
 import Select from './Select';
-
-// ── Calendar Date Picker ────────────────────────────────────────────────────
-const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const MONTHS_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const WEEK_DAYS    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-
-function isoToday() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function toISO(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function CalendarDatePicker({ value, onChange, onClose }) {
-  const parsed  = value ? new Date(value + 'T00:00:00') : new Date();
-  const [nav, setNav] = useState({ year: parsed.getFullYear(), month: parsed.getMonth() });
-  const today   = isoToday();
-
-  const grid = useMemo(() => {
-    const { year, month } = nav;
-    const first = new Date(year, month, 1);
-    const last  = new Date(year, month + 1, 0);
-    const cells = [];
-    const offset = first.getDay();
-    const prevLast = new Date(year, month, 0).getDate();
-    for (let i = offset - 1; i >= 0; i--) {
-      const d = new Date(year, month - 1, prevLast - i);
-      cells.push({ date: d, cur: false, iso: toISO(d) });
-    }
-    for (let i = 1; i <= last.getDate(); i++) {
-      const d = new Date(year, month, i);
-      cells.push({ date: d, cur: true, iso: toISO(d) });
-    }
-    while (cells.length % 7 !== 0) {
-      const n = cells.length - last.getDate() - offset + 1;
-      const d = new Date(year, month + 1, n);
-      cells.push({ date: d, cur: false, iso: toISO(d) });
-    }
-    return cells;
-  }, [nav]);
-
-  const prevMonth = () => setNav(n => {
-    const d = new Date(n.year, n.month - 1, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
-  const nextMonth = () => setNav(n => {
-    const d = new Date(n.year, n.month + 1, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
-
-  const quickPick = (label) => {
-    const d = new Date();
-    if (label === 'Today')     { onChange(toISO(d)); onClose(); return; }
-    if (label === 'Tomorrow')  { d.setDate(d.getDate()+1); onChange(toISO(d)); onClose(); return; }
-    if (label === 'Next week') { d.setDate(d.getDate() + (7 - d.getDay() + 1)); onChange(toISO(d)); onClose(); return; }
-    if (label === 'In 2 weeks'){ d.setDate(d.getDate()+14); onChange(toISO(d)); onClose(); return; }
-    if (label === 'Next month') { d.setMonth(d.getMonth()+1); onChange(toISO(d)); onClose(); return; }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
-      style={{
-        position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 100,
-        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-        borderRadius: 16, boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
-        width: 292, overflow: 'hidden',
-      }}
-      onClick={e => e.stopPropagation()}
-    >
-      {/* Quick picks */}
-      <div style={{ padding: '12px 12px 8px', display: 'flex', flexWrap: 'wrap', gap: 6, borderBottom: '1px solid var(--border)' }}>
-        {['Today','Tomorrow','Next week','In 2 weeks','Next month'].map(lbl => (
-          <button key={lbl} onClick={() => quickPick(lbl)}
-            style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-            {lbl}
-          </button>
-        ))}
-      </div>
-
-      {/* Month nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 8px' }}>
-        <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: 8, fontSize: '1rem', lineHeight: 1 }}>‹</button>
-        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-          {MONTHS_FULL[nav.month]} {nav.year}
-        </span>
-        <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: 8, fontSize: '1rem', lineHeight: 1 }}>›</button>
-      </div>
-
-      {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '0 10px' }}>
-        {WEEK_DAYS.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0', textTransform: 'uppercase' }}>{d}</div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '0 10px 14px', gap: '2px 0' }}>
-        {grid.map((cell) => {
-          const isSelected = cell.iso === value;
-          const isToday    = cell.iso === today;
-          const isPast     = cell.iso < today;
-          return (
-            <button key={cell.iso} onClick={() => { onChange(cell.iso); onClose(); }}
-              style={{
-                width: 36, height: 36, margin: '0 auto', borderRadius: '50%', border: 'none',
-                background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-glow)' : 'transparent',
-                color: isSelected ? '#fff' : isToday ? 'var(--accent)' : !cell.cur ? 'var(--text-muted)' : isPast ? 'var(--text-secondary)' : 'var(--text-primary)',
-                fontSize: '0.82rem', fontWeight: isSelected || isToday ? 700 : 400,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                outline: isToday && !isSelected ? '1px solid var(--accent)' : 'none',
-                transition: 'all 0.1s ease',
-              }}
-              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isToday ? 'var(--accent-glow)' : 'transparent'; }}
-            >
-              {cell.date.getDate()}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Footer */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={() => { onChange(''); onClose(); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
-          Clear date
-        </button>
-        <button onClick={onClose}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, padding: '4px 0' }}>
-          Cancel
-        </button>
-      </div>
-    </motion.div>
-  );
-}
+import ReminderField from './ReminderField';
+import CalendarDatePicker from './CalendarDatePicker';
 
 
 const PRI_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
@@ -398,18 +258,18 @@ function TaskRow({
                 className="kebab-dropdown-menu"
                 style={{
                   position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
-                  background: '#0f172a', border: '1px solid var(--border-strong)',
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
                   borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', padding: '8px 0',
                   display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
-                  color: '#f8fafc', fontSize: '0.9rem'
+                  color: 'var(--text-primary)', fontSize: '0.9rem'
                 }}
               >
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => setShowDatePicker(true), 120); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -418,9 +278,9 @@ function TaskRow({
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
@@ -429,9 +289,9 @@ function TaskRow({
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -440,16 +300,16 @@ function TaskRow({
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                   Delete
                 </button>
 
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
                 {/* List selection */}
                 {ALL_CATS.map(catKey => {
@@ -459,9 +319,9 @@ function TaskRow({
                       key={catKey}
                       type="button"
                       className="kebab-menu-item"
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                       onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -475,9 +335,9 @@ function TaskRow({
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: '#f8fafc', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   onClick={e => { e.stopPropagation(); handleNewList(task); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -649,7 +509,7 @@ function CompletionAnalytics({ pending, completed, onAdd, renderTask, onClearCom
   );
 }
 
-function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow }) {
+function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDelete, onClearCompleted, onAdd, onAddTask, onEdit, onUpdate, onQuickUpdate, syncStatus, onSyncNow, openTaskId, onOpenTaskIdHandled }) {
   const [customCats, setCustomCats] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('nook_custom_categories') || '{}');
@@ -796,12 +656,22 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
     showSaved();
   };
 
-  const openDetail = (task) => {
+  const openDetail = (task, initialTab = 'details') => {
     setDetailTask(task);
     setLocal({ ...task });
     setCatOpen(false);
-    setDetailTab('details');
+    setDetailTab(initialTab);
   };
+
+  // Deep link from the Reminders tab: open a specific task straight to
+  // its Scheduling tab (where the reminder field lives).
+  useEffect(() => {
+    if (!openTaskId) return;
+    const task = tasks.find(t => t.id === openTaskId);
+    if (task) openDetail(task, 'scheduling');
+    onOpenTaskIdHandled?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTaskId]);
 
   const closePanel = () => {
     if (local && detailTask && local.name.trim()) {
@@ -972,7 +842,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
             {SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? 'Sort'}
           </button>
           {sortOpen && (
-            <div className="sort-menu" style={{ position: 'absolute', top: 40, left: 0, zIndex: 200, background: 'var(--bg-elevated, #0f172a)', border: '1px solid var(--border-strong)', borderRadius: '10px', padding: '6px 0', width: '160px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <div className="sort-menu" style={{ position: 'absolute', top: 40, left: 0, zIndex: 200, background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', borderRadius: '10px', padding: '6px 0', width: '160px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
               {SORT_OPTIONS.map(opt => {
                 const isActive = sortBy === opt.value;
                 return (
@@ -1295,7 +1165,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                         <div key={att.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                            <span style={{ color: '#e2e8f0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
+                            <span style={{ color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{att.name}</span>
                           </div>
                           <button type="button" style={{ background: 'transparent', border: 'none', color: 'var(--color-red)', cursor: 'pointer', padding: 4 }}
                             onClick={() => saveField('attachments', (local.attachments || []).filter(a => a.id !== att.id))}>
@@ -1375,6 +1245,15 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                       </AnimatePresence>
                     </div>
                   </div>
+
+                  {/* Reminder */}
+                  <ReminderField
+                    sourceType="task"
+                    sourceId={local.id}
+                    title={local.name}
+                    targetAt={local.dueDate ? new Date(local.dueDate + 'T23:59:59') : null}
+                    targetLabel="due date"
+                  />
 
                   {/* Repeat — compact select */}
                   <div className="tdp-field">
@@ -1504,7 +1383,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                             e.target.value = '';
                           }
                         }}
-                        style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.875rem' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none', fontSize: '0.875rem' }}
                       />
                     </div>
                   </div>

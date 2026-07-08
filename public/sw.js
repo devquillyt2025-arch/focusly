@@ -46,3 +46,47 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+
+// ─── Web Push: task reminders ───────────────────────────────────────
+// Payload shape sent by the send-task-reminders Edge Function:
+//   { title, body, source_type: 'task', source_id, url }
+// `url` should be `/?reminder=task:<source_id>` — App.jsx parses that
+// query param on load and opens the task straight to its Scheduling tab.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+
+  const title = data.title || 'Nook reminder';
+  const options = {
+    body: data.body || '',
+    icon: '/icon-192.svg',
+    badge: '/icon-192.svg',
+    tag: data.source_id ? `${data.source_type}-${data.source_id}` : undefined,
+    data: {
+      url: data.url || '/',
+      source_type: data.source_type,
+      source_id: data.source_id,
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // Focus an existing Nook tab if one is open, navigating it to the target.
+      for (const client of clients) {
+        if ('focus' in client) {
+          if ('navigate' in client) client.navigate(targetUrl).catch(() => {});
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window/tab.
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
+  );
+});

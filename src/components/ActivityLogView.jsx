@@ -27,6 +27,7 @@ const MODULE_META = {
   countdowns: { label: 'Countdowns', tab: 'countdowns' },
   journal:  { label: 'Journal', tab: 'journal'  },
   calendar: { label: 'Calendar',tab: 'calendar' },
+  vault:    { label: 'Saved Logins', tab: 'vault' },
 };
 const ALL_MODULES = Object.keys(MODULE_META);
 

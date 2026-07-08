@@ -37,7 +37,7 @@ export const TRACKER_TYPES = {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 // genId is single-sourced in utils/id.js; re-exported here so existing
-// importers (CountdownsView, OnboardingFlow) keep working unchanged.
+// importers (CountdownsView) keep working unchanged.
 export { genId } from '../utils/id';
 
 // NOTE: this todayStr is UTC-based (toISOString) and intentionally distinct

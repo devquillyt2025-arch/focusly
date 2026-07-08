@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { CAT_META } from '../utils/categoryMeta';
+import { getTickSeconds, subscribeTick } from '../utils/timerTickStore';
 
 const RADIUS = 88;
 const STROKE = 9;
@@ -35,7 +36,10 @@ function fmtLogged(s) {
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-export default function Timer({ task, timerMode, activeTimerMode, timerState, timerSeconds, totalSeconds, pomodoroCount, onSwitchMode, onStart, onPause, onReset, onAdjustDuration }) {
+export default function Timer({ task, timerMode, activeTimerMode, timerState, totalSeconds, pomodoroCount, onSwitchMode, onStart, onPause, onReset, onAdjustDuration }) {
+  // Sourced from an external store (not props) so this 1s tick only re-renders
+  // Timer itself, not the whole app tree — see utils/timerTickStore.js.
+  const timerSeconds = useSyncExternalStore(subscribeTick, getTickSeconds);
   // Ring always reflects the ACTIVE running mode; tabs reflect the selected view mode
   const ringMode    = timerState !== 'idle' ? (activeTimerMode ?? timerMode) : timerMode;
   const progress    = totalSeconds > 0 ? timerSeconds / totalSeconds : 1;

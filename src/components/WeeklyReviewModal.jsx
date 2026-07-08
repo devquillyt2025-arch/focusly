@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { computeGlobalStats, computeHabitStreaks } from '../trackers/trackerUtils';
 import { calculateDailyScore } from '../trackers/analyticsUtils';
+import { todayStr as getTodayStr } from '../utils/date';
 import Select from './Select';
 
 export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClose, onSave }) {
@@ -38,7 +39,7 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
     }
   });
 
-  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+  const todayStr = getTodayStr();
   const todayScore = calculateDailyScore(trackers, tasks, pomodoroLog, todayStr);
 
   const toggleHabit = (id) => {

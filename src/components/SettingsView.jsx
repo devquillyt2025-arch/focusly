@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksSync';
 import { supabase, isAuthConfigured } from '../utils/authClient';
+import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import Select from './Select';
 
 const PRESETS = [
@@ -34,6 +35,17 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
   const [morningTime, setMorningTime] = useState(() => localStorage.getItem('nook-notif-morning-time') || '08:00');
   const [notifStreak, setNotifStreak] = useState(() => localStorage.getItem('nook-notif-streak') !== 'false');
   const [notifPomo, setNotifPomo] = useState(() => localStorage.getItem('nook-notif-pomo') !== 'false');
+
+  // Push reminders (Web Push — works even when Nook is closed; distinct
+  // from the in-app Notification toggles above, which only fire while a
+  // tab is open).
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    isCurrentlySubscribed().then(v => { if (active) setPushEnabled(v); });
+    return () => { active = false; };
+  }, []);
 
   // Preferences state
   const [form, setForm] = useState(settings);
@@ -134,6 +146,24 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
     }
   };
 
+  const handlePushRemindersToggle = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (!pushEnabled) {
+        await subscribeToPush();
+        setPushEnabled(true);
+      } else {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      }
+    } catch (err) {
+      alert(err.message || 'Could not update reminder settings.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   const handleLogout = async () => {
     if (!window.confirm('Log out of Nook?\n\nYou\'ll be signed out (and any Google connections disconnected). Your local data stays saved on this device.')) return;
     try { disconnectGoogleTasks(); } catch {}
@@ -157,13 +187,15 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
     <div className="settings-view">
 
       {/* ── Hero header ── */}
-      <div className="page-hero settings-hero" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '2px 2px 4px' }}>
-        <div className="page-hero-badge" aria-hidden="true" style={{ width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <h2 className="page-hero-title" style={{ margin: 0, fontSize: '1.9rem', fontWeight: 850, lineHeight: 1, letterSpacing: '-0.035em' }}>Settings</h2>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Profile, notifications, sync & preferences</span>
+      <div className="page-hero settings-hero" style={{ padding: '2px 2px 4px' }}>
+        <div className="page-hero-left" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          <div className="page-hero-badge" aria-hidden="true" style={{ width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <div className="page-hero-text" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <h2 className="page-hero-title" style={{ margin: 0, fontSize: '1.9rem', fontWeight: 850, lineHeight: 1, letterSpacing: '-0.035em' }}>Settings</h2>
+            <span className="page-hero-sub" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Profile, notifications, sync & preferences</span>
+          </div>
         </div>
       </div>
 
@@ -254,6 +286,25 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
             <div className="toggle-track" data-on={notifPomo ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
           </label>
         </div>
+
+        <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
+
+        {isPushSupported() ? (
+          <label className="set-row" onClick={handlePushRemindersToggle} style={{ opacity: pushBusy ? 0.6 : 1, pointerEvents: pushBusy ? 'none' : 'auto' }}>
+            <div>
+              <div className="set-row-lbl">Enable reminders</div>
+              <div className="set-row-sub">Task &amp; event reminders — delivered even when Nook is closed</div>
+            </div>
+            <div className="toggle-track" data-on={pushEnabled ? 'true' : 'false'} style={{ flexShrink: 0 }}><div className="toggle-thumb" /></div>
+          </label>
+        ) : (
+          <div className="set-row" style={{ cursor: 'default', opacity: 0.6 }}>
+            <div>
+              <div className="set-row-lbl">Enable reminders</div>
+              <div className="set-row-sub">Not supported in this browser</div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Google Tasks Sync Section */}

@@ -165,8 +165,9 @@ input, textarea, select { font-family: inherit; }
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background: var(--brand-gradient);
+  opacity: 0.45;
   z-index: 21;
 }
 
@@ -459,12 +460,12 @@ input, textarea, select { font-family: inherit; }
   box-shadow: inset 4px 0 0 var(--accent) !important;
 }
 :root[data-theme="light"] .nav-active {
-  background: rgba(124, 58, 237, 0.12) !important;
-  color: #7c3aed !important;
-  box-shadow: inset 4px 0 0 #7c3aed !important;
+  background: var(--accent-glow) !important;
+  color: var(--accent) !important;
+  box-shadow: inset 4px 0 0 var(--accent) !important;
 }
 .nav-active .nav-icon { color: var(--accent); }
-:root[data-theme="light"] .nav-active .nav-icon { color: #4338ca; }
+:root[data-theme="light"] .nav-active .nav-icon { color: var(--accent); }
 
 .nav-icon {
   display: flex; align-items: center; justify-content: center;
@@ -1182,8 +1183,19 @@ input, textarea, select { font-family: inherit; }
   color: var(--text-primary); font-size: 0.88rem; font-weight: 500;
   cursor: pointer; outline: none; transition: border-color 0.13s ease;
   font-family: inherit;
+  /* Without this, the native option-list popup ignores our CSS entirely
+     and renders with the browser's light-mode UI chrome regardless of theme. */
+  color-scheme: dark;
 }
+:root[data-theme="light"] .tdp-native-select { color-scheme: light; }
 .tdp-native-select:focus { border-color: var(--accent); }
+
+/* Native datetime-local input (reminder "at a specific time") — same
+   native-chrome theming issue as the select above. */
+.tdp-datetime-input {
+  color-scheme: dark;
+}
+:root[data-theme="light"] .tdp-datetime-input { color-scheme: light; }
 .tdp-select-caret {
   position: absolute; right: 12px; pointer-events: none;
   color: var(--text-muted);
@@ -3923,8 +3935,8 @@ select.modal-input {
    YARTU TEAM PRODUCTIVITY DASHBOARD UI REDESIGN
    ═══════════════════════════════════════════════════════════════════ */
 :root[data-theme="light"] .nav-active {
-  color: #4338ca !important;
-  background: #eef2ff !important;
+  color: var(--accent) !important;
+  background: var(--accent-glow) !important;
   border-color: transparent !important;
   font-weight: 600 !important;
   border-radius: var(--radius-md) !important;
@@ -4363,15 +4375,15 @@ select.modal-input {
   color: var(--text-primary);
 }
 :root[data-theme="light"] .nav-active {
-  background: #eef2ff !important;
-  color: #4338ca !important;
+  background: var(--accent-glow) !important;
+  color: var(--accent) !important;
   font-weight: 600 !important;
   border: 1px solid transparent !important;
   border-radius: var(--radius-md) !important;
   box-shadow: none;
 }
 :root[data-theme="light"] .nav-active .nav-icon {
-  color: #4338ca;
+  color: var(--accent);
 }
 
 /* Animations & Transitions */
@@ -6152,7 +6164,7 @@ select.modal-input {
 }
 :root[data-theme="light"] .nav-active {
   background: linear-gradient(90deg, rgba(120,105,252,0.14), rgba(120,105,252,0.05)) !important;
-  color: #5d50e0 !important;
+  color: var(--accent) !important;
   border-color: rgba(120,105,252,0.28) !important;
 }
 .main-nav-btn.nav-active::before {
@@ -6162,7 +6174,7 @@ select.modal-input {
   box-shadow: 0 0 10px var(--accent);
 }
 .nav-active .nav-icon { color: var(--accent-light) !important; filter: drop-shadow(0 0 5px var(--accent-glow)); }
-:root[data-theme="light"] .nav-active .nav-icon { color: #5d50e0 !important; }
+:root[data-theme="light"] .nav-active .nav-icon { color: var(--accent) !important; }
 
 .nav-badge {
   background: linear-gradient(135deg, #f87171, #ef4444) !important;

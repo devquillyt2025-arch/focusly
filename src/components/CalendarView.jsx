@@ -6,10 +6,7 @@ import {
   getCalendarToken, fetchGCalEvents, createGCalEvent, gcalColor,
 } from '../utils/googleCalendarSync';
 import Select from './Select';
-
-function toISO(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
+import { localDateStr as toISO } from '../utils/date';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

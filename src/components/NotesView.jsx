@@ -232,8 +232,9 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
         <div style={{ padding: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', bottom: 0, background: modalBg, zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={handleCopy} title="Copy"
-              className="hover:opacity-80"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '6px', display: 'flex', alignItems: 'center' }}>
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '6px', display: 'flex', alignItems: 'center', opacity: 1, transition: 'opacity 0.15s ease' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
+              onMouseLeave={e => e.currentTarget.style.opacity = 1}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -243,8 +244,9 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
               <button
                 onClick={() => setShowColorPicker(!showColorPicker)}
                 title="Change Color"
-                className="hover:scale-110 transition-transform"
-                style={{ width: 24, height: 24, borderRadius: '50%', background: accentHex ?? '#fff', border: accentHex ? 'none' : '1.5px solid #d1d5db', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+                style={{ width: 24, height: 24, borderRadius: '50%', background: accentHex ?? '#fff', border: accentHex ? 'none' : '1.5px solid #d1d5db', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', transform: 'scale(1)', transition: 'transform 0.15s ease' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
               >
                 {!accentHex && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round">
@@ -265,14 +267,16 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
                   <button
                     onClick={() => { setColor('default'); setShowColorPicker(false); if (onColorChange) onColorChange('default'); }}
                     title="No Color"
-                    className="cursor-pointer hover:scale-110 transition-transform"
                     style={{
                       width: 24, height: 24, borderRadius: '50%', padding: 0,
                       background: '#fff',
                       border: color === 'default' ? 'none' : '1.5px solid #d1d5db',
                       boxShadow: color === 'default' ? '0 0 0 2px var(--bg-elevated), 0 0 0 4px #9ca3af' : 'none',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden',
+                      transform: 'scale(1)', transition: 'transform 0.15s ease',
                     }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="4" y1="4" x2="20" y2="20"/>
@@ -286,12 +290,14 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
                         setShowColorPicker(false);
                         if (onColorChange) onColorChange(c.id);
                       }}
-                      className="cursor-pointer hover:scale-110 transition-transform"
                       style={{
                         width: 24, height: 24, borderRadius: '50%', padding: 0, border: 'none',
                         background: COLOR_ACCENT[c.id],
                         boxShadow: color === c.id ? `0 0 0 2px var(--bg-elevated), 0 0 0 4px ${COLOR_ACCENT[c.id]}` : 'none',
+                        transform: 'scale(1)', transition: 'transform 0.15s ease',
                       }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                     />
                   ))}
                 </div>
@@ -299,8 +305,9 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
             </div>
             {!isNew && (
               <button onClick={() => { onDelete(note.id); onClose(); }} title="Delete note"
-                className="hover:opacity-80"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', padding: '6px', display: 'flex', alignItems: 'center' }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', padding: '6px', display: 'flex', alignItems: 'center', opacity: 1, transition: 'opacity 0.15s ease' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
+                onMouseLeave={e => e.currentTarget.style.opacity = 1}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
                 </svg>
@@ -308,8 +315,9 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
             )}
           </div>
           <button onClick={handleSave}
-            className="hover:opacity-80"
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', opacity: 1, transition: 'opacity 0.15s ease' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
+            onMouseLeave={e => e.currentTarget.style.opacity = 1}>
             Done
           </button>
         </div>
@@ -623,7 +631,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
 
       {/* ── Hero header (inline styles guarantee layout regardless of CSS cache) ── */}
       <div className="page-hero ntv-hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: '26px 24px 14px' }}>
-        <div className="page-hero-left" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="page-hero-left" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <div className="page-hero-badge" aria-hidden="true" style={{ width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>

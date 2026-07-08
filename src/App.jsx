@@ -11,19 +11,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import TaskList from './components/TaskList';
+import confetti from 'canvas-confetti';
 import { CAT_META } from './utils/categoryMeta';
 import Timer from './components/Timer';
 import Stats from './components/Stats';
 import AddTaskModal from './components/AddTaskModal';
-import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import WeeklyReviewModal from './components/WeeklyReviewModal';
 import DailyGoalsView from './components/DailyGoalsView';
-import JournalView from './components/JournalView';
-import CountdownsView from './components/CountdownsView';
-import HabitsView from './components/HabitsView';
-import NotesView, { NoteModal } from './components/NotesView';
 import AddTrackerModal from './components/AddTrackerModal';
 import {
   loadHabits, saveHabits, migrateFromTrackers, toggleCompletion,
@@ -36,19 +31,29 @@ import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, d
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
 import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
+import { setTickSeconds, getTickSeconds } from './utils/timerTickStore';
 import { logActivity, diffObjects } from './utils/activityLog';
+import { clearReminder } from './utils/reminders';
 import { localDateStr, todayStr } from './utils/date';
 import { genId } from './utils/id';
-import ActivityLogView from './components/ActivityLogView';
 import FocusCompanion from './components/FocusCompanion';
-import VaultView from './components/VaultView';
-import LinksView from './components/LinksView';
 import nookLogo from './nook-favicon.png';
 
-// ── Code-split heavy, route-level views (chart.js, html2canvas load only when opened) ──
-const ReportsView    = lazy(() => import('./components/ReportsView'));
-const CalendarView   = lazy(() => import('./components/CalendarView'));
-const AnalyticsModal = lazy(() => import('./components/AnalyticsModal'));
+// ── Code-split route-level views (each tab's chunk loads only when that tab is opened) ──
+const ReportsView     = lazy(() => import('./components/ReportsView'));
+const CalendarView    = lazy(() => import('./components/CalendarView'));
+const AnalyticsModal  = lazy(() => import('./components/AnalyticsModal'));
+const TaskList        = lazy(() => import('./components/TaskList'));
+const SettingsView    = lazy(() => import('./components/SettingsView'));
+const JournalView     = lazy(() => import('./components/JournalView'));
+const CountdownsView  = lazy(() => import('./components/CountdownsView'));
+const HabitsView      = lazy(() => import('./components/HabitsView'));
+const NotesView       = lazy(() => import('./components/NotesView'));
+const NoteModal       = lazy(() => import('./components/NotesView').then(m => ({ default: m.NoteModal })));
+const ActivityLogView = lazy(() => import('./components/ActivityLogView'));
+const VaultView       = lazy(() => import('./components/VaultView'));
+const LinksView       = lazy(() => import('./components/LinksView'));
+const RemindersView   = lazy(() => import('./components/RemindersView'));
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
@@ -183,6 +188,18 @@ function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
   return '';
 }
 
+// Real relative-time label for a genuine past event (e.g. a logged pomodoro timestamp).
+function fmtRelativeTime(isoOrDate) {
+  const then = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
+  const mins = Math.max(0, Math.round((Date.now() - then.getTime()) / 60000));
+  if (mins < 1)   return 'Just now';
+  if (mins < 60)  return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)   return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}
+
 // ─── App ─────────────────────────────────────────────────────────
 export default function App() {
   const isMac = typeof window !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
@@ -252,6 +269,9 @@ export default function App() {
   const [timerState,   setTimerState]   = useState('idle');
   const [timerSeconds, setTimerSeconds] = useState(() => getSecsForMode('focus',initSettings));
   const [totalSeconds, setTotalSeconds] = useState(() => getSecsForMode('focus',initSettings));
+  // Seed the external tick store so Timer/FocusCompanion/DailyGoalsView show the
+  // right value on first render, before any tick/start/switch has run.
+  useEffect(() => { setTickSeconds(timerSeconds); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [openModal,    setOpenModal]    = useState(null);
@@ -259,6 +279,7 @@ export default function App() {
 
   // ── New state ──
   const [activeTab,      setActiveTab]      = useState('daily');
+  const [pendingOpenTaskId, setPendingOpenTaskId] = useState(null); // deep-link from Reminders tab
   const [trackers,       setTrackers]       = useState(loadTrackers);
   const [intentions,     setIntentions]     = useState(loadIntentions);
   const [editingTracker, setEditingTracker] = useState(null);
@@ -332,19 +353,25 @@ export default function App() {
   }, [theme]);
 
   // ── Midnight reset ──
+  // Rolls intentions over to the new day in place (no reload) so an open note/journal/task
+  // editor isn't discarded. Re-arms itself after each fire so it keeps working across
+  // multiple midnights in a long-lived tab, not just the first one after page load.
   useEffect(() => {
-    const now = new Date();
-    // Use local midnight so the reset fires when todayStr() (local-date-based) rolls over.
-    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const t = setTimeout(() => {
-      setIntentions(prev => {
-        const today = todayStr();
-        if (prev.date === today) return prev;
-        const history = {...(prev.history||{}), [prev.date]: prev.items.some(i=>i.done)};
-        return { date: today, items: makeItems(), history };
-      });
-      window.location.reload();
-    }, midnight - now);
+    let t;
+    const armNext = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      t = setTimeout(() => {
+        setIntentions(prev => {
+          const today = todayStr();
+          if (prev.date === today) return prev;
+          const history = {...(prev.history||{}), [prev.date]: prev.items.some(i=>i.done)};
+          return { date: today, items: makeItems(), history };
+        });
+        armNext();
+      }, midnight - now);
+    };
+    armNext();
     return () => clearTimeout(t);
   }, []);
 
@@ -470,12 +497,44 @@ export default function App() {
   }, []);
 
   // ── Timer ──
+  // Batched focus-time accrual: the ticking interval no longer calls setTasks (and
+  // therefore doesn't persist to localStorage) every single second. Elapsed seconds
+  // accumulate in a ref and get flushed in one write every FLUSH_EVERY_N_SECS ticks,
+  // plus immediately on pause/reset/completion/task-switch so nothing is lost.
+  const FLUSH_EVERY_N_SECS = 10;
+  const pendingFocusSecondsRef = useRef(0);
+  const pendingFocusTaskIdRef  = useRef(null);
+  const focusTickCountRef      = useRef(0);
+
+  const flushFocusTime = useCallback(() => {
+    const taskId = pendingFocusTaskIdRef.current;
+    const secs   = pendingFocusSecondsRef.current;
+    pendingFocusSecondsRef.current = 0;
+    focusTickCountRef.current = 0;
+    if (taskId && secs > 0) {
+      setTasks(ts => ts.map(t => t.id === taskId ? { ...t, timeLogged: t.timeLogged + secs } : t));
+    }
+  }, []);
+
+  const accrueFocusSecond = useCallback(() => {
+    const currentTaskId = activeTaskRef.current;
+    if (pendingFocusTaskIdRef.current !== currentTaskId) {
+      flushFocusTime(); // commit whatever was pending for the previous task first
+      pendingFocusTaskIdRef.current = currentTaskId;
+    }
+    if (!currentTaskId) return;
+    pendingFocusSecondsRef.current += 1;
+    focusTickCountRef.current += 1;
+    if (focusTickCountRef.current >= FLUSH_EVERY_N_SECS) flushFocusTime();
+  }, [flushFocusTime]);
+
   const switchMode = useCallback((mode) => {
     setTimerMode(mode);
     // Only update seconds/totalSeconds when no timer is actively running/paused
     if (timerStateRef.current === 'idle') {
       const secs = getSecsForMode(mode, settingsRef.current);
       setTimerSeconds(secs); setTotalSeconds(secs);
+      setTickSeconds(secs);
       setActiveTimerMode(mode);
     }
   }, []);
@@ -498,6 +557,7 @@ export default function App() {
     if (mode==='focus') {
       logActivity({ module: 'focus', entity_type: 'focus_session', entity_id: new Date().getTime().toString(), action: 'completed', title: 'Focus Session Completed' });
       setPomodoroLog(prev=>[...prev, new Date().toISOString()]);
+      flushFocusTime();
       if (activeTaskRef.current) {
         setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,pomodorosCompleted:(t.pomodorosCompleted||0)+1}:t));
       }
@@ -516,25 +576,26 @@ export default function App() {
     intervalRef.current = setInterval(() => {
       // Use wall-clock delta so the timer stays accurate in throttled background tabs.
       const remaining = Math.ceil((timerEndAtRef.current - Date.now()) / 1000);
-      if (activeTimerModeRef.current==='focus' && activeTaskRef.current) {
-        setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,timeLogged:t.timeLogged+1}:t));
-      }
+      if (activeTimerModeRef.current==='focus') accrueFocusSecond();
+      // Per-second display goes through an external store, not React state, so this
+      // tick never re-renders App (or the sidebar/header/other tabs) — only the
+      // few components that actually show the countdown subscribe to it.
+      setTickSeconds(Math.max(0, remaining));
       if (remaining <= 0) {
         clearInterval(intervalRef.current);
         setTimerSeconds(0);
         setTimerState('idle');
         setTimeout(() => onCompleteRef.current(), 0);
-      } else {
-        setTimerSeconds(remaining);
       }
     }, 1000);
     return () => clearInterval(intervalRef.current);
-  }, [timerState]);
+  }, [timerState, accrueFocusSecond]);
 
   const adjustDuration = useCallback((secs) => {
     const clamped = Math.max(60, secs);
     setTimerSeconds(clamped);
     setTotalSeconds(clamped);
+    setTickSeconds(clamped);
   }, []);
 
   const startTimer  = useCallback(() => {
@@ -544,24 +605,35 @@ export default function App() {
     if (isResume) {
       // Resume with remaining seconds
       timerEndAtRef.current = Date.now() + timerSecsRef.current * 1000;
+      setTickSeconds(timerSecsRef.current);
     } else {
       // Fresh start — use timerSecsRef (respects user edits; switchMode already set the default)
       clearInterval(intervalRef.current);
       const secs = timerSecsRef.current;
       setTimerSeconds(secs); setTotalSeconds(secs);
+      setTickSeconds(secs);
       timerSecsRef.current = secs;
       setActiveTimerMode(viewedMode);
       activeTimerModeRef.current = viewedMode;
       timerEndAtRef.current = Date.now() + secs * 1000;
     }
+    pendingFocusTaskIdRef.current = activeTaskRef.current;
+    pendingFocusSecondsRef.current = 0;
+    focusTickCountRef.current = 0;
     setTimerState('running');
   }, []);
-  const pauseTimer  = useCallback(() => setTimerState('paused'), []);
+  const pauseTimer  = useCallback(() => {
+    const remaining = getTickSeconds();
+    setTimerSeconds(remaining);
+    flushFocusTime();
+    setTimerState('paused');
+  }, [flushFocusTime]);
   const resetTimer  = useCallback(() => {
     clearInterval(intervalRef.current); setTimerState('idle');
-    const s=getSecsForMode(timerMode,settings); setTimerSeconds(s); setTotalSeconds(s);
+    flushFocusTime();
+    const s=getSecsForMode(timerMode,settings); setTimerSeconds(s); setTotalSeconds(s); setTickSeconds(s);
     setActiveTimerMode(timerMode);
-  }, [timerMode, settings]);
+  }, [timerMode, settings, flushFocusTime]);
 
   // ── Task operations ──
   const selectTask = useCallback((id) => {
@@ -599,6 +671,7 @@ export default function App() {
       const old = prev.find(t => t.id === updated.id);
       const changes = old ? diffObjects(old, nextUpdated, ['name', 'notes', 'priority', 'category', 'dueDate', 'timeEstimate']) : null;
       logActivity({ module: 'tasks', entity_type: 'task', entity_id: updated.id, action: 'updated', title: nextUpdated.name, field_changes: changes });
+      if (nextUpdated.completed && !old?.completed) clearReminder('task', updated.id).catch(() => {});
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
@@ -612,6 +685,8 @@ export default function App() {
   const quickUpdateTask = useCallback((updated) => {
     const nextUpdated = { ...updated, name: (updated.name||'').trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
     setTasks(prev => {
+      const old = prev.find(t => t.id === updated.id);
+      if (nextUpdated.completed && !old?.completed) clearReminder('task', updated.id).catch(() => {});
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
@@ -623,6 +698,30 @@ export default function App() {
   const openAddTaskModal = useCallback(() => setOpenModal('add'), []);
   const openEditTask     = useCallback((task) => setEditingTask(task), []);
   const handleSyncNow    = useCallback(() => syncTasks(tasks, setTasks, setSyncStatus), [tasks]);
+
+  // Reminders tab → jump to the task that owns a reminder, opened straight to its Scheduling tab.
+  const navigateToReminderSource = useCallback((sourceType, sourceId) => {
+    if (sourceType === 'task') {
+      setActiveTab('tasks');
+      setPendingOpenTaskId(sourceId);
+    }
+  }, []);
+  const clearPendingOpenTaskId = useCallback(() => setPendingOpenTaskId(null), []);
+
+  // Deep link from a reminder push notification's notificationclick handler
+  // (see public/sw.js), e.g. /?reminder=task:abc123 — opens once on load,
+  // then cleans the URL so a refresh doesn't re-trigger it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reminder = params.get('reminder');
+    if (!reminder) return;
+    const [sourceType, sourceId] = reminder.split(':');
+    if (sourceType && sourceId) navigateToReminderSource(sourceType, sourceId);
+    params.delete('reminder');
+    const next = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (next ? `?${next}` : ''));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Habit callbacks ──
   const addHabit = useCallback((h) => {
@@ -644,8 +743,7 @@ export default function App() {
     setHabits(prev => {
       const h = prev.find(x => x.id === id);
       if (h) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const wasCompleted = h.completions?.includes(todayStr);
+        const wasCompleted = h.completions?.includes(localDateStr());
         logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: wasCompleted ? 'updated' : 'completed', title: h.name, field_changes: wasCompleted ? [{ field: 'completed_today', from: 'true', to: 'false' }] : null });
       }
       return prev.map(x => x.id === id ? toggleCompletion(x) : x);
@@ -659,6 +757,9 @@ export default function App() {
 
     const done = !currentTask.completed;
     logActivity({ module: 'tasks', entity_type: 'task', entity_id: id, action: done ? 'completed' : 'updated', title: currentTask.name, field_changes: done ? null : [{ field: 'completed', from: 'true', to: 'false' }] });
+    // A completed task shouldn't still fire a reminder — clear it server-side.
+    // Fire-and-forget: a Supabase hiccup here shouldn't block completing the task.
+    if (done) clearReminder('task', id).catch(() => {});
 
     const performLocalUpdate = (forceSync = false) => {
       setTasks(prev => {
@@ -700,7 +801,13 @@ export default function App() {
         // Handle recurrence locally immediately
         if (done && currentTask.recurrence) {
            const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
-           const next = { ...currentTask, id: genId(), completed: false, status: 'needsAction', completedAt: null, dueDate: due, googleTaskId: null };
+           const next = {
+             ...currentTask,
+             id: genId(), completed: false, status: 'needsAction', completedAt: null,
+             dueDate: due, timeLogged: 0, pomodorosCompleted: 0,
+             createdAt: new Date().toISOString(),
+             googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
+           };
            setTasks(prev => [...prev, next]);
            pushSyncQueue({ type: 'CREATE', taskId: next.id });
         }
@@ -719,6 +826,7 @@ export default function App() {
   }, [tasks, activeTaskId, timerState, pauseTimer, setTasks]);
 
   const deleteTask = useCallback((id) => {
+    clearReminder('task', id).catch(() => {});
     setTasks(prev => {
       const task = prev.find(t => t.id === id);
       if (task) logActivity({ module: 'tasks', entity_type: 'task', entity_id: id, action: 'deleted', title: task.name });
@@ -763,7 +871,7 @@ export default function App() {
 
   const saveSettings = useCallback((next) => {
     setSettings(next);
-    if (timerState==='idle') { const s=getSecsForMode(timerMode,next); setTimerSeconds(s); setTotalSeconds(s); }
+    if (timerState==='idle') { const s=getSecsForMode(timerMode,next); setTimerSeconds(s); setTotalSeconds(s); setTickSeconds(s); }
     setOpenModal(null); showToast('Settings saved','success');
   }, [timerState, timerMode, showToast]);
 
@@ -816,7 +924,7 @@ export default function App() {
           if (newTracker.type === 'habit') {
             const { current: streak } = computeHabitStreaks(newTracker);
             if ([7, 14, 30, 60, 100].includes(streak)) {
-              if (window.confetti) window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+              confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
               showToast(`🔥 ${streak} day streak on ${newTracker.name}!`, 'success');
             }
           }
@@ -829,7 +937,7 @@ export default function App() {
           const total = (newTracker.config.milestones || []).length;
           if (oldDone < total && newDone === total && total > 0) {
             if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-            if (window.confetti) window.confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
+            confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
             showToast(`🎉 Project completed: ${newTracker.name}!`, 'success');
           } else if (newDone > oldDone) {
             if (navigator.vibrate) navigator.vibrate(50);
@@ -887,7 +995,6 @@ export default function App() {
   const [snoozedIds, setSnoozedIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchScope, setSearchScope] = useState('notes');
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
   const avatarRef = useRef(null);
@@ -910,7 +1017,7 @@ export default function App() {
   const [profileName, setProfileName] = useState(() => localStorage.getItem('nook-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
     const saved = localStorage.getItem('nook-profile-email');
-    if (saved && saved !== 'estherH@gmail.com') return saved;
+    if (saved) return saved;
     const name = localStorage.getItem('nook-profile-name') || 'user';
     return `${name.toLowerCase().replace(/\s+/g, '')}@gmail.com`;
   });
@@ -975,17 +1082,20 @@ export default function App() {
 
   const notifItems = useMemo(() => [
     {
-      id: 1, title: '🎯 Tasks Reminder', time: 'Just now', type: 'task',
+      // Live summaries, not discrete past events — 'Live' reflects that honestly
+      // instead of a fabricated elapsed time.
+      id: 1, title: '🎯 Tasks Reminder', time: 'Live', type: 'task',
       desc: urgentTask
         ? `You have ${pendingTasksCount} pending. "${urgentTask.name}"${urgentDueHrs !== null ? ` is due in ${urgentDueHrs}h.` : ' needs your attention.'}`
         : `You have ${pendingTasksCount} pending tasks. Keep up the momentum!`,
     },
     {
-      id: 2, title: '⚡ Habit Tracker', time: '10m ago', type: 'habit',
+      id: 2, title: '⚡ Habit Tracker', time: 'Live', type: 'habit',
       desc: `You have ${activeHabitsCount || 0} habit${activeHabitsCount !== 1 ? 's' : ''} active today. Remember to maintain your daily streaks!`,
     },
     {
-      id: 3, title: '📊 Analytics Insight', time: '1h ago', type: 'analytics',
+      // Real relative time from the most recent logged pomodoro, when one exists.
+      id: 3, title: '📊 Analytics Insight', time: pomodoroLog.length ? fmtRelativeTime(pomodoroLog[pomodoroLog.length - 1]) : 'Live', type: 'analytics',
       desc: pomodoroLog.length === 0
         ? 'Ready for your first focus session? Tap to start.'
         : yesterdayPomos > 0
@@ -1000,7 +1110,7 @@ export default function App() {
     if (localStorage.getItem('nook-notif-master') !== 'false') {
       const timer = setTimeout(() => {
         if ('Notification' in window && Notification.permission === 'granted') {
-          triggerDesktopNotification('Nook Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount || 4} active habits`);
+          triggerDesktopNotification('Nook Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount} active habits`);
         }
       }, 5000);
       return () => clearTimeout(timer);
@@ -1008,7 +1118,7 @@ export default function App() {
   }, [pendingTasksCount, activeHabitsCount]);
 
   const getInitials = (name) => {
-    if (!name) return 'EH';
+    if (!name) return 'PU'; // matches the 'Productivity User' default profile name
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
@@ -1080,7 +1190,8 @@ export default function App() {
       { id: 'tasks', label: 'Tasks' },
       { id: 'notes', label: 'Notes' },
       { id: 'calendar', label: 'Calendar' },
-      { id: 'vault', label: 'Vault' },
+      { id: 'reminders', label: 'Reminders' },
+      { id: 'vault', label: 'Saved Logins' },
       { id: 'links', label: 'Links' },
       { id: 'countdowns', label: 'Countdowns' },
       { id: 'habits', label: 'Habits' },
@@ -1377,6 +1488,7 @@ export default function App() {
             { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
             { id:'notes',    label:'Notes',    Icon: NavIcoNotes },
             { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
+            { id:'reminders', label:'Reminders', Icon: NavIcoBell },
             { id:'links',    label:'Links',    Icon: NavIcoLinks },
             { id:'countdowns', label:'Countdowns', Icon: NavIcoHourglass },
           ].map(tab => (
@@ -1397,7 +1509,7 @@ export default function App() {
             { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
             { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
             { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
-            { id:'vault',    label:'Vault',        Icon: NavIcoVault },
+            { id:'vault',    label:'Saved Logins', Icon: NavIcoVault },
             { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
             { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
           ].map(tab => (
@@ -1466,7 +1578,6 @@ export default function App() {
               pauseTimer={pauseTimer}
               resetTimer={resetTimer}
               timerState={timerState}
-              timerSeconds={timerSeconds}
               timerMode={timerMode}
               setActiveTab={setActiveTab}
             />
@@ -1539,7 +1650,6 @@ export default function App() {
                   timerMode={timerMode}
                   activeTimerMode={activeTimerMode}
                   timerState={timerState}
-                  timerSeconds={timerSeconds}
                   totalSeconds={totalSeconds}
                   pomodoroCount={pomodoroCount}
                   onSwitchMode={switchMode}
@@ -1557,7 +1667,6 @@ export default function App() {
                   onToggle={toggleComplete}
                   pomodoroLog={pomodoroLog}
                   timerState={timerState}
-                  timerSeconds={timerSeconds}
                   timerMode={timerMode}
                 />
                 <TodayBreakdown tasks={tasks} />
@@ -1576,9 +1685,10 @@ export default function App() {
           )}
           {activeTab === 'journal'  && <JournalView />}
           {activeTab === 'countdowns' && <CountdownsView />}
-          {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchScope === 'notes' ? searchQuery : ''} />}
+          {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchQuery} />}
           {activeTab === 'vault'    && <VaultView />}
           {activeTab === 'links'   && <LinksView />}
+          {activeTab === 'reminders' && <RemindersView onNavigateToSource={navigateToReminderSource} />}
           {activeTab === 'activity' && <ActivityLogView setActiveTab={setActiveTab} />}
 
           {activeTab === 'tasks' && (
@@ -1598,6 +1708,8 @@ export default function App() {
                 onQuickUpdate={quickUpdateTask}
                 syncStatus={syncStatus}
                 onSyncNow={handleSyncNow}
+                openTaskId={pendingOpenTaskId}
+                onOpenTaskIdHandled={clearPendingOpenTaskId}
               />
             </div>
           )}
@@ -1634,14 +1746,16 @@ export default function App() {
       {/* ── Modals ── */}
       <AnimatePresence>
         {noteEditorCtx && (
-          <NoteModal
-            key={noteEditorCtx.note.id}
-            note={noteEditorCtx.note}
-            onSave={(savedNote) => noteEditorCtx.onSave(savedNote)}
-            onClose={() => setNoteEditorCtx(null)}
-            onDelete={(id) => noteEditorCtx.onDelete(id)}
-            onColorChange={noteEditorCtx.onColorChange}
-          />
+          <Suspense fallback={null}>
+            <NoteModal
+              key={noteEditorCtx.note.id}
+              note={noteEditorCtx.note}
+              onSave={(savedNote) => noteEditorCtx.onSave(savedNote)}
+              onClose={() => setNoteEditorCtx(null)}
+              onDelete={(id) => noteEditorCtx.onDelete(id)}
+              onColorChange={noteEditorCtx.onColorChange}
+            />
+          </Suspense>
         )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
         {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
@@ -1787,6 +1901,9 @@ function NavIcoVault() {
 }
 function NavIcoLinks() {
   return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
+}
+function NavIcoBell() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
 }
 // Bottom
 function NavIcoSettings() {

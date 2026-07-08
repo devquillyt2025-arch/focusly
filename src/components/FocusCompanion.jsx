@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { CAT_META } from '../utils/categoryMeta';
 import { localDateStr } from '../utils/date';
+import { getTickSeconds, subscribeTick } from '../utils/timerTickStore';
 
 const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
 const PRIO_COLOR = { high: 'var(--color-red)', medium: 'var(--color-amber)', low: 'var(--color-blue)', none: 'var(--text-secondary)' };
@@ -13,8 +14,11 @@ function fmtEndTime(date) {
 
 export default function FocusCompanion({
   tasks, activeTaskId, onSelectTask, onToggle,
-  pomodoroLog, timerState, timerSeconds, timerMode,
+  pomodoroLog, timerState, timerMode,
 }) {
+  // Sourced from an external store (not props) so this 1s tick only re-renders
+  // FocusCompanion itself, not the whole app tree — see utils/timerTickStore.js.
+  const timerSeconds = useSyncExternalStore(subscribeTick, getTickSeconds);
   const modeColor  = MODE_COLOR[timerMode] ?? 'var(--color-red)';
   const activeTask = tasks.find(t => t.id === activeTaskId) ?? null;
 

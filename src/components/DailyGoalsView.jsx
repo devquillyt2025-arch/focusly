@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import DailyIntentions from './DailyIntentions';
 import Select from './Select';
+import { getTickSeconds, subscribeTick } from '../utils/timerTickStore';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   isScheduledToday, isLoggedToday, getLogForDate,
@@ -75,8 +76,11 @@ export default function DailyGoalsView({
   pomodoroLog = [], tasks = [], onTriggerWeeklyReview,
   habits = [], onMarkHabitDone,
   activeTaskId, timerRunning, selectTask, toggleComplete, deleteTask, clearCompleted, setOpenModal, addTask, setEditingTask, updateTaskData, quickUpdateTask, syncStatus, syncTasks,
-  startTimer, pauseTimer, resetTimer, timerState, timerSeconds, timerMode, setActiveTab
+  startTimer, pauseTimer, resetTimer, timerState, timerMode, setActiveTab
 }) {
+  // Sourced from an external store (not props) so this 1s tick only re-renders
+  // DailyGoalsView itself, not the whole app tree — see utils/timerTickStore.js.
+  const timerSeconds = useSyncExternalStore(subscribeTick, getTickSeconds);
   const [mode, setMode] = useState('viewing'); // 'viewing' or 'editing'
   const [taskRange, setTaskRange] = useState('today'); // 'today' or 'week'
 
