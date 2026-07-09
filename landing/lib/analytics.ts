@@ -16,7 +16,8 @@ type AnalyticsEvent =
   | { type: 'dwell'; seconds: number; ts: number }
   | { type: 'held_past_8s'; ts: number }
   | { type: 'easter_egg'; ts: number }
-  | { type: 'ask_nook'; ts: number };
+  | { type: 'ask_nook'; ts: number }
+  | { type: 'sign_in'; ts: number };
 
 function send(event: AnalyticsEvent) {
   try {
@@ -36,7 +37,7 @@ function send(event: AnalyticsEvent) {
 }
 
 export function track(
-  type: 'easter_egg' | 'ask_nook'
+  type: 'easter_egg' | 'ask_nook' | 'sign_in'
 ): void {
   send({ type, ts: Date.now() } as AnalyticsEvent);
 }

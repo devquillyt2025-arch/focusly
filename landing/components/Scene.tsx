@@ -238,6 +238,63 @@ function GlassKnot() {
   );
 }
 
+/**
+ * Floating holographic dust surrounding the object — one instancing-free
+ * points draw call. The additive blend lets bright particles catch the bloom
+ * pass, so the space around the glass sparkles instead of reading as empty.
+ */
+function Particles({ count = 260 }: { count?: number }) {
+  const ref = useRef<THREE.Points>(null!);
+
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // Hollow-ish shell (2.5–9 units) so dust surrounds but never crowds the knot.
+      const r = 2.5 + Math.pow(Math.random(), 0.6) * 6.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
+      arr[i * 3 + 2] = r * Math.cos(phi) * 0.6 - 1;
+    }
+    return arr;
+  }, [count]);
+
+  useFrame((state, delta) => {
+    if (!ref.current) return;
+    // Slow drift + gentle cursor parallax; the field sinks as you scroll so
+    // it hands the frame over to the DOM content.
+    ref.current.rotation.y += delta * 0.02;
+    ref.current.rotation.x = lerp(
+      ref.current.rotation.x,
+      state.pointer.y * 0.08,
+      0.03
+    );
+    ref.current.position.y = lerp(
+      ref.current.position.y,
+      -clamp(scrollStore.heroProgress) * 1.4,
+      0.06
+    );
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.035}
+        sizeAttenuation
+        transparent
+        opacity={0.5}
+        color="#a5b4fc"
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
 /** Studio lighting built from lightformers — no network HDR fetch. */
 function StudioEnv() {
   return (
@@ -310,6 +367,7 @@ export default function Scene() {
       <ambientLight intensity={0.4} />
       <Suspense fallback={null}>
         <GlassKnot />
+        <Particles />
         <StudioEnv />
       </Suspense>
       <Effects />

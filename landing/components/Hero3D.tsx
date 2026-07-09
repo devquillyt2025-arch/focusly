@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useDeviceCapability } from '@/lib/useDeviceCapability';
 import Fallback from './Fallback';
 
@@ -11,6 +11,8 @@ const Scene = dynamic(() => import('./Scene'), {
   ssr: false,
   loading: () => <SceneLoading />,
 });
+
+const LETTERS = ['n', 'o', 'o', 'k'];
 
 function SceneLoading() {
   return (
@@ -23,6 +25,15 @@ function SceneLoading() {
 export default function Hero3D() {
   const { can3D, ready } = useDeviceCapability();
 
+  // Scroll-out parallax: as you leave the hero, the type drifts up, swells
+  // slightly, and dissolves — the object (which grows via scrollStore in the
+  // 3D scene) takes over the frame. MotionValues, so no re-renders.
+  const { scrollY } = useScroll();
+  const textY = useTransform(scrollY, [0, 640], [0, -150]);
+  const textOpacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const textScale = useTransform(scrollY, [0, 640], [1, 1.07]);
+  const cueOpacity = useTransform(scrollY, [0, 200], [1, 0]);
+
   return (
     <section className="relative flex h-[100svh] w-full items-center justify-center">
       {/* Soft radial glow behind the object. */}
@@ -34,34 +45,58 @@ export default function Hero3D() {
       </div>
 
       {/* Wordmark + tagline, layered over the object. */}
-      <div className="pointer-events-none relative z-10 flex flex-col items-center text-center">
-        <motion.h1
-          initial={{ opacity: 0, y: 20, filter: 'blur(12px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-          className="text-holo-gradient select-none text-[22vw] font-medium leading-none tracking-[0.08em] sm:text-[18vw] md:text-[15rem]"
+      <motion.div
+        style={{ y: textY, opacity: textOpacity, scale: textScale }}
+        className="pointer-events-none relative z-10 flex flex-col items-center text-center"
+      >
+        <h1
+          className="select-none text-[22vw] font-medium leading-none tracking-[0.08em] sm:text-[18vw] md:text-[15rem]"
           style={{ mixBlendMode: 'plus-lighter' }}
         >
-          nook
-        </motion.h1>
+          {/* Per-letter reveal. The gradient lives on each span (not the h1):
+              transformed children break parent background-clip:text. */}
+          {LETTERS.map((ch, i) => (
+            <motion.span
+              key={i}
+              className="text-holo-gradient inline-block"
+              initial={{ opacity: 0, y: '0.4em', scale: 1.12, filter: 'blur(18px)' }}
+              animate={{ opacity: 1, y: '0em', scale: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.25 + i * 0.11 }}
+            >
+              {ch}
+            </motion.span>
+          ))}
+        </h1>
         <motion.p
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: 'easeOut', delay: 0.8 }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 1.05 }}
           className="mt-6 max-w-xs text-sm font-light tracking-[0.35em] text-holo-ice/60 sm:text-base"
         >
           A QUIET PLACE FOR EVERYTHING
         </motion.p>
-      </div>
+      </motion.div>
 
-      {/* Scroll cue. */}
+      {/* Scroll cue — fades as soon as scrolling starts. */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        transition={{ duration: 2.4, repeat: Infinity, delay: 1.6 }}
-        className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 text-xs tracking-[0.3em] text-holo-ice/40"
+        style={{ opacity: cueOpacity }}
+        className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-3"
       >
-        SCROLL
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.9, duration: 1 }}
+          className="text-[10px] tracking-[0.35em] text-holo-ice/40"
+        >
+          SCROLL
+        </motion.span>
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.9, duration: 1 }}
+          className="scroll-line"
+          aria-hidden
+        />
       </motion.div>
     </section>
   );

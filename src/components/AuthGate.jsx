@@ -12,7 +12,30 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!isAuthConfigured) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => { if (active) setSession(data.session ?? null); });
+
+    (async () => {
+      // Cross-app SSO handoff: the marketing/landing login page (a separate
+      // origin) signs the user in with its own Supabase client and hands off
+      // the resulting session via a URL hash using custom key names
+      // (`sb_access_token`/`sb_refresh_token`) so it never collides with
+      // Supabase's own OAuth/magic-link hash format, which this app's
+      // `detectSessionInUrl` already handles natively for its own Google
+      // sign-in and password-reset flows. Consume it once, then scrub the
+      // hash so the tokens never linger in the URL or browser history.
+      const hash = window.location.hash;
+      if (hash.includes('sb_access_token=')) {
+        const params = new URLSearchParams(hash.slice(1));
+        const access_token = params.get('sb_access_token');
+        const refresh_token = params.get('sb_refresh_token');
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+        }
+      }
+      const { data } = await supabase.auth.getSession();
+      if (active) setSession(data.session ?? null);
+    })();
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);

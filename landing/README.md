@@ -49,10 +49,69 @@ ambient hue shift **as one system** — cool indigo at the hero, warm holographi
 magenta by the modules (`components/ModuleShowcase.tsx`), where the eight nook
 modules stagger in as glass cards on scroll-into-view.
 
+### Atmosphere & feel
+The login card's living-glass language is carried across the whole page:
+
+- **Cursor light** (`components/CursorGlow.tsx`) — a hue-tinted glow trails the
+  cursor (transform-only rAF lerp), so every glass surface reads as lit by you.
+- **Card physics** — module cards tilt in 3D toward the pointer and carry a
+  cursor-tracked specular highlight (direct style writes, zero re-renders).
+- **Letter-by-letter hero** — the wordmark blurs in per letter, then parallaxes
+  up and dissolves on scroll-out while the object takes the frame.
+- **Particle dust** — ~260 additive points drift around the object (one draw
+  call) and catch the bloom pass.
+- **Pinned statement** (`components/Statement.tsx`) — an Apple-style sentence
+  revealed word-by-word, scrubbed by scroll while pinned.
+- **Marquee, film grain, vignette, giant finale wordmark** — plus styled
+  scrollbar and selection. Grain/vignette/glow are fixed compositor layers;
+  everything respects `prefers-reduced-motion`.
+
 ### Easter egg
 **Triple-click the object** and it briefly shatters into shard particles, then
 reforms. Instanced shards (one draw call), envelope-animated in `useFrame` — cheap,
 and it gets screenshotted.
+
+### Login → dashboard (`components/LiquidGlassLogin.tsx` + `app/login/page.tsx`)
+`/login` is now the real front door to the nook dashboard — same Supabase
+project as the main (Vite) app, email/password + Google OAuth, sign-up, and
+password reset, all wired to `src/utils/authClient.js`'s exact error-copy and
+`AuthPage.jsx`'s exact auth calls. Visual design is untouched from the
+original: the SVG turbulence/displacement refraction, cursor-tracked
+specular, and edge sheen are unchanged.
+
+**Why it's not a shared session automatically:** landing (`/login`) and the
+dashboard are separate deployments — separate origins, separate storage.
+- **Google/GitHub OAuth** needs no bridge: `redirectTo` points straight at the
+  dashboard's origin (`NEXT_PUBLIC_APP_URL`), so when the provider redirects
+  back, the dashboard's own `detectSessionInUrl` (already used for its native
+  Google sign-in) picks the session up automatically.
+- **Email/password** has no redirect step — Supabase just returns a session
+  directly. `lib/supabaseClient.ts`'s `handoffUrl()` hands the access/refresh
+  tokens to the dashboard via a URL hash with custom key names
+  (`sb_access_token`/`sb_refresh_token`, chosen so they never collide with
+  Supabase's own `access_token=` hash format). `src/components/AuthGate.jsx`
+  on the dashboard side consumes them once via `supabase.auth.setSession(...)`
+  and immediately scrubs the hash from the URL/history.
+- **Password reset** needs no bridge either — Supabase's recovery email uses
+  its own native hash format, which `detectSessionInUrl` already handles.
+
+**Setup required:**
+1. `landing/.env.local` needs `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` (same values as the main app's
+   `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`), and `NEXT_PUBLIC_APP_URL`
+   (the dashboard's origin — `http://localhost:5173` in dev).
+2. In the Supabase dashboard → **Authentication → URL Configuration →
+   Redirect URLs**, add landing's origin (e.g. `http://localhost:3000` in dev,
+   your production landing domain in prod) — required for the OAuth flow to
+   be allowed even though it lands on the dashboard's origin.
+3. **GitHub is wired but not required to work out of the box** — only Google
+   is enabled in the shared Supabase project today (per `AuthPage.jsx`). The
+   GitHub button makes a real `signInWithOAuth('github')` call; until GitHub
+   is enabled as a provider in the Supabase dashboard, it'll show a friendly
+   "isn't enabled yet" error rather than silently doing nothing.
+
+Without `ANTHROPIC_API_KEY` the "ask nook" widget below still degrades to a
+demo answer — sign-in configuration is independent of that.
 
 ### ask nook (`components/AskNook.tsx` + `app/api/ask/route.ts`)
 One input, hits Claude (`claude-opus-4-8`) server-side, and answers *how nook would
