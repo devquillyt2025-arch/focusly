@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { memo,  useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { logActivity } from '../utils/activityLog';
 import { localDateStr } from '../utils/date';
@@ -148,7 +148,7 @@ function computeStreak(today, wcMap) {
 }
 
 // ─── Component ──────────────────────────────────────────────────────
-export default function JournalView() {
+export default memo(function JournalView() {
   const todayDate = localDateStr();
 
   const [viewingDate, setViewingDate] = useState(todayDate);
@@ -448,7 +448,7 @@ export default function JournalView() {
         />, document.body)}
     </div>
   );
-}
+});
 
 // ─── Command palette ────────────────────────────────────────────────
 function CommandPalette({ entries, todayDate, onClose, onJump }) {

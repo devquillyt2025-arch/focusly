@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { memo,  useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
@@ -500,7 +500,7 @@ export function NoteCard({ note, onOpen, onPin, onDelete, onTagClick, onColorSel
 }
 
 // ── Main NotesView ─────────────────────────────────────────────────────────
-export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) {
+export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [notes,       setNotes]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
@@ -831,7 +831,7 @@ export default function NotesView({ onOpenNoteEditor, globalSearchQuery = '' }) 
     </div>
     </ErrorBoundary>
   );
-}
+});
 
 
 // ── Date helpers ──────────────────────────────────────────────────

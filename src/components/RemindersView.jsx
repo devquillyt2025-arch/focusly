@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { memo,  useState, useEffect, useCallback } from 'react';
 import { listReminders, groupReminders } from '../utils/reminders';
 
 // Read-only aggregated view over the `reminders` companion table — this
 // page has no independent create/delete, it only surfaces and lets you
 // jump to the task that owns each reminder (set from a task's
 // Scheduling tab). Snooze/dismiss actions land in the next pass.
-export default function RemindersView({ onNavigateToSource }) {
+export default memo(function RemindersView({ onNavigateToSource }) {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
@@ -69,7 +69,7 @@ export default function RemindersView({ onNavigateToSource }) {
       )}
     </div>
   );
-}
+});
 
 function ReminderGroup({ label, items, tone, onNavigateToSource }) {
   if (items.length === 0) return null;

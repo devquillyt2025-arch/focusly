@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { memo,  useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { loadActivityLog, clearActivityLog } from '../utils/activityLog';
 
 // ── Verb/dot colors per action ────────────────────────────────────
@@ -105,7 +105,7 @@ function buildLabel(entity_type, action) {
 const PAGE_SIZE = 150;
 
 // ── Main component ────────────────────────────────────────────────
-export default function ActivityLogView({ setActiveTab }) {
+export default memo(function ActivityLogView({ setActiveTab }) {
   const [log,          setLog]          = useState([]);
   const [search,       setSearch]       = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
@@ -344,7 +344,7 @@ export default function ActivityLogView({ setActiveTab }) {
       )}
     </div>
   );
-}
+});
 
 // ── Dense single-line entry ───────────────────────────────────────
 function DenseEntry({ entry, setActiveTab }) {
