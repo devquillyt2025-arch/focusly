@@ -7,6 +7,8 @@ import ErrorBoundary from './ErrorBoundary';
 import Select from './Select';
 import ReminderField from './ReminderField';
 import CalendarDatePicker from './CalendarDatePicker';
+import TimePicker from './TimePicker';
+import { syncTaskField } from '../utils/googleTasksSync';
 
 
 const PRI_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
@@ -539,20 +541,29 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
   const notesRef     = useRef(null);
   const catMenuRef       = useRef(null);
   const datePickerRef    = useRef(null);
+  const timePickerRef    = useRef(null);
   const skipBlurRef      = useRef(false); // prevents onBlur from firing after Escape in inline-add
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  // 'idle' | 'saving' | 'saved' | 'error' | 'offline'
+  const [dueSyncStatus, setDueSyncStatus] = useState('idle');
+  const dueSyncTimerRef = useRef(null);
+  const saveDueTimeDebounceRef = useRef(null);
 
   // Close calendar picker on outside click
   useEffect(() => {
-    if (!showDatePicker) return;
+    if (!showDatePicker && !showTimePicker) return;
     const handler = (e) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+      if (showDatePicker && datePickerRef.current && !datePickerRef.current.contains(e.target)) {
         setShowDatePicker(false);
+      }
+      if (showTimePicker && timePickerRef.current && !timePickerRef.current.contains(e.target)) {
+        setShowTimePicker(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showDatePicker]);
+  }, [showDatePicker, showTimePicker]);
 
   const handleNewList = (taskToMove) => {
     const name = prompt('Enter new list name:');
@@ -655,6 +666,124 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
     (onQuickUpdate || onUpdate)(updated);
     showSaved();
   };
+
+  // ── Due-date save with Google Tasks sync feedback ──────────────────
+  // Saves locally first (optimistic), then fires a direct PATCH to Google Tasks.
+  // On failure: shows an error badge + rolls back the local change.
+  const saveDueDate = useCallback(async (newDate) => {
+    const syncEnabled = localStorage.getItem('nook_sync_enabled') === 'true';
+    const prevDate = local?.dueDate ?? '';
+    const updated = { ...local, dueDate: newDate };
+
+    // 1. Optimistic local save.
+    setLocal(updated);
+    (onQuickUpdate || onUpdate)(updated);
+    showSaved();
+    setShowDatePicker(false);
+
+    // 2. If Google Tasks is not connected, show a subtle offline badge and bail.
+    if (!syncEnabled) {
+      setDueSyncStatus('offline');
+      clearTimeout(dueSyncTimerRef.current);
+      dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 2500);
+      return;
+    }
+
+    // 3. Push to Google Tasks.
+    setDueSyncStatus('saving');
+    try {
+      const result = await syncTaskField(updated);
+
+      if (result.ok) {
+        setDueSyncStatus('saved');
+        clearTimeout(dueSyncTimerRef.current);
+        dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 2000);
+      } else if (result.reason === 'unauthenticated') {
+        // Token expired and could not be refreshed — roll back.
+        const rolledBack = { ...local, dueDate: prevDate };
+        setLocal(rolledBack);
+        (onQuickUpdate || onUpdate)(rolledBack);
+        setDueSyncStatus('error');
+        clearTimeout(dueSyncTimerRef.current);
+        dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 3500);
+      } else if (result.reason === 'no_google_id') {
+        // Task not yet created in Google — the regular sync queue will handle it.
+        setDueSyncStatus('saved');
+        clearTimeout(dueSyncTimerRef.current);
+        dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 1500);
+      } else {
+        // API error — roll back.
+        const rolledBack = { ...local, dueDate: prevDate };
+        setLocal(rolledBack);
+        (onQuickUpdate || onUpdate)(rolledBack);
+        setDueSyncStatus('error');
+        clearTimeout(dueSyncTimerRef.current);
+        dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 3500);
+      }
+    } catch {
+      setDueSyncStatus('error');
+      clearTimeout(dueSyncTimerRef.current);
+      dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 3500);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local, onQuickUpdate, onUpdate, showSaved]);
+
+  const saveDueTime = useCallback((newTime) => {
+    console.log('[DEBUG] TimePicker onChange output (newTime):', newTime);
+    const syncEnabled = localStorage.getItem('nook_sync_enabled') === 'true';
+    const prevTime = local?.time ?? '';
+    const updated = { ...local, time: newTime };
+    console.log('[DEBUG] Constructed updated task before syncTaskField:', JSON.stringify(updated, null, 2));
+
+    // 1. Optimistic local save.
+    setLocal(updated);
+    (onQuickUpdate || onUpdate)(updated);
+    showSaved();
+    setShowTimePicker(false);
+
+    // 2. If Google Tasks is not connected, show a subtle offline badge and bail.
+    if (!syncEnabled) {
+      setDueSyncStatus('offline');
+      clearTimeout(dueSyncTimerRef.current);
+      dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 2500);
+      return;
+    }
+
+    if (saveDueTimeDebounceRef.current) clearTimeout(saveDueTimeDebounceRef.current);
+
+    // 3. Push to Google Tasks (debounced)
+    setDueSyncStatus('saving');
+    saveDueTimeDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await syncTaskField(updated);
+
+        if (result.ok) {
+          setDueSyncStatus('saved');
+          clearTimeout(dueSyncTimerRef.current);
+          dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 2000);
+        } else if (result.reason === 'unauthenticated' || result.reason === 'api_error') {
+          const rolledBack = { ...local, time: prevTime };
+          setLocal(rolledBack);
+          (onQuickUpdate || onUpdate)(rolledBack);
+          setDueSyncStatus('error');
+          clearTimeout(dueSyncTimerRef.current);
+          dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 3500);
+        } else {
+          setDueSyncStatus('saved');
+          clearTimeout(dueSyncTimerRef.current);
+          dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 1500);
+        }
+      } catch {
+        setDueSyncStatus('error');
+        clearTimeout(dueSyncTimerRef.current);
+        dueSyncTimerRef.current = setTimeout(() => setDueSyncStatus('idle'), 3500);
+      }
+    }, 500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local, onQuickUpdate, onUpdate, showSaved]);
+
+  // Cleanup sync timer on unmount
+  useEffect(() => () => clearTimeout(dueSyncTimerRef.current), []);
 
   const openDetail = (task, initialTab = 'details') => {
     setDetailTask(task);
@@ -1218,47 +1347,89 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                 <>
                   {/* Due Date */}
                   <div className="tdp-field">
-                    <label className="tdp-label">Due Date</label>
-                    <div ref={datePickerRef} style={{ position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowDatePicker(p => !p)}
-                        style={{
-                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: 'var(--bg-input)', border: `1px solid ${showDatePicker ? 'var(--accent)' : 'var(--border)'}`,
-                          borderRadius: 'var(--radius-sm)', padding: '9px 12px', cursor: 'pointer',
-                          color: local.dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                          fontSize: '0.875rem', fontWeight: local.dueDate ? 600 : 400,
-                          transition: 'border-color 0.13s ease', gap: 8,
-                        }}
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: local.dueDate ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
-                            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                          </svg>
-                          {local.dueDate
-                            ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                            : 'Pick a date'}
+                    <label className="tdp-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      Due Date
+                      {/* Google Tasks sync status badge */}
+                      {dueSyncStatus === 'saving' && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          <span style={{ width: 10, height: 10, border: '1.5px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite', display: 'inline-block', flexShrink: 0 }} />
+                          Syncing…
                         </span>
-                        {local.dueDate && (
-                          <span role="button"
-                            onClick={e => { e.stopPropagation(); saveField('dueDate', ''); setShowDatePicker(false); }}
-                            title="Clear"
-                            style={{ color: 'var(--color-red)', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
-                          >×</span>
-                        )}
-                      </button>
-                      <AnimatePresence>
-                        {showDatePicker && (
-                          <CalendarDatePicker
-                            value={local.dueDate || ''}
-                            onChange={v => { saveField('dueDate', v); }}
-                            onClose={() => setShowDatePicker(false)}
-                          />
-                        )}
-                      </AnimatePresence>
+                      )}
+                      {dueSyncStatus === 'saved' && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-green)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          Synced
+                        </span>
+                      )}
+                      {dueSyncStatus === 'error' && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-red)', display: 'inline-flex', alignItems: 'center', gap: 3 }} title="Google Tasks sync failed — change rolled back">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          Sync failed
+                        </span>
+                      )}
+                      {dueSyncStatus === 'offline' && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }} title="Connect Google Tasks in Settings to sync">
+                          Local only
+                        </span>
+                      )}
+                    </label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div ref={datePickerRef} style={{ position: 'relative', flex: 3 }}>
+                        <button
+                          type="button"
+                          disabled={dueSyncStatus === 'saving'}
+                          onClick={() => { setShowDatePicker(p => !p); setShowTimePicker(false); }}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            background: 'var(--bg-input)', border: `1px solid ${showDatePicker ? 'var(--accent)' : 'var(--border)'}`,
+                            borderRadius: 'var(--radius-sm)', padding: '9px 12px', cursor: dueSyncStatus === 'saving' ? 'not-allowed' : 'pointer',
+                            color: local.dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                            fontSize: '0.875rem', fontWeight: local.dueDate ? 600 : 400,
+                            transition: 'border-color 0.13s ease', gap: 8,
+                            opacity: dueSyncStatus === 'saving' ? 0.65 : 1,
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: local.dueDate ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
+                              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            {local.dueDate
+                              ? new Date(local.dueDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                              : 'Pick a date'}
+                            {local.dueDate && local.time && (
+                              <span style={{ color: 'var(--text-muted)', marginLeft: 4, fontWeight: 500 }}>
+                                @ {(() => {
+                                  const [h, m] = local.time.split(':').map(Number);
+                                  const meridiem = h >= 12 ? 'PM' : 'AM';
+                                  const h12 = h % 12 === 0 ? 12 : h % 12;
+                                  return `${h12}:${String(m).padStart(2, '0')} ${meridiem}`;
+                                })()}
+                              </span>
+                            )}
+                          </span>
+                          {local.dueDate && dueSyncStatus !== 'saving' && (
+                            <span role="button"
+                              onClick={e => { e.stopPropagation(); saveDueDate(''); saveDueTime(''); }}
+                              title="Clear"
+                              style={{ color: 'var(--color-red)', fontSize: '1rem', lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}
+                            >×</span>
+                          )}
+                        </button>
+                        <AnimatePresence>
+                          {showDatePicker && (
+                            <CalendarDatePicker
+                              value={local.dueDate || ''}
+                              onChange={v => { saveDueDate(v); }}
+                              onClose={() => setShowDatePicker(false)}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
                   </div>
+                  {/* Keyframe for saving spinner — only injected once */}
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
                   {/* Reminder */}
                   <ReminderField
@@ -1267,9 +1438,13 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                     title={local.name}
                     targetAt={local.dueDate ? new Date(local.dueDate + 'T23:59:59') : null}
                     targetLabel="due date"
+                    onTimeSelect={saveDueTime}
                   />
 
                   {/* Repeat — compact select */}
+                  {/* NOTE: Recurrence is local-only. The Google Tasks REST API does not
+                      support a recurrence/RRULE field for classic tasks. Nook handles
+                      this locally by auto-creating the next occurrence on completion. */}
                   <div className="tdp-field">
                     <label className="tdp-label">Repeat</label>
                     <div className="tdp-select-wrap">

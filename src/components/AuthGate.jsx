@@ -40,7 +40,7 @@ export default function AuthGate({ children }) {
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
 
-  if (!isAuthConfigured) return <AuthPage />;
+  if (!isAuthConfigured) return children;
 
   if (session === undefined) {
     return (

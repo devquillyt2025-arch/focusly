@@ -300,7 +300,7 @@ export default function App() {
       }
       window.location.reload();
     }
-  }, [setTasks, setTrackers, setPomodoroLog, showToast, saveSettings, setTheme]);
+  }, []);
 
   const handleClearData = useCallback(() => {
     if (confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
@@ -333,9 +333,8 @@ export default function App() {
   }, [tasks, setTasks, setSyncStatus]);
 
   const handleUpdateProfile = useCallback((name, email, av) => {
-    setProfileName(name);
-    setProfileEmail(email);
-    setProfileAvatar(av);
+    // Profile name/email/avatar are stored in localStorage by SettingsView directly.
+    // Nothing to sync into App state here.
   }, []);
 
   const handleConnectGCal = useCallback(() => connectGoogleCalendar(), []);
@@ -523,6 +522,16 @@ export default function App() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 3200);
   }, []);
+
+  useEffect(() => {
+    const handleAppToast = (e) => {
+      if (e.detail && e.detail.msg) {
+        showToast(e.detail.msg, e.detail.type || 'info');
+      }
+    };
+    window.addEventListener('app-toast', handleAppToast);
+    return () => window.removeEventListener('app-toast', handleAppToast);
+  }, [showToast]);
 
   // ── Timer ──
   // Batched focus-time accrual: the ticking interval no longer calls setTasks (and

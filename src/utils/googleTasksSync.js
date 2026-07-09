@@ -197,19 +197,121 @@ export async function getValidAccessToken(onStatusChange) {
 }
 
 // ─── Task Model Mapping ─────────────────────────────────────────────────────────────────
+export function extractDueDateTime(gTaskDue) {
+  if (!gTaskDue) return { dueDate: '', time: '' };
+  
+  // If no time is provided, Google Tasks (or Nook's date-only fallback) sets it to midnight UTC.
+  const isDateOnly = gTaskDue.endsWith('T00:00:00.000Z') || !gTaskDue.includes('T');
+  if (isDateOnly) {
+    return { dueDate: gTaskDue.split('T')[0], time: '' };
+  }
+  
+  // If a specific time was set, convert it from UTC to the user's local timezone.
+  const d = new Date(gTaskDue);
+  if (isNaN(d.getTime())) return { dueDate: '', time: '' };
+  
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  
+  return {
+    dueDate: `${yyyy}-${mm}-${dd}`,
+    time: `${hh}:${min}`
+  };
+}
+
 export function nookToGoogleTask(task) {
   const res = {
     title: task.name || 'Untitled',
     notes: task.notes || '',
     status: task.status === 'completed' ? 'completed' : 'needsAction'
   };
+  console.log('[DEBUG] task.time value: ', task.time);
   if (task.dueDate) {
-    res.due = `${task.dueDate}T00:00:00.000Z`;
+    if (task.time && typeof task.time === 'string' && task.time.includes(':')) {
+      const [yyyy, mm, dd] = task.dueDate.split('-');
+      const [hh, min] = task.time.split(':');
+      const localD = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd), parseInt(hh), parseInt(min));
+      if (!isNaN(localD.getTime())) {
+        res.due = localD.toISOString();
+      } else {
+        res.due = `${task.dueDate}T00:00:00.000Z`;
+      }
+    } else {
+      res.due = `${task.dueDate}T00:00:00.000Z`;
+    }
   } else {
     res.due = null;
   }
+  // NOTE — Recurrence / RRULE:
+  // The Google Tasks REST API does NOT support a recurrence field for classic
+  // tasks (only Google Calendar events do). Any RRULE sent here is silently
+  // ignored by the API. Nook's recurrence is therefore intentionally local-only:
+  // it auto-creates the next task occurrence when a recurring task is completed.
+  // If full native recurrence is needed, a separate Google Calendar integration
+  // (different OAuth scope: calendar) would be required.
   return res;
 }
+
+// ─── Immediate single-field sync ────────────────────────────────────────────────────────
+// Directly PATCHes one task in Google Tasks without going through the full sync queue.
+// Used by the Scheduling tab so the user gets instant feedback when changing a field.
+//
+// Returns:
+//   { ok: true }                          — push succeeded
+//   { ok: false, reason: 'unauthenticated' } — no valid token (not connected / expired)
+//   { ok: false, reason: 'api_error', status, message } — Google API returned an error
+//   { ok: false, reason: 'network_error', message }     — fetch threw
+//
+export async function syncTaskField(task) {
+  // 1. Auth guard — get a valid token, refreshing if needed.
+  const token = await getValidAccessToken();
+  if (!token) {
+    return { ok: false, reason: 'unauthenticated' };
+  }
+
+  // 2. The task must already have a googleTaskId to be PATCHable.
+  //    If it doesn't (hasn't been created on Google yet), fall back to the full queue.
+  if (!task.googleTaskId) {
+    return { ok: false, reason: 'no_google_id' };
+  }
+
+  // 3. Build the minimal payload (only the fields Google Tasks exposes).
+  const payload = nookToGoogleTask(task);
+  console.log('[Google Tasks Sync] Outgoing PATCH Payload:', JSON.stringify(payload, null, 2));
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/tasks/v1/lists/@default/tasks/${task.googleTaskId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (res.ok) {
+      window.dispatchEvent(new CustomEvent('app-toast', { detail: { msg: 'Time updated and synced successfully!', type: 'success' } }));
+      return { ok: true };
+    }
+
+    const errText = await res.text();
+    console.warn('[syncTaskField] PATCH failed', res.status, errText);
+    window.dispatchEvent(new CustomEvent('app-toast', { detail: { msg: 'Failed to sync. Please check your connection.', type: 'warn' } }));
+    return { ok: false, reason: 'api_error', status: res.status, message: errText };
+  } catch (err) {
+    console.error('[syncTaskField] Network error:', err);
+    window.dispatchEvent(new CustomEvent('app-toast', { detail: { msg: 'Failed to sync. Please check your connection.', type: 'warn' } }));
+    return { ok: false, reason: 'network_error', message: err.message };
+  }
+}
+
+
 
 // ─── Offline Queue & Rate Limiting ───────────────────────────────────────────────────────
 export function pushSyncQueue(action) {
@@ -274,10 +376,12 @@ export async function pushLocalChangesToGoogle(tasks, token) {
       let parentGoogleTaskId = localTask.googleTaskId;
 
       if (op.type === 'CREATE' || !parentGoogleTaskId) {
+        const payload = nookToGoogleTask(localTask);
+        console.log('[Google Tasks Sync] Outgoing POST Payload:', JSON.stringify(payload, null, 2));
         const res = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(nookToGoogleTask(localTask))
+          body: JSON.stringify(payload)
         });
 
         if (res.ok) {
@@ -298,10 +402,12 @@ export async function pushLocalChangesToGoogle(tasks, token) {
           continue;
         }
       } else {
+        const payload = nookToGoogleTask(localTask);
+        console.log('[Google Tasks Sync] Outgoing PATCH Payload:', JSON.stringify(payload, null, 2));
         const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${parentGoogleTaskId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(nookToGoogleTask(localTask))
+          body: JSON.stringify(payload)
         });
 
         if (res.ok) {
@@ -452,6 +558,7 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
       if (deletedIds.includes(gTask.id)) {
         console.warn(`[Google Tasks Sync] Conflict logged: Task "${gTask.title}" was deleted locally but updated on Google Tasks.`);
       } else {
+        const extracted = extractDueDateTime(gTask.due);
         const newTask = {
           id: String(Date.now() + Math.random()),
           name: gTask.title || 'Untitled',
@@ -459,7 +566,8 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
           priority: 'none',
           timeEstimate: 25,
           notes: gTask.notes || '',
-          dueDate: gTask.due ? gTask.due.split('T')[0] : '',
+          dueDate: extracted.dueDate,
+          time: extracted.time,
           completed: gTask.status === 'completed',
           status: gTask.status || 'needsAction',
           timeLogged: 0,
@@ -499,11 +607,13 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
 
         // If Google Task is newer than our last sync AND newer than local update
         if (gUpdated > localSynced && gUpdated > localUpdated) {
+          const extracted = extractDueDateTime(gTask.due);
           updatedTasks = updatedTasks.map(t => t.id === localTask.id ? {
             ...t,
             name: gTask.title || 'Untitled',
             notes: gTask.notes || '',
-            dueDate: gTask.due ? gTask.due.split('T')[0] : '',
+            dueDate: extracted.dueDate,
+            time: extracted.time,
             completed: gTask.status === 'completed',
             status: gTask.status || 'needsAction',
             completedAt: gTask.status === 'completed' ? (gTask.completed || t.completedAt || new Date().toISOString()) : null,

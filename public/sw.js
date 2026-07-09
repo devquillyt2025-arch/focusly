@@ -1,10 +1,10 @@
-const CACHE_NAME = 'nook-v1';
+const CACHE_NAME = 'nook-v2';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon-192.svg',
-  '/icon-512.svg'
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -30,20 +30,26 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // Network first for everything, fallback to cache
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
+    (async () => {
+      try {
+        const response = await fetch(event.request);
         // Clone the response and cache it
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(event.request, responseToCache);
         }
         return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+      } catch (error) {
+        // Network request failed, try to return cached response
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        // Always return a Response object to prevent TypeError crashing the worker
+        return Response.error();
+      }
+    })()
   );
 });
 
@@ -59,8 +65,8 @@ self.addEventListener('push', event => {
   const title = data.title || 'Nook reminder';
   const options = {
     body: data.body || '',
-    icon: '/icon-192.svg',
-    badge: '/icon-192.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     tag: data.source_id ? `${data.source_type}-${data.source_id}` : undefined,
     data: {
       url: data.url || '/',
