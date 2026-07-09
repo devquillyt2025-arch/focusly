@@ -12,7 +12,7 @@ import {
   ArcElement
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
-import { isScheduledOn, dateStrOf } from '../trackers/trackerUtils';
+import { isScheduledOn, dateStrOf, getConfig } from '../trackers/trackerUtils';
 
 ChartJS.register(
   CategoryScale,
@@ -111,7 +111,10 @@ export function HabitDayOfWeekChart({ tracker, color }) {
   // Only consider days since creation up to today
   const createdDate = new Date(tracker.createdAt);
   const today = new Date();
-  
+  if (isNaN(createdDate)) {
+    console.warn(`[Trackers] "${tracker.name}" has an unparseable createdAt — day-of-week chart will be empty.`);
+  }
+
   for (let d = new Date(createdDate); d <= today; d.setDate(d.getDate() + 1)) {
     if (isScheduledOn(tracker, d)) {
       const dow = d.getDay();
@@ -147,7 +150,7 @@ export function HabitDayOfWeekChart({ tracker, color }) {
 // ─── Target Charts ─────────────────────────────────────────────────────────
 
 export function TargetProgressChart({ tracker, color }) {
-  const { startValue = 0, targetValue = 100, targetDate = '' } = tracker.config;
+  const { startValue = 0, targetValue = 100, targetDate = '' } = getConfig(tracker);
   const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
   
   if (!logs.length) return null;
@@ -282,7 +285,7 @@ export function AverageRollingChart({ tracker, color }) {
 // ─── Project Charts ────────────────────────────────────────────────────────
 
 export function ProjectBurndownChart({ tracker, color }) {
-  const { milestones = [], targetDate = '' } = tracker.config;
+  const { milestones = [], targetDate = '' } = getConfig(tracker);
   if (!milestones.length || !targetDate) return null;
 
   const s = new Date(tracker.createdAt).getTime();

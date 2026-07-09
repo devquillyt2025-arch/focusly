@@ -493,6 +493,9 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
         const gUpdated = new Date(gTask.updated).getTime();
         const localUpdated = new Date(localTask.updatedAt || localTask.createdAt).getTime();
         const localSynced = new Date(localTask.lastSyncedAt || 0).getTime();
+        if (isNaN(gUpdated)) {
+          console.warn(`[Google Tasks Sync] Task "${gTask.title}" has an unparseable "updated" timestamp — this update will be skipped.`);
+        }
 
         // If Google Task is newer than our last sync AND newer than local update
         if (gUpdated > localSynced && gUpdated > localUpdated) {
@@ -545,6 +548,9 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
         const gUpdated = new Date(gSub.updated).getTime();
         const localUpdated = new Date(localSub.updatedAt || parentTask.updatedAt || parentTask.createdAt).getTime();
         const localSynced = new Date(parentTask.lastSyncedAt || 0).getTime();
+        if (isNaN(gUpdated)) {
+          console.warn(`[Google Tasks Sync] Subtask "${gSub.title}" has an unparseable "updated" timestamp — this update will be skipped.`);
+        }
 
         if (gUpdated > localSynced && gUpdated > localUpdated) {
           const nextSubs = (parentTask.subtasks || []).map(s => s.id === localSub.id ? {

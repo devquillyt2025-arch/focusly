@@ -61,6 +61,14 @@ export function defaultConfig(type) {
   }
 }
 
+// Config-less trackers can reach here from corrupted/legacy/imported data.
+// Falling back to the same defaultConfig() used for brand-new trackers means
+// every reader sees one consistent, already-trusted shape instead of each
+// call site inventing its own fallback.
+export function getConfig(tracker) {
+  return tracker.config || defaultConfig(tracker.type);
+}
+
 // ─── Schedule ─────────────────────────────────────────────────────
 export function isScheduledOn(tracker, date = new Date()) {
   const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : date;
@@ -94,18 +102,22 @@ export function upsertLog(tracker, value, date = todayStr()) {
 }
 
 export function toggleMilestone(tracker, milestoneId) {
-  const milestones = (tracker.config.milestones || []).map(m =>
+  const config = getConfig(tracker);
+  const milestones = (config.milestones || []).map(m =>
     m.id === milestoneId
       ? { ...m, done: !m.done, doneAt: !m.done ? new Date().toISOString() : null }
       : m
   );
-  return { ...tracker, config: { ...tracker.config, milestones } };
+  // Writing back through getConfig() heals a config-less tracker to a full
+  // default shape (e.g. adds targetDate: '') the moment it's touched — a
+  // strict superset of whatever was there before, never a data loss.
+  return { ...tracker, config: { ...config, milestones } };
 }
 
 export function isLoggedToday(tracker) {
   const today = todayStr();
   if (tracker.type === 'project') {
-    const { milestones = [] } = tracker.config;
+    const { milestones = [] } = getConfig(tracker);
     return milestones.length > 0 && milestones.every(m => m.done);
   }
   if (tracker.type === 'habit') {
@@ -148,6 +160,9 @@ export function computeHabitStreaks(tracker) {
   let longest = 0;
   let run = 0;
   const createdDate = new Date(tracker.createdAt);
+  if (isNaN(createdDate)) {
+    console.warn(`[Trackers] "${tracker.name}" has an unparseable createdAt — longest streak may be understated.`);
+  }
   for (let d = new Date(createdDate); d <= now; d.setDate(d.getDate() + 1)) {
     const ds = dateStrOf(d);
     if (!isScheduledOn(tracker, d)) continue;
@@ -166,7 +181,7 @@ export function computeHabitStreaks(tracker) {
 
 // ─── Target stats ─────────────────────────────────────────────────
 export function computeTargetStats(tracker) {
-  const { targetValue = 100, startValue = 0, unit = '', targetDate = '' } = tracker.config;
+  const { targetValue = 100, startValue = 0, unit = '', targetDate = '' } = getConfig(tracker);
   const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
   const currentValue = logs.length > 0 ? logs[logs.length - 1].value : startValue;
   const range = targetValue - startValue;
@@ -189,7 +204,7 @@ export function computeTargetStats(tracker) {
 
 // ─── Average stats ────────────────────────────────────────────────
 export function computeAverageStats(tracker) {
-  const { targetAverage = 0, unit = '' } = tracker.config;
+  const { targetAverage = 0, unit = '' } = getConfig(tracker);
   const today = todayStr();
   const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
   const avg = list => list.length
@@ -211,7 +226,7 @@ export function computeAverageStats(tracker) {
 
 // ─── Project stats ────────────────────────────────────────────────
 export function computeProjectStats(tracker) {
-  const { milestones = [], targetDate = '' } = tracker.config;
+  const { milestones = [], targetDate = '' } = getConfig(tracker);
   const done = milestones.filter(m => m.done).length;
   const total = milestones.length;
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;

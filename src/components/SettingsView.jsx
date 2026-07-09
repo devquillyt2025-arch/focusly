@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { memo,  useState, useEffect, useRef } from 'react';
 import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksSync';
 import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
@@ -14,7 +14,7 @@ const PRESETS = [
 
 const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '👻'];
 
-export default function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile, initialProfileName, initialProfileEmail, initialProfileAvatar, gcalConnected, onConnectGCal, onDisconnectGCal }) {
+export default memo(function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile, initialProfileName, initialProfileEmail, initialProfileAvatar, gcalConnected, onConnectGCal, onDisconnectGCal }) {
   // Profile state — seed from App.jsx's already-resolved state (same values the header shows)
   const [profileName, setProfileName] = useState(
     () => initialProfileName || localStorage.getItem('nook-profile-name') || 'Productivity User'
@@ -561,4 +561,4 @@ export default function SettingsView({ settings, onSaveSettings, theme, onSetThe
       </button>
     </div>
   );
-}
+});

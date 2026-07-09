@@ -15,7 +15,10 @@ export function generateInsights(trackers, tasks, pomodoroLog) {
     
     const logs = tracker.logs || [];
     const createdDate = new Date(tracker.createdAt);
-    
+    if (isNaN(createdDate)) {
+      console.warn(`[Insights] "${tracker.name}" has an unparseable createdAt — skipping weekday/weekend insight for it.`);
+    }
+
     for (let d = new Date(createdDate); d <= today; d.setDate(d.getDate() + 1)) {
       if (!isScheduledOn(tracker, d)) continue;
       const dow = d.getDay();

@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
+
 import { CAT_META } from './utils/categoryMeta';
 import Timer from './components/Timer';
 import Stats from './components/Stats';
@@ -25,7 +25,7 @@ import {
 } from './habitsStore';
 import {
   loadTrackers, saveTrackers,
-  isScheduledToday, isLoggedToday, computeHabitStreaks
+  isScheduledToday, isLoggedToday, computeHabitStreaks, getConfig
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
@@ -293,16 +293,16 @@ export default function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
 
-  const handleImportData = (data) => {
+  const handleImportData = useCallback((data) => {
     if (confirm("This will replace your current data. Are you sure?")) {
       for (const key in data) {
         localStorage.setItem(key, data[key]);
       }
       window.location.reload();
     }
-  };
+  }, [setTasks, setTrackers, setPomodoroLog, showToast, saveSettings, setTheme]);
 
-  const handleClearData = () => {
+  const handleClearData = useCallback(() => {
     if (confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -311,7 +311,35 @@ export default function App() {
       keys.forEach(k => localStorage.removeItem(k));
       window.location.reload();
     }
-  };
+  }, []);
+
+  const handleSettingsSyncToggle = useCallback((enabled) => {
+    if (enabled) {
+      localStorage.setItem('nook_sync_enabled', 'true');
+      setSyncStatus('Syncing...');
+      syncTasks(tasks, setTasks, setSyncStatus);
+    } else {
+      localStorage.setItem('nook_sync_enabled', 'false');
+      setSyncStatus('Not connected');
+    }
+  }, [tasks, setTasks, setSyncStatus]);
+
+  const handleSettingsDisconnect = useCallback(() => {
+    setSyncStatus('Not connected');
+  }, [setSyncStatus]);
+
+  const handleSettingsSyncNow = useCallback(() => {
+    syncTasks(tasks, setTasks, setSyncStatus);
+  }, [tasks, setTasks, setSyncStatus]);
+
+  const handleUpdateProfile = useCallback((name, email, av) => {
+    setProfileName(name);
+    setProfileEmail(email);
+    setProfileAvatar(av);
+  }, []);
+
+  const handleConnectGCal = useCallback(() => connectGoogleCalendar(), []);
+  const handleDisconnectGCal = useCallback(() => disconnectGoogleCalendar(), []);
 
   // ── Handlers ──
   const intervalRef        = useRef(null);
@@ -924,7 +952,7 @@ export default function App() {
           if (newTracker.type === 'habit') {
             const { current: streak } = computeHabitStreaks(newTracker);
             if ([7, 14, 30, 60, 100].includes(streak)) {
-              confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+              import('canvas-confetti').then(({ default: confetti }) => confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }));
               showToast(`🔥 ${streak} day streak on ${newTracker.name}!`, 'success');
             }
           }
@@ -932,12 +960,12 @@ export default function App() {
         
         // Project Goal completed
         if (newTracker.type === 'project') {
-          const oldDone = (oldTracker.config.milestones || []).filter(m => m.done).length;
-          const newDone = (newTracker.config.milestones || []).filter(m => m.done).length;
-          const total = (newTracker.config.milestones || []).length;
+          const oldDone = (getConfig(oldTracker).milestones || []).filter(m => m.done).length;
+          const newDone = (getConfig(newTracker).milestones || []).filter(m => m.done).length;
+          const total = (getConfig(newTracker).milestones || []).length;
           if (oldDone < total && newDone === total && total > 0) {
             if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-            confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
+            import('canvas-confetti').then(({ default: confetti }) => confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } }));
             showToast(`🎉 Project completed: ${newTracker.name}!`, 'success');
           } else if (newDone > oldDone) {
             if (navigator.vibrate) navigator.vibrate(50);
@@ -1026,10 +1054,10 @@ export default function App() {
   // Push notification helper
   const triggerDesktopNotification = (title, body) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/favicon.ico' });
+      new Notification(title, { body, icon: '/nook-favicon.png' });
     } else if ('Notification' in window && Notification.permission !== 'denied') {
       Notification.requestPermission().then(perm => {
-        if (perm === 'granted') new Notification(title, { body, icon: '/favicon.ico' });
+        if (perm === 'granted') new Notification(title, { body, icon: '/nook-favicon.png' });
       });
     }
   };
@@ -1048,7 +1076,7 @@ export default function App() {
           localStorage.setItem('nook-push-enabled', 'true');
           new Notification('Nook Notifications Enabled', {
             body: 'You will receive task reminders and updates here.',
-            icon: '/favicon.ico',
+            icon: '/nook-favicon.png',
           });
         } else {
           setIsPushEnabled(false);
@@ -1629,31 +1657,16 @@ export default function App() {
               onClearData={handleClearData}
               onImportData={handleImportData}
               syncStatus={syncStatus}
-              onSyncToggle={(enabled) => {
-                if (enabled) {
-                  localStorage.setItem('nook_sync_enabled', 'true');
-                  setSyncStatus('Syncing...');
-                  syncTasks(tasks, setTasks, setSyncStatus);
-                } else {
-                  localStorage.setItem('nook_sync_enabled', 'false');
-                  setSyncStatus('Not connected');
-                }
-              }}
-              onDisconnect={() => {
-                setSyncStatus('Not connected');
-              }}
-              onSyncNow={() => syncTasks(tasks, setTasks, setSyncStatus)}
+              onSyncToggle={handleSettingsSyncToggle}
+              onDisconnect={handleSettingsDisconnect}
+              onSyncNow={handleSettingsSyncNow}
               initialProfileName={profileName}
               initialProfileEmail={profileEmail}
               initialProfileAvatar={profileAvatar}
-              onUpdateProfile={(name, email, av) => {
-                setProfileName(name);
-                setProfileEmail(email);
-                setProfileAvatar(av);
-              }}
+              onUpdateProfile={handleUpdateProfile}
               gcalConnected={isGCalConnected()}
-              onConnectGCal={() => connectGoogleCalendar()}
-              onDisconnectGCal={() => disconnectGoogleCalendar()}
+              onConnectGCal={handleConnectGCal}
+              onDisconnectGCal={handleDisconnectGCal}
             />
           )}
 
@@ -1806,7 +1819,9 @@ export default function App() {
             trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog}
             onClose={() => setOpenModal(null)}
             onSave={(reviewData) => {
-              const currentReviews = JSON.parse(localStorage.getItem('nook-weekly-reviews') || '[]');
+              let currentReviews = [];
+              try { currentReviews = JSON.parse(localStorage.getItem('nook-weekly-reviews') || '[]'); }
+              catch { console.warn('[WeeklyReview] nook-weekly-reviews was corrupted, resetting.'); }
               localStorage.setItem('nook-weekly-reviews', JSON.stringify([reviewData, ...currentReviews]));
               showToast('Weekly review saved!', 'success');
               setOpenModal(null);

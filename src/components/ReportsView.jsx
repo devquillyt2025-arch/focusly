@@ -1,17 +1,23 @@
-import { useState, useRef } from 'react';
+import { memo,  useState, useRef } from 'react';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
   getLogForDate, todayStr, dateStrOf, isScheduledOn, computeGlobalStats, getSparklineData,
-  upsertLog, toggleMilestone
+  upsertLog, toggleMilestone, getConfig
 } from '../trackers/trackerUtils';
-import { HabitStreakChart, HabitDayOfWeekChart, TargetProgressChart, TargetVelocityChart, AverageRollingChart, ProjectBurndownChart } from './TrackerCharts';
+import { lazy, Suspense } from 'react';
+const HabitStreakChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitStreakChart })));
+const HabitDayOfWeekChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitDayOfWeekChart })));
+const TargetProgressChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.TargetProgressChart })));
+const TargetVelocityChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.TargetVelocityChart })));
+const AverageRollingChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.AverageRollingChart })));
+const ProjectBurndownChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.ProjectBurndownChart })));
 import { calculateTrends } from '../trackers/analyticsUtils';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import html2canvas from 'html2canvas';
 
 // ─── Reports view ──────────────────────────────────────────────────
-export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker }) {
+export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker }) {
   const [catFilter,  setCatFilter]  = useState('all');
   const [viewMode,   setViewMode]   = useState('trackers'); // 'trackers' | 'analytics'
   const [detail,     setDetail]     = useState(null); // tracker shown in detail
@@ -167,7 +173,7 @@ export default function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTrac
       )}
     </div>
   );
-}
+});
 
 // ─── Report row ────────────────────────────────────────────────────
 function TrackerReportRow({ tracker, onClick }) {
@@ -375,8 +381,15 @@ function HabitDetail({ tracker, onLog }) {
       <div className="detail-section-lbl" style={{ marginBottom: 8 }}>Activity (last 13 weeks)</div>
       <HabitHeatmap tracker={tracker} />
 
-      <HabitStreakChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
-      <HabitDayOfWeekChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+      <Suspense fallback={
+        <>
+          <ChartSkeleton height={200} />
+          <ChartSkeleton height={200} />
+        </>
+      }>
+        <HabitStreakChart tracker={tracker} color={color} />
+        <HabitDayOfWeekChart tracker={tracker} color={color} />
+      </Suspense>
     </>
   );
 }
@@ -441,7 +454,8 @@ function HabitHeatmap({ tracker }) {
 
 // ─── Target detail ─────────────────────────────────────────────────
 function TargetDetail({ tracker, onLog }) {
-  const { currentValue, targetValue, startValue, unit, progress, pace } = computeTargetStats(tracker);
+  const stats = computeTargetStats(tracker);
+  const { currentValue, targetValue, unit, progress, pace } = stats;
   const [val, setVal] = useState('');
   const today = todayStr();
   const todayLog = getLogForDate(tracker, today);
@@ -486,8 +500,15 @@ function TargetDetail({ tracker, onLog }) {
       {tracker.logs.length > 0 && (
         <>
           <div className="detail-section-lbl" style={{ marginBottom: 8, marginTop: 16 }}>Progress vs Pace</div>
-          <TargetProgressChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
-          <TargetVelocityChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+          <Suspense fallback={
+            <>
+              <ChartSkeleton height={240} />
+              <ChartSkeleton height={200} />
+            </>
+          }>
+            <TargetProgressChart tracker={tracker} stats={stats} />
+            <TargetVelocityChart tracker={tracker} />
+          </Suspense>
         </>
       )}
     </>
@@ -528,8 +549,15 @@ function AverageDetail({ tracker, onLog }) {
       {tracker.logs.length > 0 && (
         <>
           <div className="detail-section-lbl" style={{ marginBottom: 8, marginTop: 16 }}>Last 30 Days</div>
-          <AverageBarChart tracker={tracker} />
-          <AverageRollingChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+          <Suspense fallback={
+            <>
+              <ChartSkeleton height={240} />
+              <ChartSkeleton height={240} />
+            </>
+          }>
+            <AverageBarChart tracker={tracker} />
+            <AverageRollingChart tracker={tracker} color={TRACKER_CATS[tracker.category]?.color || 'var(--accent)'} />
+          </Suspense>
         </>
       )}
     </>
@@ -539,7 +567,7 @@ function AverageDetail({ tracker, onLog }) {
 // ─── Project detail ────────────────────────────────────────────────
 function ProjectDetail({ tracker, onToggle }) {
   const { done, total, progress, pace } = computeProjectStats(tracker);
-  const { milestones = [], targetDate = '' } = tracker.config;
+  const { milestones = [], targetDate = '' } = getConfig(tracker);
   const catColor = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   const PACE_COLOR = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', complete: 'var(--accent)' };
 
@@ -570,7 +598,9 @@ function ProjectDetail({ tracker, onToggle }) {
         ))}
       </div>
 
-      <ProjectBurndownChart tracker={tracker} color={catColor} />
+      <Suspense fallback={<ChartSkeleton height={240} />}>
+        <ProjectBurndownChart tracker={tracker} color={catColor} />
+      </Suspense>
     </>
   );
 }
@@ -578,7 +608,7 @@ function ProjectDetail({ tracker, onToggle }) {
 // ─── SVG Charts ───────────────────────────────────────────────────
 function TargetLineChart({ tracker }) {
   const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
-  const { startValue = 0, targetValue = 100 } = tracker.config;
+  const { startValue = 0, targetValue = 100 } = getConfig(tracker);
   const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   const data = [{ value: startValue }, ...logs];
 
@@ -605,7 +635,7 @@ function TargetLineChart({ tracker }) {
       </svg>
       <div className="chart-axis-row">
         <span>{data[0]?.date ?? ''}</span>
-        <span style={{ color, fontWeight: 700 }}>Target: {targetValue}{tracker.config.unit}</span>
+        <span style={{ color, fontWeight: 700 }}>Target: {targetValue}{getConfig(tracker).unit}</span>
         <span>{data[data.length - 1]?.date ?? ''}</span>
       </div>
     </div>
@@ -619,7 +649,7 @@ function AverageBarChart({ tracker }) {
     .filter(l => l.date >= dateStrOf(cutoff))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const { targetAverage = 0, unit = '' } = tracker.config;
+  const { targetAverage = 0, unit = '' } = getConfig(tracker);
   const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   if (!logs.length) return null;
 
@@ -678,3 +708,26 @@ function IconPlusCircle() {
     </svg>
   );
 }
+
+// ─── Chart Skeleton ────────────────────────────────────────────────
+const ChartSkeleton = memo(function ChartSkeleton({ height = 240, title = '' }) {
+  return (
+    <div className="chart-container" style={{ height, marginTop: 16 }}>
+      {title && (
+        <div className="detail-section-lbl" style={{ marginBottom: 8 }}>
+          {title}
+        </div>
+      )}
+      <div 
+        style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: 8,
+          background: 'var(--bg-hover)',
+          animation: 'skeletonPulse 1.5s ease-in-out infinite',
+          opacity: 0.4
+        }} 
+      />
+    </div>
+  );
+});

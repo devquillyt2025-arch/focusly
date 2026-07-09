@@ -1621,6 +1621,9 @@ input, textarea, select { font-family: inherit; }
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.72); backdrop-filter: blur(10px);
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   display: flex; align-items: center; justify-content: center;
   z-index: 100; padding: 20px;
   animation: fadeOverlay 0.13s ease;
@@ -3124,6 +3127,9 @@ select.modal-input {
 .jnx-palette-overlay {
   position: fixed; inset: 0; z-index: 300;
   background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   display: flex; align-items: flex-start; justify-content: center;
   padding: 12vh 20px 20px;
   animation: fadeOverlay 0.12s ease;
@@ -6022,6 +6028,9 @@ select.modal-input {
 .al-overlay {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   display: flex; align-items: center; justify-content: center;
 }
 .al-confirm {
@@ -6453,3 +6462,113 @@ select.modal-input {
   .hc-left { width: 100%; }
 }
 
+/* ── Liquid glass (login) ── */
+:root {
+  --ambient-hue: 244;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.liquid-glass {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.025)
+  );
+  backdrop-filter: blur(16px) saturate(1.7);
+  -webkit-backdrop-filter: blur(16px) saturate(1.7);
+  will-change: transform, backdrop-filter;
+  transform: translateZ(0);
+  contain: paint style layout;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 24px 70px -24px rgba(8, 6, 24, 0.85),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.06),
+    inset 0 0 44px rgba(160, 180, 255, 0.05);
+}
+
+.liquid-glass__refract {
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(
+      28% 22% at 28% 18%,
+      hsla(var(--ambient-hue), 95%, 80%, 0.5),
+      transparent 60%
+    ),
+    radial-gradient(
+      34% 30% at 82% 72%,
+      hsla(calc(var(--ambient-hue) + 45), 95%, 75%, 0.42),
+      transparent 62%
+    ),
+    radial-gradient(24% 24% at 62% 40%, rgba(255, 255, 255, 0.28), transparent 60%);
+  filter: url(#nook-liquid);
+}
+
+.liquid-glass__specular {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    200px 200px at var(--mx, 50%) var(--my, -10%),
+    rgba(255, 255, 255, 0.28),
+    transparent 60%
+  );
+  transition: background 0.12s ease-out;
+}
+
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.14) 48%,
+    transparent 66%
+  );
+  background-size: 250% 100%;
+  animation: shimmer 9s linear infinite;
+}
+
+.liquid-input {
+  width: 100%;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.85rem 1rem 0.85rem 2.5rem; /* left padding for icons */
+  color: #e0e7ff;
+  outline: none;
+  backdrop-filter: blur(4px);
+  will-change: border-color, box-shadow;
+  transform: translateZ(0);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease;
+}
+.liquid-input::placeholder {
+  color: rgba(224, 231, 255, 0.35);
+}
+.liquid-input:focus {
+  border-color: hsla(var(--ambient-hue), 90%, 78%, 0.6);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 0 3px hsla(var(--ambient-hue), 90%, 70%, 0.18);
+}

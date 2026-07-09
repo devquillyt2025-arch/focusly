@@ -99,6 +99,10 @@ export function groupReminders(reminders, now = new Date()) {
 
   for (const r of reminders) {
     const at = new Date(r.reminder_at);
+    if (isNaN(at)) {
+      console.warn(`[Reminders] Reminder ${r.id} has an unparseable reminder_at — hiding it from the list.`);
+      continue;
+    }
     if (at <= now) overdue.push(r);
     else if (at <= todayEnd) today.push(r);
     else upcoming.push(r);

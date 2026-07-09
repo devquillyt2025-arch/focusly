@@ -86,6 +86,11 @@ export default function DailyGoalsView({
 
   const today = new Date();
   const todayDateStr = todayStr();
+  // Local-date form of "today", used only for the calendar strip's day-highlight
+  // comparison below (dStr there is built from local Date components). todayDateStr
+  // stays UTC-based since it's compared against UTC-stamped journal/pomodoro data
+  // elsewhere in this component.
+  const todayLocalStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   
   // Calculations for Greeting Row Subtext
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
@@ -114,7 +119,7 @@ export default function DailyGoalsView({
     const d = new Date(mon);
     d.setDate(mon.getDate() + i);
     const dStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const isCurr = dStr === todayDateStr;
+    const isCurr = dStr === todayLocalStr;
     const hasDone = tasks.some(t => t.completed && t.completedAt?.startsWith(dStr)) || pomodoroLog.some(p => p.timestamp?.startsWith(dStr));
     calDays.push({
       lbl: d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),

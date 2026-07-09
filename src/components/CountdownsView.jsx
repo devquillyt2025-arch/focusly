@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { memo,  useState, useEffect, useRef } from 'react';
 import Select from './Select';
 import { genId } from '../trackers/trackerUtils';
 import { logActivity, diffObjects } from '../utils/activityLog';
@@ -67,6 +67,14 @@ function sortedMilestones(list) {
 function computeCd(cd) {
   const today = todayLocal();
   const total = Math.max(1, daysBetween(cd.startDate, cd.endDate));
+
+  if (isNaN(total)) {
+    console.warn(`[Countdowns] "${cd.title || cd.id}" has an invalid startDate/endDate — showing a neutral state.`);
+    const milestones = sortedMilestones(cd.milestones);
+    const nextMs = milestones.find(m => m.targetDate >= today) || null;
+    return { total: 1, daysCompleted: 0, daysRemaining: 1, pct: 0, status: 'active', overdueDays: 0, milestones, nextMs };
+  }
+
   const elapsed = daysBetween(cd.startDate, today);
   const daysCompleted = Math.min(total, Math.max(0, elapsed));
   const pct = Math.min(100, Math.max(0, Math.round((daysCompleted / total) * 100)));
@@ -108,7 +116,7 @@ function makeCountdown(data) {
 }
 
 // ─── Main view ─────────────────────────────────────────────────────
-export default function CountdownsView() {
+export default memo(function CountdownsView() {
   const [countdowns, setCountdowns] = useState(loadCountdowns);
   const [pinnedId,   setPinnedId]   = useState(loadPinned);
   const [showModal,  setShowModal]  = useState(false);
@@ -284,7 +292,7 @@ export default function CountdownsView() {
       )}
     </div>
   );
-}
+});
 
 // ─── SVG progress ring ────────────────────────────────────────────────
 function Ring({ pct, size = 56, stroke = 5, color = 'var(--accent)', children }) {

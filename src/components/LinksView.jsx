@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { memo,  useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { genId } from '../utils/id';
@@ -386,7 +386,7 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
 }
 
 // ── Main LinksView ────────────────────────────────────────────────
-export default function LinksView() {
+export default memo(function LinksView() {
   const [links,     setLinks]     = useState(load);
   const [query,     setQuery]     = useState('');
   const [catFilter, setCatFilter] = useState('');
@@ -561,4 +561,4 @@ export default function LinksView() {
       </AnimatePresence>
     </div>
   );
-}
+});

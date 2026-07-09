@@ -1374,7 +1374,11 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                             onClick={() => {
                               if (sub.googleTaskId) {
                                 const delStr = localStorage.getItem('nook_deleted_tasks');
-                                let deletedIds = delStr ? JSON.parse(delStr) : [];
+                                let deletedIds = [];
+                                if (delStr) {
+                                  try { deletedIds = JSON.parse(delStr); }
+                                  catch { console.warn('[TaskList] nook_deleted_tasks was corrupted, resetting.'); }
+                                }
                                 if (!deletedIds.includes(sub.googleTaskId)) { deletedIds.push(sub.googleTaskId); localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds)); }
                               }
                               saveField('subtasks', (local.subtasks || []).filter(s => s.id !== sub.id));

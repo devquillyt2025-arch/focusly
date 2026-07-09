@@ -3,9 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Driven by useScrollGrade — the whole page grades against this hue. */
-  --ambient-hue: 244;
-  --scroll-progress: 0;
+  --ambient-hue: 272;
 }
 
 * {
@@ -18,7 +16,6 @@ body {
   padding: 0;
   background: #050505;
   color: #e0e7ff;
-  /* Prevent the horizontal jitter transmission/bloom canvases can cause. */
   overflow-x: hidden;
 }
 
@@ -28,22 +25,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Lenis smooth-scroll: let the document own height and disable native smooth. */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-
-/* Ambient wash tied to scroll hue — sits behind everything, warms as you go. */
+/* Ambient wash behind the login card. */
 .ambient-wash {
   position: fixed;
   inset: 0;
@@ -60,12 +42,9 @@ html.lenis body {
       hsla(calc(var(--ambient-hue) + 20), 90%, 62%, 0.1) 0%,
       transparent 65%
     );
-  /* No transition: with per-scroll hue steps a transition would re-interpolate
-     the gradient continuously, repainting every backdrop-filter layer above it.
-     The quantized hue writes are already smooth enough on their own. */
 }
 
-/* Soft radial glow that sits directly behind the hero object. */
+/* Soft radial glow that sits directly behind the login card. */
 .hero-glow {
   position: absolute;
   left: 50%;
@@ -84,49 +63,6 @@ html.lenis body {
   filter: blur(30px);
 }
 
-/* Glassmorphic surface — the recurring Nook material.
- * Deliberately NOT hue-driven: a fixed tint means per-scroll hue changes never
- * repaint these backdrop-filter layers (the expensive part). The graded ambient
- * wash still shows *through* the translucent glass, so the cards read as warming
- * with scroll — we just get that for free from the blur, not from a repaint. */
-.glass {
-  background: rgba(190, 200, 255, 0.045);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(210, 215, 255, 0.12);
-  box-shadow:
-    0 8px 40px -12px rgba(20, 16, 45, 0.6),
-    inset 0 1px 0 0 rgba(225, 230, 255, 0.08);
-  /* transform-only transition — border/shadow no longer change per scroll */
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Iridescent sheen that catches the light on hover. */
-.glass-sheen {
-  position: relative;
-  overflow: hidden;
-}
-.glass-sheen::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(
-    115deg,
-    transparent 20%,
-    hsla(var(--ambient-hue), 90%, 85%, 0.18) 45%,
-    hsla(calc(var(--ambient-hue) + 40), 90%, 80%, 0.12) 55%,
-    transparent 80%
-  );
-  background-size: 200% 100%;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.glass-sheen:hover::before {
-  opacity: 1;
-  animation: shimmer 6s linear infinite;
-}
-
 .text-holo-gradient {
   background: linear-gradient(
     100deg,
@@ -141,10 +77,10 @@ html.lenis body {
 }
 
 /* ── Liquid glass (login) ──
- * A heavier, refractive cousin of `.glass`. The "liquid" is an SVG turbulence +
- * displacement filter (see LiquidGlassLogin) warping colored caustics behind a
- * frosted backdrop, plus a cursor-tracked specular highlight and a moving edge
- * sheen — so it reads as living glass catching light, not a flat frosted panel. */
+ * The "liquid" is an SVG turbulence + displacement filter (see
+ * LiquidGlassLogin) warping colored caustics behind a frosted backdrop, plus
+ * a cursor-tracked specular highlight and a moving edge sheen — so it reads
+ * as living glass catching light, not a flat frosted panel. */
 .liquid-glass {
   position: relative;
   overflow: hidden;
@@ -156,6 +92,9 @@ html.lenis body {
   );
   backdrop-filter: blur(16px) saturate(1.7);
   -webkit-backdrop-filter: blur(16px) saturate(1.7);
+  will-change: transform, backdrop-filter;
+  transform: translateZ(0);
+  contain: paint style layout;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow:
     0 24px 70px -24px rgba(8, 6, 24, 0.85),
@@ -221,6 +160,11 @@ html.lenis body {
   animation: shimmer 9s linear infinite;
 }
 
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
 .liquid-input {
   width: 100%;
   border-radius: 14px;
@@ -242,128 +186,6 @@ html.lenis body {
   border-color: hsla(var(--ambient-hue), 90%, 78%, 0.6);
   background: rgba(255, 255, 255, 0.09);
   box-shadow: 0 0 0 3px hsla(var(--ambient-hue), 90%, 70%, 0.18);
-}
-
-/* ── Atmosphere layers ── */
-
-/* Soft cursor-following light — moved via transform only (compositor-cheap).
-   Every glass surface on the page reads as lit by the visitor's cursor. */
-.cursor-glow {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 20;
-  width: 520px;
-  height: 520px;
-  border-radius: 50%;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  will-change: transform;
-  transform: translate3d(-600px, -600px, 0);
-  background: radial-gradient(
-    circle,
-    hsla(var(--ambient-hue), 90%, 72%, 0.09) 0%,
-    hsla(var(--ambient-hue), 90%, 64%, 0.045) 35%,
-    transparent 65%
-  );
-}
-
-/* Cinematic edge falloff. Sits above content, below nav/grain; pure paint-once. */
-.vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 25;
-  pointer-events: none;
-  background: radial-gradient(
-    120% 95% at 50% 45%,
-    transparent 58%,
-    rgba(0, 0, 0, 0.42) 100%
-  );
-}
-
-/* Film grain — echoes the 3D scene's noise pass so DOM and canvas share one
-   texture. Fixed size + transform-jitter animation (no repaints). */
-.grain {
-  position: fixed;
-  inset: -150px;
-  z-index: 50;
-  pointer-events: none;
-  opacity: 0.04;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 240px 240px;
-  animation: grain-jitter 7s steps(10) infinite;
-}
-@keyframes grain-jitter {
-  0%, 100% { transform: translate(0, 0); }
-  10% { transform: translate(-40px, -60px); }
-  20% { transform: translate(-90px, 30px); }
-  30% { transform: translate(50px, -80px); }
-  40% { transform: translate(-30px, 90px); }
-  50% { transform: translate(-80px, 30px); }
-  60% { transform: translate(80px, 0); }
-  70% { transform: translate(0, 80px); }
-  80% { transform: translate(-90px, 0); }
-  90% { transform: translate(60px, 30px); }
-}
-
-/* ── Marquee ticker ── */
-.marquee {
-  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
-}
-.marquee__track {
-  display: flex;
-  width: max-content;
-  animation: marquee 38s linear infinite;
-}
-@keyframes marquee {
-  to { transform: translateX(-50%); }
-}
-
-/* ── Scroll cue line ── */
-.scroll-line {
-  position: relative;
-  display: block;
-  width: 1px;
-  height: 48px;
-  overflow: hidden;
-  background: rgba(224, 231, 255, 0.12);
-}
-.scroll-line::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  height: 16px;
-  background: linear-gradient(to bottom, transparent, #e0e7ff);
-  animation: scroll-dot 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-@keyframes scroll-dot {
-  0% { transform: translateY(-16px); }
-  70%, 100% { transform: translateY(48px); }
-}
-
-/* ── Cursor-tracked specular for glass cards (login's signature, lite) ──
-   --mx/--my are set in JS on pointermove; light overlays content like a
-   reflection would (pointer-events: none keeps interaction untouched). */
-.card-specular {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  mix-blend-mode: screen;
-  transition: opacity 0.35s ease;
-  background: radial-gradient(
-    240px 240px at var(--mx, 50%) var(--my, 50%),
-    rgba(255, 255, 255, 0.16),
-    transparent 60%
-  );
-}
-.group:hover .card-specular {
-  opacity: 1;
 }
 
 /* ── Brand touches ── */
@@ -391,7 +213,6 @@ html {
   background: hsla(var(--ambient-hue), 60%, 65%, 0.45);
 }
 
-/* Respect reduced-motion for all CSS animation too, not just the 3D bail-out. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

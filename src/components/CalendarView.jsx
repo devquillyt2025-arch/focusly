@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { memo,  useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import {
@@ -59,7 +59,7 @@ function addHour(timeStr) {
 const LABEL_STYLE = { display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 };
 const INPUT_STYLE = { width: '100%', padding: '11px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 11, color: 'var(--text-primary)', fontSize: '0.92rem', boxSizing: 'border-box' };
 
-export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
+export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   const [currentDate,   setCurrentDate]   = useState(() => new Date());
   const [viewMode,      setViewMode]      = useState('day');
   const [showAddModal,  setShowAddModal]  = useState(false);
@@ -764,4 +764,4 @@ export default function CalendarView({ tasks, onAddTask, onUpdateTask }) {
 
     </div>
   );
-}
+});

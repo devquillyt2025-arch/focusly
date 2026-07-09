@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { memo,  useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { genId } from '../utils/id';
@@ -280,7 +280,7 @@ function ServiceGroup({ serviceName, accounts, defaultOpen, onEdit, onDelete, on
 }
 
 // ── Main VaultView ────────────────────────────────────────────────
-export default function VaultView() {
+export default memo(function VaultView() {
   const [entries,  setEntries]  = useState(load);
   const [query,    setQuery]    = useState('');
   const [modal,    setModal]    = useState(null); // null | { mode:'add', service? } | { mode:'edit', entry }
@@ -426,4 +426,4 @@ export default function VaultView() {
       </AnimatePresence>
     </div>
   );
-}
+});

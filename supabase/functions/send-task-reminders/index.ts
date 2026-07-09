@@ -88,54 +88,70 @@ Deno.serve(async (req) => {
 
   let sent = 0, failed = 0, cleaned = 0, emailSent = 0, emailFailed = 0;
 
-  for (const reminder of dueReminders ?? []) {
-    const [{ data: subs }, { data: prefs }] = await Promise.all([
-      supabase.from('push_subscriptions').select('id, endpoint, p256dh_key, auth_key').eq('user_id', reminder.user_id),
-      supabase.from('notification_prefs').select('email_reminders_enabled').eq('user_id', reminder.user_id).maybeSingle(),
+  if (dueReminders && dueReminders.length > 0) {
+    const userIds = [...new Set(dueReminders.map(r => r.user_id))];
+    const [{ data: allSubs }, { data: allPrefs }] = await Promise.all([
+      supabase.from('push_subscriptions').select('id, user_id, endpoint, p256dh_key, auth_key').in('user_id', userIds),
+      supabase.from('notification_prefs').select('user_id, email_reminders_enabled').in('user_id', userIds),
     ]);
 
-    if (prefs?.email_reminders_enabled) {
-      try {
-        const { data: userRes } = await supabase.auth.admin.getUserById(reminder.user_id);
-        const email = userRes?.user?.email;
-        if (email) {
-          await sendReminderEmail(email, reminder);
-          emailSent++;
+    const subsByUserId: Record<string, any[]> = {};
+    for (const sub of allSubs ?? []) {
+      if (!subsByUserId[sub.user_id]) subsByUserId[sub.user_id] = [];
+      subsByUserId[sub.user_id].push(sub);
+    }
+
+    const prefsByUserId: Record<string, any> = {};
+    for (const pref of allPrefs ?? []) {
+      prefsByUserId[pref.user_id] = pref;
+    }
+
+    for (const reminder of dueReminders) {
+      const subs = subsByUserId[reminder.user_id];
+      const prefs = prefsByUserId[reminder.user_id];
+
+      if (prefs?.email_reminders_enabled) {
+        try {
+          const { data: userRes } = await supabase.auth.admin.getUserById(reminder.user_id);
+          const email = userRes?.user?.email;
+          if (email) {
+            await sendReminderEmail(email, reminder);
+            emailSent++;
+          }
+        } catch {
+          emailFailed++;
         }
-      } catch {
-        emailFailed++;
+      }
+
+      const payload = JSON.stringify({
+        title: reminder.title,
+        body: reminderBody(reminder),
+        source_type: reminder.source_type,
+        source_id: reminder.source_id,
+        url: reminder.source_type === 'task' ? `/?reminder=task:${reminder.source_id}` : '/',
+      });
+
+      for (const sub of subs ?? []) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh_key, auth: sub.auth_key } },
+            payload,
+          );
+          sent++;
+        } catch (err) {
+          failed++;
+          const statusCode = (err as { statusCode?: number }).statusCode;
+          if (statusCode === 404 || statusCode === 410 || statusCode === 401 || statusCode === 403) {
+            await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+            cleaned++;
+          }
+        }
       }
     }
 
-    const payload = JSON.stringify({
-      title: reminder.title,
-      body: reminderBody(reminder),
-      source_type: reminder.source_type,
-      source_id: reminder.source_id,
-      url: reminder.source_type === 'task' ? `/?reminder=task:${reminder.source_id}` : '/',
-    });
-
-    for (const sub of subs ?? []) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh_key, auth: sub.auth_key } },
-          payload,
-        );
-        sent++;
-      } catch (err) {
-        failed++;
-        const statusCode = (err as { statusCode?: number }).statusCode;
-        // 404/410 = subscription gone; 401/403 = signed with a VAPID key the
-        // subscription no longer recognizes (e.g. after a key rotation) —
-        // both are permanent failures for this endpoint, not transient ones.
-        if (statusCode === 404 || statusCode === 410 || statusCode === 401 || statusCode === 403) {
-          await supabase.from('push_subscriptions').delete().eq('id', sub.id);
-          cleaned++;
-        }
-      }
-    }
-
-    await supabase.from('reminders').update({ reminder_sent: true }).eq('id', reminder.id);
+    // Batch mark all processed reminders as sent
+    const reminderIds = dueReminders.map(r => r.id);
+    await supabase.from('reminders').update({ reminder_sent: true }).in('id', reminderIds);
   }
 
   return new Response(
