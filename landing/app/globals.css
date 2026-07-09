@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Driven by useScrollGrade — the whole page grades against this hue. */
+  --ambient-hue: 244;
+  --scroll-progress: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #050505;
+  color: #e0e7ff;
+  /* Prevent the horizontal jitter transmission/bloom canvases can cause. */
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Lenis smooth-scroll: let the document own height and disable native smooth. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Ambient wash tied to scroll hue — sits behind everything, warms as you go. */
+.ambient-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60% 50% at 50% 22%,
+      hsla(var(--ambient-hue), 85%, 60%, 0.14) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      70% 60% at 50% 100%,
+      hsla(calc(var(--ambient-hue) + 20), 90%, 62%, 0.1) 0%,
+      transparent 65%
+    );
+  /* No transition: with per-scroll hue steps a transition would re-interpolate
+     the gradient continuously, repainting every backdrop-filter layer above it.
+     The quantized hue writes are already smooth enough on their own. */
+}
+
+/* Soft radial glow that sits directly behind the hero object. */
+.hero-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70vmin;
+  height: 70vmin;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    hsla(var(--ambient-hue), 90%, 65%, 0.35) 0%,
+    hsla(var(--ambient-hue), 90%, 55%, 0.12) 35%,
+    transparent 68%
+  );
+  filter: blur(30px);
+}
+
+/* Glassmorphic surface — the recurring Nook material.
+ * Deliberately NOT hue-driven: a fixed tint means per-scroll hue changes never
+ * repaint these backdrop-filter layers (the expensive part). The graded ambient
+ * wash still shows *through* the translucent glass, so the cards read as warming
+ * with scroll — we just get that for free from the blur, not from a repaint. */
+.glass {
+  background: rgba(190, 200, 255, 0.045);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(210, 215, 255, 0.12);
+  box-shadow:
+    0 8px 40px -12px rgba(20, 16, 45, 0.6),
+    inset 0 1px 0 0 rgba(225, 230, 255, 0.08);
+  /* transform-only transition — border/shadow no longer change per scroll */
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Iridescent sheen that catches the light on hover. */
+.glass-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.glass-sheen::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    hsla(var(--ambient-hue), 90%, 85%, 0.18) 45%,
+    hsla(calc(var(--ambient-hue) + 40), 90%, 80%, 0.12) 55%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.glass-sheen:hover::before {
+  opacity: 1;
+  animation: shimmer 6s linear infinite;
+}
+
+.text-holo-gradient {
+  background: linear-gradient(
+    100deg,
+    #e0e7ff 0%,
+    hsla(var(--ambient-hue), 95%, 78%, 1) 45%,
+    hsla(calc(var(--ambient-hue) + 45), 95%, 80%, 1) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── Liquid glass (login) ──
+ * A heavier, refractive cousin of `.glass`. The "liquid" is an SVG turbulence +
+ * displacement filter (see LiquidGlassLogin) warping colored caustics behind a
+ * frosted backdrop, plus a cursor-tracked specular highlight and a moving edge
+ * sheen — so it reads as living glass catching light, not a flat frosted panel. */
+.liquid-glass {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.025)
+  );
+  backdrop-filter: blur(16px) saturate(1.7);
+  -webkit-backdrop-filter: blur(16px) saturate(1.7);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 24px 70px -24px rgba(8, 6, 24, 0.85),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.06),
+    inset 0 0 44px rgba(160, 180, 255, 0.05);
+}
+
+/* Warped colored caustics — the "liquid" refraction, warped by #nook-liquid. */
+.liquid-glass__refract {
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(
+      28% 22% at 28% 18%,
+      hsla(var(--ambient-hue), 95%, 80%, 0.5),
+      transparent 60%
+    ),
+    radial-gradient(
+      34% 30% at 82% 72%,
+      hsla(calc(var(--ambient-hue) + 45), 95%, 75%, 0.42),
+      transparent 62%
+    ),
+    radial-gradient(24% 24% at 62% 40%, rgba(255, 255, 255, 0.28), transparent 60%);
+  filter: url(#nook-liquid);
+}
+
+/* Specular highlight that tracks the cursor (--mx/--my set in JS). */
+.liquid-glass__specular {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    200px 200px at var(--mx, 50%) var(--my, -10%),
+    rgba(255, 255, 255, 0.28),
+    transparent 60%
+  );
+  transition: background 0.12s ease-out;
+}
+
+/* Slow moving edge sheen. */
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.14) 48%,
+    transparent 66%
+  );
+  background-size: 250% 100%;
+  animation: shimmer 9s linear infinite;
+}
+
+.liquid-input {
+  width: 100%;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.85rem 1rem;
+  color: #e0e7ff;
+  outline: none;
+  backdrop-filter: blur(4px);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease;
+}
+.liquid-input::placeholder {
+  color: rgba(224, 231, 255, 0.35);
+}
+.liquid-input:focus {
+  border-color: hsla(var(--ambient-hue), 90%, 78%, 0.6);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 0 3px hsla(var(--ambient-hue), 90%, 70%, 0.18);
+}
+
+/* Respect reduced-motion for all CSS animation too, not just the 3D bail-out. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
