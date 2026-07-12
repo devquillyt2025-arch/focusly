@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import Select from './Select';
 import ErrorBoundary from './ErrorBoundary';
+import { sameDay, startOfDay, endOfDay } from '../utils/date';
 
 const STORAGE_KEY = 'nook_notes';
 
@@ -568,8 +569,13 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
   };
 
   const togglePin = (id) => {
-    const updated = notes.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() } : n);
-    persist(updated);
+    // Functional update (like saveNote/deleteNote) so it can't overwrite a
+    // concurrent change with a stale `notes` snapshot from the closure.
+    setNotes(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() } : n);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const openNew = (overrides = {}) => onOpenNoteEditor({ note: newNote(overrides), onSave: saveNote, onDelete: deleteNote });
@@ -835,13 +841,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
 
 
 // ── Date helpers ──────────────────────────────────────────────────
-function sameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-function startOfDay(d) { const r = new Date(d); r.setHours(0, 0, 0, 0); return r; }
-function endOfDay(d)   { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; }
-
+// sameDay / startOfDay / endOfDay now come from utils/date.js (shared).
 function thisWeekRange() {
   const end   = new Date();
   const start = startOfDay(new Date()); start.setDate(start.getDate() - 6);

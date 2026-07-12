@@ -2,6 +2,7 @@ import { memo,  useState, useEffect, useRef } from 'react';
 import Select from './Select';
 import { genId } from '../trackers/trackerUtils';
 import { logActivity, diffObjects } from '../utils/activityLog';
+import { localDateStr } from '../utils/date';
 
 // ─── Storage ───────────────────────────────────────────────────────
 const CD_KEY = 'nook_countdowns';
@@ -42,10 +43,8 @@ const SELECT_PILL_STYLE = {
 };
 
 // ─── Date helpers ──────────────────────────────────────────────────
-function todayLocal() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+// Shared local-date helper (was a byte-identical reimplementation of localDateStr).
+const todayLocal = () => localDateStr();
 function daysBetween(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
 }

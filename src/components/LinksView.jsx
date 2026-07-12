@@ -90,10 +90,10 @@ function CategoryDropdown({ value, onChange, options }) {
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           height: 36, padding: '0 12px',
-          background: value ? 'rgba(99,102,241,.06)' : 'var(--bg-input)',
-          border: `1px solid ${value ? '#a5b4fc' : 'var(--border)'}`,
+          background: value ? 'var(--accent-glow)' : 'var(--bg-input)',
+          border: `1px solid ${value ? 'var(--border-accent)' : 'var(--border)'}`,
           borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem',
-          color: value ? '#4338ca' : 'var(--text-secondary)',
+          color: value ? 'var(--accent)' : 'var(--text-secondary)',
           fontWeight: value ? 600 : 400,
           fontFamily: 'inherit', whiteSpace: 'nowrap',
           transition: 'border-color .13s, background .13s',
@@ -140,8 +140,8 @@ function CategoryDropdown({ value, onChange, options }) {
                       width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                       padding: '7px 10px', border: 'none', borderRadius: 7, cursor: 'pointer',
                       fontSize: '0.83rem', fontFamily: 'inherit', textAlign: 'left',
-                      background: isActive ? '#eef2ff' : 'transparent',
-                      color: isActive ? '#4338ca' : 'var(--text-primary)',
+                      background: isActive ? 'var(--accent-glow)' : 'transparent',
+                      color: isActive ? 'var(--accent)' : 'var(--text-primary)',
                       fontWeight: isActive ? 600 : 400,
                       transition: 'background .12s',
                     }}
@@ -155,7 +155,7 @@ function CategoryDropdown({ value, onChange, options }) {
                     }
                     <span style={{ flex: 1 }}>{opt.label}</span>
                     {isActive && (
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     )}

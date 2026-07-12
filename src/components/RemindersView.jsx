@@ -10,8 +10,8 @@ export default memo(function RemindersView({ onNavigateToSource }) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     listReminders()
       .then(setReminders)
       .catch(err => setError(err.message || 'Could not load reminders.'))
@@ -19,6 +19,14 @@ export default memo(function RemindersView({ onNavigateToSource }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Refresh (without the loading spinner) when the tab regains focus, so reminders
+  // added/cleared from a task's Scheduling tab show up without a manual reload.
+  useEffect(() => {
+    const onFocus = () => load(true);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [load]);
 
   const { overdue, today, upcoming } = groupReminders(reminders);
   const total = reminders.length;
