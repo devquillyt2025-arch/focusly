@@ -304,9 +304,14 @@ export default function App() {
 
   const handleClearData = useCallback(() => {
     if (confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
+      // Nook keys use BOTH prefixes: 'nook-' (tasks, settings, calendar…) and
+      // 'nook_' (notes, links, countdowns, journal, goals, Google tokens/sync).
+      // Match both so "Clear all data" actually clears everything — leaving the
+      // underscore keys behind previously kept content and live OAuth tokens.
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
-        if (localStorage.key(i).startsWith('nook-')) keys.push(localStorage.key(i));
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('nook-') || k.startsWith('nook_'))) keys.push(k);
       }
       keys.forEach(k => localStorage.removeItem(k));
       window.location.reload();
@@ -889,18 +894,21 @@ export default function App() {
 
     if (isSyncEnabled) {
       setSyncStatus('Deleting Completed Tasks...');
-      for (const t of completedTasks) {
-        if (t.googleTaskId) {
-           await directGoogleTaskDelete(t.googleTaskId);
-           // Also track it in local deleted tasks to prevent re-pull
-           const delStr = localStorage.getItem('nook_deleted_tasks');
-           let deletedIds = [];
-           try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
-           if (!deletedIds.includes(t.googleTaskId)) {
-             deletedIds.push(t.googleTaskId);
-             localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
-           }
-        }
+      const withGid = completedTasks.filter(t => t.googleTaskId);
+      // Delete on Google in bounded-concurrency batches instead of one sequential
+      // await per task (N round-trips) — much faster when clearing many at once.
+      const LIMIT = 5;
+      for (let i = 0; i < withGid.length; i += LIMIT) {
+        await Promise.all(withGid.slice(i, i + LIMIT).map(t => directGoogleTaskDelete(t.googleTaskId)));
+      }
+      // Record all deletions once (was re-parsing/writing localStorage per task) so
+      // the next pull doesn't re-create them.
+      if (withGid.length) {
+        const delStr = localStorage.getItem('nook_deleted_tasks');
+        let deletedIds = [];
+        try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
+        for (const t of withGid) if (!deletedIds.includes(t.googleTaskId)) deletedIds.push(t.googleTaskId);
+        localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
       }
       const filtered = tasks.filter(t => !t.completed && t.status !== 'completed');
       setTasks(filtered);

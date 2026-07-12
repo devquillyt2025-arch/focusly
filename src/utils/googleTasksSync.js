@@ -280,7 +280,6 @@ export async function syncTaskField(task) {
 
   // 3. Build the minimal payload (only the fields Google Tasks exposes).
   const payload = nookToGoogleTask(task);
-  console.log('[Google Tasks Sync] Outgoing PATCH Payload:', JSON.stringify(payload, null, 2));
 
   try {
     const res = await fetch(
@@ -377,7 +376,6 @@ export async function pushLocalChangesToGoogle(tasks, token) {
 
       if (op.type === 'CREATE' || !parentGoogleTaskId) {
         const payload = nookToGoogleTask(localTask);
-        console.log('[Google Tasks Sync] Outgoing POST Payload:', JSON.stringify(payload, null, 2));
         const res = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -403,7 +401,6 @@ export async function pushLocalChangesToGoogle(tasks, token) {
         }
       } else {
         const payload = nookToGoogleTask(localTask);
-        console.log('[Google Tasks Sync] Outgoing PATCH Payload:', JSON.stringify(payload, null, 2));
         const res = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks/${parentGoogleTaskId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
