@@ -835,7 +835,11 @@ export default function App() {
       
       if (success) {
 
-        // Handle recurrence locally immediately
+        // Handle recurrence locally immediately. Track the freshly-built list so
+        // the sync below runs on an array that INCLUDES the new occurrence —
+        // passing the stale `tasks` closure here dropped it (pull rebuilds state
+        // from whatever array it's given, erasing the just-added next occurrence).
+        let nextTasks = tasks;
         if (done && currentTask.recurrence) {
            const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
            const next = {
@@ -845,13 +849,14 @@ export default function App() {
              createdAt: new Date().toISOString(),
              googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
            };
+           nextTasks = [...tasks, next];
            setTasks(prev => [...prev, next]);
            pushSyncQueue({ type: 'CREATE', taskId: next.id });
         }
-        
-        // Force a fresh sync to pull the status update from Google
-        // We pass the current tasks array, syncTasks will pull latest and update state
-        await syncTasks(tasks, setTasks, setSyncStatus); 
+
+        // Force a fresh sync to pull the status update from Google. Pass the list
+        // that includes any new occurrence so the pull's setTasks doesn't erase it.
+        await syncTasks(nextTasks, setTasks, setSyncStatus);
         if (id===activeTaskId && timerState==='running') pauseTimer();
       } else {
         setSyncStatus('Sync failed');

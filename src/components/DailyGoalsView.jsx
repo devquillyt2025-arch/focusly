@@ -1,4 +1,4 @@
-import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import DailyIntentions from './DailyIntentions';
 import Select from './Select';
 import { getTickSeconds, subscribeTick } from '../utils/timerTickStore';
@@ -6,7 +6,7 @@ import {
   TRACKER_CATS, TRACKER_TYPES,
   isScheduledToday, isLoggedToday, getLogForDate,
   upsertLog, toggleMilestone, computeHabitStreaks, computeTargetStats, computeAverageStats,
-  computeProjectStats, computeGlobalStats, todayStr,
+  computeProjectStats, computeGlobalStats,
 } from '../trackers/trackerUtils';
 import { getDailyInsight } from '../trackers/insightsEngine';
 import {
@@ -14,6 +14,16 @@ import {
   isCompletedToday as isHabitCompletedToday, calcStreak as habitStreak, fmtFrequency,
 } from '../habitsStore';
 import { CAT_META } from '../utils/categoryMeta';
+import { localDateStr } from '../utils/date';
+
+// Bucket an ISO instant (completedAt, pomodoro timestamp) into the viewer's
+// LOCAL calendar day, so day-grouping here matches journal/task dates (which are
+// stored as local dates) instead of drifting a day near midnight in non-UTC zones.
+function localDayOf(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : localDateStr(d);
+}
 
 // ─── Local Storage Helpers for Preview Cards ─────────────────────────
 function loadRecentJournalEntries() {
@@ -85,22 +95,25 @@ export default function DailyGoalsView({
   const [taskRange, setTaskRange] = useState('today'); // 'today' or 'week'
 
   const today = new Date();
-  const todayDateStr = todayStr();
-  // Local-date form of "today", used only for the calendar strip's day-highlight
-  // comparison below (dStr there is built from local Date components). todayDateStr
-  // stays UTC-based since it's compared against UTC-stamped journal/pomodoro data
-  // elsewhere in this component.
-  const todayLocalStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  
+  // Single LOCAL "today" for every day-comparison in this dashboard, so it agrees
+  // with journal/task dates (stored as local) instead of drifting a day near
+  // midnight in non-UTC zones (instant timestamps are bucketed via localDayOf).
+  const todayLocalStr = localDateStr(today);
+
   // Calculations for Greeting Row Subtext
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
   const dueHabitsCount = habits.filter(isHabitScheduledToday).filter(h => !isHabitCompletedToday(h)).length;
-  const journalEntries = loadRecentJournalEntries();
-  const journalPendingCount = journalEntries.some(e => e.date === todayDateStr && e.wins?.[0]?.trim()) ? 0 : 1;
+  // Loaded once per mount (remounts on tab switch) rather than on every render —
+  // this component re-renders every second from the timer tick, and these scan all
+  // of localStorage + JSON.parse each entry, which is far too costly per-second.
+  const journalEntries = useMemo(() => loadRecentJournalEntries(), []);
+  // A journal entry counts as "done today" when today's entry has real content
+  // (entries store `content`, not the old `wins` shape).
+  const journalPendingCount = journalEntries.some(e => e.date === todayLocalStr && getJournalPreview(e.content) !== 'No entry yet') ? 0 : 1;
   const eventsCount = intentions?.items?.filter(i => !i.done).length || trackers?.filter(t => isScheduledToday(t) && !isLoggedToday(t)).length || 0;
 
-  // Load preview data
-  const activeGoals = loadActiveGoals();
+  // Load preview data (once per mount — see journalEntries note above)
+  const activeGoals = useMemo(() => loadActiveGoals(), []);
 
   // Recent Activity feed (mix of completed tasks & habits today)
   const recentActivity = [
@@ -118,9 +131,9 @@ export default function DailyGoalsView({
   for (let i = 0; i < 7; i++) {
     const d = new Date(mon);
     d.setDate(mon.getDate() + i);
-    const dStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const dStr = localDateStr(d);
     const isCurr = dStr === todayLocalStr;
-    const hasDone = tasks.some(t => t.completed && t.completedAt?.startsWith(dStr)) || pomodoroLog.some(p => p.timestamp?.startsWith(dStr));
+    const hasDone = tasks.some(t => t.completed && localDayOf(t.completedAt) === dStr) || pomodoroLog.some(p => localDayOf(p.timestamp) === dStr);
     calDays.push({
       lbl: d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
       num: d.getDate(),
@@ -140,7 +153,7 @@ export default function DailyGoalsView({
   const habitPct = Math.round((doneHabits / totalHabits) * 100);
 
   // Time Breakdown calculations
-  let totalMinutesToday = pomodoroLog.filter(p => p.timestamp?.startsWith(todayDateStr)).length * 25;
+  let totalMinutesToday = pomodoroLog.filter(p => localDayOf(p.timestamp) === todayLocalStr).length * 25;
   if (timerState === 'running') totalMinutesToday += Math.floor((25 * 60 - timerSeconds) / 60);
   if (totalMinutesToday === 0) totalMinutesToday = tasks.reduce((acc, t) => acc + (t.timeEstimate || 25), 0); // fallback for gorgeous UI representation
   const hours = Math.floor(totalMinutesToday / 60);
@@ -375,7 +388,7 @@ export default function DailyGoalsView({
                 journalEntries.slice(0, 1).map((e, idx) => (
                   <div key={idx} className="yartu-compact-row" onClick={() => setActiveTab?.('journal')} style={{ cursor: 'pointer' }}>
                     <div className="yartu-row-left" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                      <div className="yartu-row-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{e.date === todayDateStr ? 'Today' : e.date}</div>
+                      <div className="yartu-row-title" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{e.date === todayLocalStr ? 'Today' : e.date}</div>
                       <div className="yartu-row-sub" style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 500, lineHeight: 1.4 }}>{getJournalPreview(e.content)}</div>
                     </div>
                     <div className="yartu-row-right">
