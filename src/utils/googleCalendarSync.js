@@ -8,6 +8,15 @@
  * ensures Tasks and Calendar callbacks don't conflict.
  */
 
+import { localDateStr } from './date';
+
+// 'YYYY-MM-DD' + 1 calendar day (local), for events whose end time crosses midnight.
+function addOneDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return localDateStr(d);
+}
+
 const GCAL_TOKEN_KEY    = 'nook_gcal_tokens';
 const GCAL_VERIFIER_KEY = 'nook_gcal_pkce_verifier';
 const GCAL_ENABLED_KEY  = 'nook_gcal_enabled';
@@ -185,18 +194,28 @@ export async function fetchGCalEvents(token, timeMin, timeMax) {
     }));
 }
 
-export async function createGCalEvent(token, { title, date, time, description = '' }) {
+export async function createGCalEvent(token, { title, date, time, endTime, description = '' }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const endHour = time
-    ? `${String((parseInt(time.split(':')[0], 10) + 1) % 24).padStart(2, '0')}:${time.split(':')[1]}`
-    : null;
 
-  const body = {
-    summary: title,
-    description,
-    start: time ? { dateTime: `${date}T${time}:00`, timeZone: tz } : { date },
-    end:   time ? { dateTime: `${date}T${endHour}:00`, timeZone: tz } : { date },
-  };
+  let start, end;
+  if (time) {
+    start = { dateTime: `${date}T${time}:00`, timeZone: tz };
+    // Honor the caller's end time; fall back to +1h. If the end isn't strictly
+    // after the start (e.g. 23:30 start), it crosses midnight — roll the end
+    // DATE forward a day so Google doesn't get a negative-length event.
+    let endT = endTime;
+    if (!endT) {
+      const [h, m] = time.split(':').map(Number);
+      endT = `${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    const endDate = endT <= time ? addOneDay(date) : date;
+    end = { dateTime: `${endDate}T${endT}:00`, timeZone: tz };
+  } else {
+    start = { date };
+    end   = { date };
+  }
+
+  const body = { summary: title, description, start, end };
 
   const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/${CALENDAR_ID}/events`,

@@ -147,6 +147,9 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
       const task = tasks?.find(t => t.id === id);
       if (task && onUpdateTask) onUpdateTask({ ...task, dueDate: newDate, time: newTime, endTime: newEndTime, isAllDay });
     } else if (type === 'event') {
+      // A custom event with a null date is unreachable in the UI (eventsByDate skips
+      // it), so never write one — callers that "unschedule" an event should delete it.
+      if (!newDate) return;
       const u = customEvents.map(e => e.id === id ? { ...e, date: newDate, time: newTime, endTime: newEndTime, isAllDay } : e);
       setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
     }
@@ -207,11 +210,14 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     if (!modalTitle.trim()) return;
     const endTime = modalEndTime || addHour(modalTime);
     const ev = { id: Date.now().toString(), title: modalTitle.trim(), date: modalDate, time: modalTime, endTime, isAllDay: !modalTime, category: modalCategory, notes: modalNotes };
+    // Store as a calendar event ONLY. Previously this also called onAddTask with the
+    // same id, so the item was persisted twice (customEvents + tasks) and rendered
+    // twice in eventsByDate. Google sync for events goes through the Calendar API
+    // (pushToGCal below), not Google Tasks.
     saveCustomEvent(ev);
     logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: ev.id, action: 'created', title: ev.title });
-    if (onAddTask) onAddTask({ id: ev.id, name: ev.title, dueDate: modalDate, time: ev.time, endTime, isAllDay: ev.isAllDay, category: modalCategory, completed: false });
     if (gcalConnected && pushToGCal) {
-      try { const tok = await getCalendarToken(); if (tok) { await createGCalEvent(tok, { title: ev.title, date: ev.date, time: ev.time }); await fetchGCalRange(); } } catch {}
+      try { const tok = await getCalendarToken(); if (tok) { await createGCalEvent(tok, { title: ev.title, date: ev.date, time: ev.time, endTime: ev.endTime }); await fetchGCalRange(); } } catch {}
     }
     setModalTitle(''); setModalNotes(''); setShowAddModal(false);
   };
@@ -245,13 +251,23 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     };
     const onUp = up => {
       window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp);
+      resizeListenersRef.current = null;
       const dm = Math.round((up.clientY - iy) / PX_PER_MIN / 15) * 15;
       if (edge === 'bottom') updateEventSchedule(ev.id, ev.type, ds, formatTime(iS), formatTime(Math.max(iS+15, Math.min(1440, iE+dm))), false);
       else updateEventSchedule(ev.id, ev.type, ds, formatTime(Math.min(iE-15, Math.max(0, iS+dm))), formatTime(iE), false);
       setResizing(null);
     };
+    // Tracked so an unmount mid-drag can tear these down (see cleanup effect below).
+    resizeListenersRef.current = { onMove, onUp };
     window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
   };
+
+  // Remove any drag listeners still attached if the view unmounts mid-resize.
+  const resizeListenersRef = useRef(null);
+  useEffect(() => () => {
+    const l = resizeListenersRef.current;
+    if (l) { window.removeEventListener('mousemove', l.onMove); window.removeEventListener('mouseup', l.onUp); }
+  }, []);
 
   const dropOnHour = (e, dateStr, hour) => {
     e.preventDefault(); setDragOverHour(null); setIsDragging(false);
@@ -749,10 +765,31 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                   <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)' }}>Mark as Completed</span>
                 </label>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button type="button" onClick={() => { updateEventSchedule(detailEvent.id, detailEvent.type, null, null, null, false); setDetailEvent(null); }} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--color-red)', fontWeight: 600, cursor: 'pointer' }}>Unschedule</button>
                   <button type="button" onClick={() => {
-                    if (detailEvent.type === 'task') { const task = tasks?.find(t => t.id === detailEvent.id); if (task && onUpdateTask) onUpdateTask({ ...task, name: detailEvent.title, time: detailEvent.time, endTime: detailEvent.endTime, isAllDay: detailEvent.isAllDay, category: detailEvent.category, completed: detailEvent.completed }); }
-                    else updateEventSchedule(detailEvent.id, detailEvent.type, toISO(currentDate), detailEvent.time, detailEvent.endTime, detailEvent.isAllDay);
+                    if (detailEvent.type === 'event') {
+                      // Custom events have no "unscheduled" state and no other delete path,
+                      // so removing them from the calendar means deleting the record.
+                      const u = customEvents.filter(e => e.id !== detailEvent.id);
+                      setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
+                    } else if (detailEvent.type === 'task') {
+                      updateEventSchedule(detailEvent.id, 'task', null, null, null, false);
+                    }
+                    // gcal events are read-only in Nook — nothing to unschedule locally
+                    setDetailEvent(null);
+                  }} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--color-red)', fontWeight: 600, cursor: 'pointer' }}>Unschedule</button>
+                  <button type="button" onClick={() => {
+                    if (detailEvent.type === 'task') {
+                      const task = tasks?.find(t => t.id === detailEvent.id);
+                      if (task && onUpdateTask) onUpdateTask({ ...task, name: detailEvent.title, time: detailEvent.time, endTime: detailEvent.endTime, isAllDay: detailEvent.isAllDay, category: detailEvent.category, completed: detailEvent.completed });
+                    } else if (detailEvent.type === 'event') {
+                      // Persist ALL edited fields (title/category/completed too — not just
+                      // schedule) and preserve the event's own date via the `...e` spread.
+                      const u = customEvents.map(e => e.id === detailEvent.id
+                        ? { ...e, title: detailEvent.title, time: detailEvent.time, endTime: detailEvent.endTime, isAllDay: detailEvent.isAllDay, category: detailEvent.category, completed: detailEvent.completed }
+                        : e);
+                      setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
+                    }
+                    // (gcal events are read-only in Nook — no local persistence path)
                     setDetailEvent(null);
                   }} style={{ flex: 2, padding: 12, background: 'var(--accent)', border: 'none', borderRadius: 13, color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(120,105,252,.35)' }}>Save Changes</button>
                 </div>
