@@ -333,20 +333,6 @@ export default memo(function VaultView() {
   return (
     <div style={{ width: '100%', maxWidth: 900, margin: '0 auto', boxSizing: 'border-box', padding: '32px', display: 'flex', flexDirection: 'column', gap: 20, background: 'transparent' }}>
 
-      {/* ── Hero header ── */}
-      <div className="page-hero">
-        <div className="page-hero-left">
-          <div className="page-hero-badge" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          </div>
-          <div className="page-hero-text">
-            <h2 className="page-hero-title">Saved Logins</h2>
-            <span className="page-hero-sub">{totalAccounts} account{totalAccounts !== 1 ? 's' : ''} · {groups.length} service{groups.length !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-        <button className="add-task-btn" onClick={() => setModal({ mode: 'add' })}>＋ Add Account</button>
-      </div>
-
       {/* ── Toolbar ── */}
       <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 340 }}>
@@ -361,6 +347,9 @@ export default memo(function VaultView() {
             ? `${groups.reduce((n, [, a]) => n + a.length, 0)} of ${totalAccounts} accounts`
             : `${totalAccounts} account${totalAccounts !== 1 ? 's' : ''} · ${groups.length} service${groups.length !== 1 ? 's' : ''}`}
         </span>
+
+        {/* Add Account — primary action, moved here from the removed page header */}
+        <button className="add-task-btn" style={{ marginLeft: 'auto', flexShrink: 0 }} onClick={() => setModal({ mode: 'add' })}>＋ Add Account</button>
       </div>
 
       {/* ── Grouped List ── */}

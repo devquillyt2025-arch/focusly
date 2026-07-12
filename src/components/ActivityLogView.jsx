@@ -214,31 +214,6 @@ export default memo(function ActivityLogView({ setActiveTab }) {
   return (
     <div className="al-view">
 
-      {/* ── Title row ── */}
-      <div className="page-hero al-header">
-        <div className="page-hero-left">
-          <div className="page-hero-badge" aria-hidden="true"><IcoHistory /></div>
-          <div className="page-hero-text">
-            <h2 className="page-hero-title">Activity Log</h2>
-            <span className="page-hero-sub">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} found</span>
-          </div>
-        </div>
-        <div className="al-header-right">
-          <div className="al-gear-wrap" ref={gearRef}>
-            <button className="al-icon-btn" onClick={() => setGearOpen(o => !o)} title="Options"><IcoGear /></button>
-            {gearOpen && (
-              <div className="al-drop al-gear-drop">
-                <button className="al-drop-item" onClick={() => doExport('csv')}>Export CSV</button>
-                <button className="al-drop-item" onClick={() => doExport('json')}>Export JSON</button>
-                <div className="al-drop-divider" />
-                <button className="al-drop-danger" onClick={openClear}><IcoTrash /> Clear Log…</button>
-              </div>
-            )}
-          </div>
-          <button className="al-icon-btn" onClick={reload} title="Refresh"><IcoRefresh /></button>
-        </div>
-      </div>
-
       {/* ── Single-row compact toolbar ── */}
       <div className="al-toolbar">
         <div className="al-tb-search">
@@ -287,6 +262,22 @@ export default memo(function ActivityLogView({ setActiveTab }) {
         </div>
 
         <span className="al-count-txt">{filtered.length} entries found</span>
+
+        {/* Gear menu + Refresh — moved here from the removed page header */}
+        <div className="al-header-right">
+          <div className="al-gear-wrap" ref={gearRef}>
+            <button className="al-icon-btn" onClick={() => setGearOpen(o => !o)} title="Options"><IcoGear /></button>
+            {gearOpen && (
+              <div className="al-drop al-gear-drop">
+                <button className="al-drop-item" onClick={() => doExport('csv')}>Export CSV</button>
+                <button className="al-drop-item" onClick={() => doExport('json')}>Export JSON</button>
+                <div className="al-drop-divider" />
+                <button className="al-drop-danger" onClick={openClear}><IcoTrash /> Clear Log…</button>
+              </div>
+            )}
+          </div>
+          <button className="al-icon-btn" onClick={reload} title="Refresh"><IcoRefresh /></button>
+        </div>
       </div>
 
       {/* ── Dense timeline ── */}

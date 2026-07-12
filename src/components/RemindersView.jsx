@@ -33,18 +33,6 @@ export default memo(function RemindersView({ onNavigateToSource }) {
 
   return (
     <div className="cdp-page">
-      <div className="page-hero">
-        <div className="page-hero-left">
-          <div className="page-hero-badge" aria-hidden="true"><IcoBell size={22} /></div>
-          <div className="page-hero-text">
-            <h2 className="page-hero-title">Reminders</h2>
-            <span className="page-hero-sub">
-              {total === 0 ? 'Stay on track with your tasks' : `${total} reminder${total === 1 ? '' : 's'}${overdue.length > 0 ? ` · ${overdue.length} overdue` : ''}`}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="cdp-stats">
         <StatCard icon={<IcoBell />} label="Total" value={total} sub="All reminders" />
         <StatCard icon={<IcoAlert />} label="Overdue" value={overdue.length} sub={overdue.length > 0 ? 'Need attention' : 'All caught up'} warn={overdue.length > 0} />

@@ -65,16 +65,11 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
 
   return (
     <div className="reports-view">
-      <div className="page-hero" style={{ marginBottom: 24 }}>
-        <div className="page-hero-left">
-          <div className="page-hero-badge" aria-hidden="true"><IconBarChart /></div>
-          <div className="page-hero-text">
-            <h2 className="page-hero-title">Reports</h2>
-            <span className="page-hero-sub">
-              {global.activeTrackers} tracker{global.activeTrackers === 1 ? '' : 's'} · {successRate}% success rate
-            </span>
-          </div>
-        </div>
+      {/* Minimal action row — replaces the removed page header; keeps the success-rate stat and Add Tracker action */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+          {global.activeTrackers} tracker{global.activeTrackers === 1 ? '' : 's'} · {successRate}% success rate
+        </span>
         {onAddTracker && (
           <button className="add-task-btn" onClick={onAddTracker}>＋ Add Tracker</button>
         )}

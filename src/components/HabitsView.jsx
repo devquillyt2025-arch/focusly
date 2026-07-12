@@ -88,26 +88,6 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
   return (
     <div className="hv">
 
-      {/* ── Hero header ── */}
-      <div className="hv-hdr">
-        <div className="hv-hdr-left">
-          <div className="hv-hdr-badge" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            </svg>
-          </div>
-          <div className="hv-hdr-text">
-            <h2 className="hv-title">Habits</h2>
-            <span className="hv-date">{dateLabel}</span>
-          </div>
-        </div>
-        <button className="hv-new-btn" onClick={() => setShowModal(true)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Habit
-        </button>
-      </div>
-
       {/* ── Command bar ── */}
       <div className="hv-stat-bar">
         {/* Today progress ring */}
@@ -198,6 +178,11 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
             </button>
           );
         })}
+        {/* New Habit — primary action, moved here from the removed page header */}
+        <button className="hv-new-btn" style={{ marginLeft: 'auto' }} onClick={() => setShowModal(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Habit
+        </button>
       </div>
 
       {/* ── Content ── */}

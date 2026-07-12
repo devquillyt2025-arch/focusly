@@ -637,29 +637,6 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
     <ErrorBoundary title="Notes failed to load" message="An unexpected error occurred in the Notes view. Try refreshing.">
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', overflow: 'hidden' }}>
 
-      {/* ── Hero header (inline styles guarantee layout regardless of CSS cache) ── */}
-      <div className="page-hero ntv-hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: '26px 24px 14px' }}>
-        <div className="page-hero-left" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <div className="page-hero-badge" aria-hidden="true" style={{ width: 46, height: 46, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 24px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.28)' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-            </svg>
-          </div>
-          <div className="page-hero-text" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <h2 className="page-hero-title" style={{ margin: 0, fontSize: '1.9rem', fontWeight: 850, lineHeight: 1, letterSpacing: '-0.035em' }}>Notes</h2>
-            <span className="page-hero-sub" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              {notes.length} {notes.length === 1 ? 'note' : 'notes'}
-              {notes.filter(n => n.pinned).length > 0 && ` · ${notes.filter(n => n.pinned).length} pinned`}
-            </span>
-          </div>
-        </div>
-        <button type="button" className="hv-new-btn" onClick={() => openNew()}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', border: 'none', borderRadius: 13, fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Note
-        </button>
-      </div>
-
       {/* ── Top Bar ── */}
       <div style={{ padding: '8px 24px 12px', flexShrink: 0 }}>
 
@@ -770,6 +747,13 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
               ? `${filtered.length} of ${notes.length} entries`
               : `${notes.length} entries`}
           </span>
+
+          {/* 7. New Note — primary action, moved here from the removed page header */}
+          <button type="button" className="hv-new-btn" onClick={() => openNew()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', border: 'none', borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Note
+          </button>
         </div>
 
       </div>

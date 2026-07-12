@@ -204,19 +204,6 @@ export default memo(function CountdownsView() {
 
   return (
     <div className="cdp-page">
-      <div className="page-hero">
-        <div className="page-hero-left">
-          <div className="page-hero-badge" aria-hidden="true"><CdIcoHourglass size={22} /></div>
-          <div className="page-hero-text">
-            <h2 className="page-hero-title">Countdowns</h2>
-            <span className="page-hero-sub">
-              {totalCount === 0 ? 'Track time between a start and end date' : `${totalCount} countdown${totalCount === 1 ? '' : 's'}${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}`}
-            </span>
-          </div>
-        </div>
-        <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ Add Countdown</button>
-      </div>
-
       <div className="cdp-stats">
         <StatCard icon={<CdIcoLayers />} label="Total" value={totalCount} sub="All time" />
         <StatCard icon={<CdIcoActivity />} label="Active" value={activeCount} sub="In progress" />
@@ -249,6 +236,8 @@ export default memo(function CountdownsView() {
             <span className="cdp-filter-label">Sort</span>
             <Select value={sortBy} onChange={e => setSortBy(e.target.value)} options={sortOptions} style={{ ...SELECT_PILL_STYLE, width: 150 }} />
             <span className="cdp-count-label">{finalList.length} of {totalCount} shown</span>
+            {/* Add Countdown — primary action, moved here from the removed page header */}
+            <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ Add Countdown</button>
           </div>
         </div>
       )}

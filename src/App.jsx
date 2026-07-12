@@ -1704,17 +1704,6 @@ export default function App() {
 
           {activeTab === 'timer' && (
             <div className="timer-tab-wrap">
-              <div className="page-hero" style={{ padding: '28px 30px 0' }}>
-                <div className="page-hero-left">
-                  <div className="page-hero-badge" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 16"/><line x1="9" y1="2" x2="15" y2="2"/><line x1="12" y1="2" x2="12" y2="5"/></svg>
-                  </div>
-                  <div className="page-hero-text">
-                    <h2 className="page-hero-title">Focus</h2>
-                    <span className="page-hero-sub">Pomodoro timer & quick task tracking</span>
-                  </div>
-                </div>
-              </div>
             <div className="timer-tab">
               <div className="timer-left-col">
                 <Timer
