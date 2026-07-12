@@ -892,6 +892,8 @@ export default function App() {
     const completedTasks = tasks.filter(t => t.completed || t.status === 'completed');
     if (!completedTasks.length) return;
 
+    logActivity({ module: 'tasks', entity_type: 'task', entity_id: '', action: 'deleted', title: `Cleared ${completedTasks.length} completed task${completedTasks.length > 1 ? 's' : ''}` });
+
     if (isSyncEnabled) {
       setSyncStatus('Deleting Completed Tasks...');
       const withGid = completedTasks.filter(t => t.googleTaskId);

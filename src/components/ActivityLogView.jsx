@@ -28,6 +28,10 @@ const MODULE_META = {
   journal:  { label: 'Journal', tab: 'journal'  },
   calendar: { label: 'Calendar',tab: 'calendar' },
   vault:    { label: 'Saved Logins', tab: 'vault' },
+  links:    { label: 'Links',       tab: 'links'  },
+  trackers: { label: 'Trackers',    tab: 'reports' },
+  intentions: { label: 'Intentions', tab: 'daily'  },
+  focus:    { label: 'Focus',       tab: 'timer'  },
 };
 const ALL_MODULES = Object.keys(MODULE_META);
 

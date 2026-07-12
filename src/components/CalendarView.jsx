@@ -150,8 +150,10 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
       // A custom event with a null date is unreachable in the UI (eventsByDate skips
       // it), so never write one — callers that "unschedule" an event should delete it.
       if (!newDate) return;
+      const ev = customEvents.find(e => e.id === id);
       const u = customEvents.map(e => e.id === id ? { ...e, date: newDate, time: newTime, endTime: newEndTime, isAllDay } : e);
       setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
+      if (ev) logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: id, action: 'updated', title: ev.title });
     }
   }, [tasks, customEvents, onUpdateTask]);
 
@@ -771,6 +773,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                       // so removing them from the calendar means deleting the record.
                       const u = customEvents.filter(e => e.id !== detailEvent.id);
                       setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
+                      logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: detailEvent.id, action: 'deleted', title: detailEvent.title });
                     } else if (detailEvent.type === 'task') {
                       updateEventSchedule(detailEvent.id, 'task', null, null, null, false);
                     }
@@ -788,6 +791,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                         ? { ...e, title: detailEvent.title, time: detailEvent.time, endTime: detailEvent.endTime, isAllDay: detailEvent.isAllDay, category: detailEvent.category, completed: detailEvent.completed }
                         : e);
                       setCustomEvents(u); localStorage.setItem('nook-calendar-events', JSON.stringify(u));
+                      logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: detailEvent.id, action: 'updated', title: detailEvent.title });
                     }
                     // (gcal events are read-only in Nook — no local persistence path)
                     setDetailEvent(null);

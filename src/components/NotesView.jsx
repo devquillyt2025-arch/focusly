@@ -572,6 +572,8 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
     // Functional update (like saveNote/deleteNote) so it can't overwrite a
     // concurrent change with a stale `notes` snapshot from the closure.
     setNotes(prev => {
+      const target = prev.find(n => n.id === id);
+      if (target) logActivity({ module: 'notes', entity_type: 'note', entity_id: id, action: 'updated', title: `${target.pinned ? 'Unpinned' : 'Pinned'}: ${target.title || '(untitled)'}` });
       const updated = prev.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() } : n);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;

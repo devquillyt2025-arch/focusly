@@ -195,6 +195,12 @@ export default memo(function CountdownsView() {
   };
 
   const toggleComplete = (id) => {
+    const cd = countdowns.find(c => c.id === id);
+    if (cd) logActivity({
+      module: 'countdowns', entity_type: 'countdown', entity_id: id,
+      action: cd.completed ? 'updated' : 'completed', title: cd.name,
+      field_changes: cd.completed ? [{ field: 'completed', from: 'true', to: 'false' }] : null,
+    });
     setCountdowns(prev => prev.map(c => c.id === id ? { ...c, completed: !c.completed } : c));
   };
 
