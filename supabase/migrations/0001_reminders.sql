@@ -24,7 +24,7 @@ create table public.reminders (
   -- and the push/email content don't need a live round-trip to Google
   -- or the client's localStorage.
   title                    text not null,
-a
+
   -- The due date/time (task) or start time (calendar event) this
   -- reminder is attached to. Used for Today/Upcoming/Overdue grouping.
   target_at                timestamptz not null,
