@@ -228,7 +228,6 @@ export function nookToGoogleTask(task) {
     notes: task.notes || '',
     status: task.status === 'completed' ? 'completed' : 'needsAction'
   };
-  console.log('[DEBUG] task.time value: ', task.time);
   if (task.dueDate) {
     if (task.time && typeof task.time === 'string' && task.time.includes(':')) {
       const [yyyy, mm, dd] = task.dueDate.split('-');
@@ -449,7 +448,10 @@ export async function pushLocalChangesToGoogle(tasks, token) {
           const sub = updatedSubtasks[i];
           let match = currentGChildren.find(gt => gt.id === sub.googleTaskId || gt.title === sub.text);
 
-          if (!match || !sub.googleTaskId) {
+          // Only create a new Google subtask when there's no existing match. If a
+          // match is found by title but we haven't stored its googleTaskId yet, the
+          // `else if (match)` branch links it — creating here would duplicate it.
+          if (!match) {
             const subRes = await fetch(`https://www.googleapis.com/tasks/v1/lists/@default/tasks?parent=${parentGoogleTaskId}`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

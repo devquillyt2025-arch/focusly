@@ -61,8 +61,11 @@ function computeUrgency(task, nowMs, isDone) {
   if (isDone || !task.dueDate || !task.createdAt) return null;
   const created = new Date(task.createdAt).getTime();
   const due     = new Date(task.dueDate + 'T23:59:59').getTime();
-  if (!Number.isFinite(created) || !Number.isFinite(due) || due <= created) return null;
+  if (!Number.isFinite(created) || !Number.isFinite(due)) return null;
+  // Overdue takes priority: a past due date always shows a full red bar, even when
+  // the due date sits at/ before createdAt (e.g. a Google-imported or edited task).
   if (nowMs > due) return { pct: 100, color: 'var(--color-red)' };            // overdue
+  if (due <= created) return null;   // no meaningful window (due not after creation)
   const pct = Math.min(100, Math.max(0, ((nowMs - created) / (due - created)) * 100));
   const color = pct < 60 ? 'var(--accent)'
               : pct <= 90 ? 'var(--color-amber)'
@@ -766,11 +769,9 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
   }, [local, onQuickUpdate, onUpdate, showSaved]);
 
   const saveDueTime = useCallback((newTime) => {
-    console.log('[DEBUG] TimePicker onChange output (newTime):', newTime);
     const syncEnabled = localStorage.getItem('nook_sync_enabled') === 'true';
     const prevTime = local?.time ?? '';
     const updated = { ...local, time: newTime };
-    console.log('[DEBUG] Constructed updated task before syncTaskField:', JSON.stringify(updated, null, 2));
 
     // 1. Optimistic local save.
     setLocal(updated);

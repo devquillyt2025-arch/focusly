@@ -840,11 +840,20 @@ export default function App() {
       
       if (success) {
 
-        // Handle recurrence locally immediately. Track the freshly-built list so
-        // the sync below runs on an array that INCLUDES the new occurrence —
-        // passing the stale `tasks` closure here dropped it (pull rebuilds state
-        // from whatever array it's given, erasing the just-added next occurrence).
-        let nextTasks = tasks;
+        // Apply the completion locally straight away so the checkbox reflects the
+        // change immediately, instead of depending on the follow-up pull to bring
+        // the status back (clock skew / timing could otherwise revert it).
+        const completedIso = new Date().toISOString();
+        const applyDone = t => t.id === id
+          ? { ...t, completed: done, status: done ? 'completed' : 'needsAction', completedAt: done ? completedIso : null, updatedAt: completedIso }
+          : t;
+        // Track the freshly-built list so the sync below runs on an array that
+        // INCLUDES both the completion and any new occurrence — passing the stale
+        // `tasks` closure dropped them (pull rebuilds state from whatever array
+        // it's given, erasing just-applied local changes).
+        let nextTasks = tasks.map(applyDone);
+        setTasks(prev => prev.map(applyDone));
+
         if (done && currentTask.recurrence) {
            const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
            const next = {
@@ -854,13 +863,14 @@ export default function App() {
              createdAt: new Date().toISOString(),
              googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
            };
-           nextTasks = [...tasks, next];
+           nextTasks = [...nextTasks, next];
            setTasks(prev => [...prev, next]);
            pushSyncQueue({ type: 'CREATE', taskId: next.id });
         }
 
         // Force a fresh sync to pull the status update from Google. Pass the list
-        // that includes any new occurrence so the pull's setTasks doesn't erase it.
+        // that includes the completion and any new occurrence so the pull's
+        // setTasks doesn't erase them.
         await syncTasks(nextTasks, setTasks, setSyncStatus);
         if (id===activeTaskId && timerState==='running') pauseTimer();
       } else {
