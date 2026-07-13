@@ -11,7 +11,8 @@ import {
 import { getDailyInsight } from '../trackers/insightsEngine';
 import {
   HABIT_CATS, isScheduledToday as isHabitScheduledToday,
-  isCompletedToday as isHabitCompletedToday, calcStreak as habitStreak, fmtFrequency,
+  isCompletedToday as isHabitCompletedToday, isScheduledOn as isHabitScheduledOn,
+  isCompletedOn as isHabitCompletedOn, calcStreak as habitStreak, fmtFrequency,
 } from '../habitsStore';
 import { CAT_META } from '../utils/categoryMeta';
 import { localDateStr } from '../utils/date';
@@ -86,7 +87,7 @@ export default function DailyGoalsView({
   pomodoroLog = [], tasks = [], onTriggerWeeklyReview,
   habits = [], onMarkHabitDone,
   activeTaskId, timerRunning, selectTask, toggleComplete, deleteTask, clearCompleted, setOpenModal, addTask, setEditingTask, updateTaskData, quickUpdateTask, syncStatus, syncTasks,
-  startTimer, pauseTimer, resetTimer, timerState, timerMode, setActiveTab
+  startTimer, pauseTimer, resetTimer, timerState, timerMode, totalSeconds: totalSessionSeconds = 1500, setActiveTab
 }) {
   // Sourced from an external store (not props) so this 1s tick only re-renders
   // DailyGoalsView itself, not the whole app tree — see utils/timerTickStore.js.
@@ -121,6 +122,34 @@ export default function DailyGoalsView({
     ...habits.filter(isHabitCompletedToday).map(h => ({ id: h.id, title: h.name, type: 'Habit', time: 'Completed today', icon: '🔥' }))
   ].slice(0, 4);
 
+  // ── Per-day stats for last 7 days (shared by heatmap + sparklines) ──
+  const last7DayStats = useMemo(() => {
+    const stats = [];
+    const base = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const ds = localDateStr(d);
+      // Tasks done on this date
+      const tDone = tasks.filter(t => t.completed && localDayOf(t.completedAt) === ds).length;
+      // Tasks "on" this date: due on date OR completed on date
+      const tTotal = tasks.filter(t => t.dueDate === ds || (t.completed && localDayOf(t.completedAt) === ds)).length;
+      // Habits scheduled / completed on this date
+      const hSched = habits.filter(h => isHabitScheduledOn(h, d)).length;
+      const hDone = habits.filter(h => isHabitScheduledOn(h, d) && isHabitCompletedOn(h, ds)).length;
+      const total = tTotal + hSched;
+      const done = tDone + hDone;
+      stats.push({
+        date: ds,
+        taskPct: tTotal > 0 ? Math.round((tDone / tTotal) * 100) : 0,
+        habitPct: hSched > 0 ? Math.round((hDone / hSched) * 100) : 0,
+        completionPct: total > 0 ? Math.round((done / total) * 100) : 0,
+        hasData: total > 0,
+      });
+    }
+    return stats;
+  }, [tasks, habits, pomodoroLog]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Calendar strip (Mon - Sun of current week)
   const calDays = [];
   const currDay = today.getDay(); // 0 is Sun, 1 is Mon
@@ -133,12 +162,20 @@ export default function DailyGoalsView({
     d.setDate(mon.getDate() + i);
     const dStr = localDateStr(d);
     const isCurr = dStr === todayLocalStr;
+    const isFuture = dStr > todayLocalStr;
     const hasDone = tasks.some(t => t.completed && localDayOf(t.completedAt) === dStr) || pomodoroLog.some(p => localDayOf(p.timestamp) === dStr);
+    // Heatmap: per-day completion rate for past/today; null for future
+    let completionPct = null;
+    if (!isFuture) {
+      const dayStat = last7DayStats.find(s => s.date === dStr);
+      completionPct = dayStat?.hasData ? dayStat.completionPct : 0;
+    }
     calDays.push({
       lbl: d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
       num: d.getDate(),
       isCurr,
-      hasDone
+      hasDone,
+      completionPct,
     });
   }
 
@@ -151,6 +188,12 @@ export default function DailyGoalsView({
   const totalHabits = schedHabits.length || 1;
   const doneHabits = schedHabits.filter(isHabitCompletedToday).length;
   const habitPct = Math.round((doneHabits / totalHabits) * 100);
+
+  // Sparkline helpers
+  const taskSparkData = last7DayStats.map(s => s.taskPct);
+  const habitSparkData = last7DayStats.map(s => s.habitPct);
+  const taskSparkDaysWithData = last7DayStats.filter(s => s.hasData || s.taskPct > 0).length;
+  const habitSparkDaysWithData = last7DayStats.filter(s => s.hasData || s.habitPct > 0).length;
 
   // Time Breakdown calculations
   let totalMinutesToday = pomodoroLog.filter(p => localDayOf(p.timestamp) === todayLocalStr).length * 25;
@@ -410,7 +453,18 @@ export default function DailyGoalsView({
               <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>{timerState === 'running' ? 'Running' : 'Paused'}</span>
             </div>
             <div className="yartu-pomo-box">
-              <div className="yartu-mini-timer">{formatTimerDisplay(timerSeconds)}</div>
+              <div className="yartu-pomo-ring-wrap">
+                <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--ring-track)" strokeWidth="5" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" strokeWidth="5"
+                    strokeDasharray={2 * Math.PI * 52}
+                    strokeDashoffset={2 * Math.PI * 52 * (timerSeconds / totalSessionSeconds)}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.3s linear' }}
+                  />
+                </svg>
+                <div className="yartu-mini-timer">{formatTimerDisplay(timerSeconds)}</div>
+              </div>
               <div className="yartu-timer-controls">
                 <button className="yartu-timer-btn" onClick={startTimer} title="Start / Resume">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -466,13 +520,25 @@ export default function DailyGoalsView({
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mon – Sun</span>
             </div>
             <div className="yartu-cal-strip">
-              {calDays.map((cd, idx) => (
-                <div key={idx} className={`yartu-cal-day${cd.isCurr ? ' active' : ''}`}>
-                  <span className="yartu-cal-day-lbl">{cd.lbl}</span>
-                  <span className="yartu-cal-day-num">{cd.num}</span>
-                  <div className={`yartu-cal-dot${cd.hasDone ? ' done' : ''}`} />
-                </div>
-              ))}
+              {calDays.map((cd, idx) => {
+                // Heatmap background: stepped accent opacity based on completion %
+                let heatBg = undefined;
+                if (cd.completionPct != null && cd.completionPct > 0) {
+                  const opacity = cd.completionPct <= 25 ? 0.10
+                    : cd.completionPct <= 50 ? 0.25
+                    : cd.completionPct <= 75 ? 0.45 : 0.65;
+                  heatBg = `rgba(120,105,252, ${opacity})`;
+                }
+                return (
+                  <div key={idx} className={`yartu-cal-day${cd.isCurr ? ' active' : ''}`}
+                    style={heatBg ? { backgroundColor: heatBg } : undefined}
+                  >
+                    <span className="yartu-cal-day-lbl">{cd.lbl}</span>
+                    <span className="yartu-cal-day-num">{cd.num}</span>
+                    <div className={`yartu-cal-dot${cd.hasDone ? ' done' : ''}`} />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -492,6 +558,15 @@ export default function DailyGoalsView({
                   <span className="yartu-ring-val">{taskPct}%</span>
                 </div>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Tasks Done</span>
+                {taskSparkDaysWithData >= 2 && (
+                  <svg className="yartu-sparkline" width="80" height="24" viewBox="0 0 80 24">
+                    <polyline
+                      fill="none" stroke="var(--accent)" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round"
+                      points={taskSparkData.map((v, i) => `${i * (80 / 6)},${22 - (v / 100) * 20}`).join(' ')}
+                    />
+                  </svg>
+                )}
               </div>
 
               <div className="yartu-ring-card">
@@ -503,6 +578,15 @@ export default function DailyGoalsView({
                   <span className="yartu-ring-val">{habitPct}%</span>
                 </div>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Habit Consistency</span>
+                {habitSparkDaysWithData >= 2 && (
+                  <svg className="yartu-sparkline" width="80" height="24" viewBox="0 0 80 24">
+                    <polyline
+                      fill="none" stroke="#34d399" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round"
+                      points={habitSparkData.map((v, i) => `${i * (80 / 6)},${22 - (v / 100) * 20}`).join(' ')}
+                    />
+                  </svg>
+                )}
               </div>
             </div>
           </div>

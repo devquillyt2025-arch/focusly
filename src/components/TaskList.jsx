@@ -52,6 +52,24 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Deadline-urgency bar value — DERIVED at render time from createdAt → dueDate.
+// Never stored on the task or synced. Returns null when there's nothing to show
+// (task done, no dueDate, or no createdAt — missing createdAt is a valid "no bar"
+// fallback, see migrateTask in App.jsx). The deadline is end-of-due-day so the
+// overdue flip matches fmtDue's day-granularity logic.
+function computeUrgency(task, nowMs, isDone) {
+  if (isDone || !task.dueDate || !task.createdAt) return null;
+  const created = new Date(task.createdAt).getTime();
+  const due     = new Date(task.dueDate + 'T23:59:59').getTime();
+  if (!Number.isFinite(created) || !Number.isFinite(due) || due <= created) return null;
+  if (nowMs > due) return { pct: 100, color: 'var(--color-red)' };            // overdue
+  const pct = Math.min(100, Math.max(0, ((nowMs - created) / (due - created)) * 100));
+  const color = pct < 60 ? 'var(--accent)'
+              : pct <= 90 ? 'var(--color-amber)'
+              : 'var(--color-orange)';
+  return { pct, color };
+}
+
 // normalise display name
 function displayName(name) {
   if (!name) return '';
@@ -74,6 +92,7 @@ const ALL_CATS_STATIC = Object.keys(CAT_META);
 function TaskRow({
   task,
   isDone,
+  now,
   activeTaskId,
   timerRunning,
   confirmDeleteId,
@@ -96,6 +115,7 @@ function TaskRow({
   const isOverdue = !isDone && due?.overdue;
   const priColor = !isDone && task.priority !== 'none' ? (PRI_META[task.priority]?.color ?? null) : null;
   const cardBorderLeft = priColor ? `4px solid ${priColor}` : '4px solid transparent';
+  const urgency = computeUrgency(task, now, isDone);
 
   return (
     <motion.div
@@ -348,6 +368,15 @@ function TaskRow({
               </div>
             )}
           </div>
+
+          {/* Deadline-urgency bar — derived, absolutely positioned, does not affect
+              layout/height. Clip layer (not overflow on the row) keeps the kebab
+              dropdown from being clipped. */}
+          {urgency && (
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: 10, overflow: 'hidden', pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, height: 2, width: `${urgency.pct}%`, background: urgency.color, transition: 'width 500ms ease-out, background-color 500ms ease-out' }} />
+            </div>
+          )}
         </>
       )}
     </motion.div>
@@ -534,6 +563,14 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
   const [inlineAddCat,    setInlineAddCat]    = useState(null);
   const [inlineAddText,   setInlineAddText]   = useState('');
   const [detailTab,       setDetailTab]       = useState('details'); // 'details' | 'scheduling' | 'subtasks'
+  // Single tab-scoped clock that drives the deadline-urgency bar on every card
+  // (one interval for the whole list, not one per row). 30s granularity is more
+  // than enough for date-scale deadlines and avoids per-second re-renders.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
   const sortRef      = useRef(null);
   const searchRef    = useRef(null);
   const savedTimerRef = useRef(null);
@@ -895,6 +932,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
       key={task.id}
       task={task}
       isDone={isDone}
+      now={now}
       activeTaskId={activeTaskId}
       timerRunning={timerRunning}
       confirmDeleteId={confirmDeleteId}

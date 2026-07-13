@@ -24,35 +24,69 @@ function to24(hour12, minute, meridiem) {
   return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+// Odd number of repeated blocks used to fake an infinite wheel. The current
+// value sits in the middle block; after every scroll settles we jump back to
+// the middle block's equivalent item (an identical-looking row), so there are
+// always ~4 blocks of runway in either direction and the loop never "ends".
+const LOOP_REPEAT = 9;
+
 // Scrollable "wheel" column — click an item, or scroll and it snaps to
-// whichever item lands in the center band.
-function WheelColumn({ items, value, onChange, format = v => v }) {
+// whichever item lands in the center band. When `loop` is set (hours/minutes),
+// the list wraps around continuously in both directions.
+function WheelColumn({ items, value, onChange, format = v => v, loop = false }) {
   const ref = useRef(null);
   const scrollTimer = useRef(null);
   const didInit = useRef(false);
 
-  // Jump to the correct position when the picker opens or value changes externally.
+  const len = items.length;
+  const middleStart = loop ? Math.floor(LOOP_REPEAT / 2) * len : 0;
+  const rendered = loop
+    ? Array.from({ length: LOOP_REPEAT * len }, (_, i) => items[i % len])
+    : items;
+
+  // Position to the selected value on first open, or when it changes externally
+  // (e.g. the "Now" button). Skips repositioning when our own scroll already
+  // centered the right item, so it never fights the user mid-scroll.
   useEffect(() => {
-    const idx = items.indexOf(value);
-    if (idx < 0 || !ref.current) return;
-    ref.current.scrollTop = idx * ITEM_H;
+    const el = ref.current;
+    if (!el) return;
+    const centeredIdx = Math.round(el.scrollTop / ITEM_H);
+    const centeredVal = loop
+      ? items[((centeredIdx % len) + len) % len]
+      : items[Math.max(0, Math.min(len - 1, centeredIdx))];
+    if (didInit.current && centeredVal === value) return;
+    const vIdx = items.indexOf(value);
+    if (vIdx < 0) return;
+    el.scrollTop = (middleStart + vIdx) * ITEM_H;
     didInit.current = true;
-  }, [items, value]);
+  }, [items, value, loop, len, middleStart]);
+
+  const settle = () => {
+    const el = ref.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollTop / ITEM_H);
+    if (loop) {
+      const mod = ((idx % len) + len) % len;
+      // Snap to the nearest item AND recenter into the middle block in one
+      // instant move — lands on an identical row, so the jump is invisible and
+      // the wheel can keep scrolling forever in both directions.
+      el.scrollTop = (middleStart + mod) * ITEM_H;
+      if (items[mod] !== value) onChange(items[mod]);
+    } else {
+      const clamped = Math.max(0, Math.min(len - 1, idx));
+      el.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+      if (items[clamped] !== value) onChange(items[clamped]);
+    }
+  };
 
   const handleScroll = () => {
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => {
-      if (!ref.current) return;
-      const idx = Math.round(ref.current.scrollTop / ITEM_H);
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      ref.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
-      if (items[clamped] !== value) onChange(items[clamped]);
-    }, 100);
+    scrollTimer.current = setTimeout(settle, 100);
   };
 
-  const selectItem = (item, idx) => {
+  const selectItem = (renderedIdx, item) => {
     onChange(item);
-    ref.current?.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
+    ref.current?.scrollTo({ top: renderedIdx * ITEM_H, behavior: 'smooth' });
   };
 
   return (
@@ -71,12 +105,12 @@ function WheelColumn({ items, value, onChange, format = v => v }) {
           padding: `${PAD}px 0`, scrollbarWidth: 'none',
         }}
       >
-        {items.map((item, idx) => {
+        {rendered.map((item, idx) => {
           const isSelected = item === value;
           return (
             <div
-              key={item}
-              onClick={() => selectItem(item, idx)}
+              key={idx}
+              onClick={() => selectItem(idx, item)}
               style={{
                 height: ITEM_H, scrollSnapAlign: 'center',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -132,9 +166,9 @@ export default function TimePicker({ value, onChange, onClose }) {
       onClick={e => e.stopPropagation()}
     >
       <div style={{ padding: '14px 12px 4px', display: 'flex', justifyContent: 'center', gap: 4 }}>
-        <WheelColumn items={HOURS} value={hour12} onChange={setHour12} format={h => String(h).padStart(2, '0')} />
+        <WheelColumn items={HOURS} value={hour12} onChange={setHour12} format={h => String(h).padStart(2, '0')} loop />
         <div style={{ display: 'flex', alignItems: 'center', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-muted)' }}>:</div>
-        <WheelColumn items={MINUTES} value={minute} onChange={setMinute} format={m => String(m).padStart(2, '0')} />
+        <WheelColumn items={MINUTES} value={minute} onChange={setMinute} format={m => String(m).padStart(2, '0')} loop />
         <WheelColumn items={MERIDIEMS} value={meridiem} onChange={setMeridiem} />
       </div>
 

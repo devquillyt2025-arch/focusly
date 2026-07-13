@@ -1461,7 +1461,7 @@ export default function App() {
             <AnimatePresence>
             {avatarOpen && (
               <motion.div
-                className="yartu-avatar-dropdown"
+                className="yartu-avatar-dropdown prefs-dropdown"
                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -1477,8 +1477,8 @@ export default function App() {
                   <span className="nav-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
                   <span className="nav-label">Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
                 </button>
-                <div className="nav-divider" style={{ margin: '8px 0' }} />
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 11px', marginBottom: -6 }}>Connections</div>
+                <div className="nav-divider" style={{ margin: '3px 0' }} />
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 11px', marginBottom: 0 }}>Connections</div>
                 <button className="main-nav-btn" style={{ justifyContent: 'space-between' }} onClick={() => { setActiveTab('settings'); setAvatarOpen(false); }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="nav-icon"><NavIcoCheckSquare /></span>
@@ -1503,7 +1503,7 @@ export default function App() {
                     </span>
                   </span>
                 </button>
-                <div className="nav-divider" style={{ margin: '8px 0' }} />
+                <div className="nav-divider" style={{ margin: '3px 0' }} />
                 <button className="hdr-cta-btn" style={{ width: '100%' }} onClick={() => { setAvatarOpen(false); if (activeTab === 'tasks') setOpenModal('add'); else openAddTracker(); }}>
                   {activeTab === 'tasks' ? '＋ Add Task' : '＋ Add Tracker'}
                 </button>
@@ -1656,6 +1656,7 @@ export default function App() {
               resetTimer={resetTimer}
               timerState={timerState}
               timerMode={timerMode}
+              totalSeconds={totalSeconds}
               setActiveTab={setActiveTab}
             />
           )}

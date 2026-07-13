@@ -44,6 +44,7 @@
   --color-red-bg:  rgba(248,113,113,0.1);
   --color-amber:   #fbbf24;
   --color-amber-bg: rgba(251,191,36,0.1);
+  --color-orange:  #fb923c;
   --color-blue:    #60a5fa;
   --color-blue-bg: rgba(96,165,250,0.1);
   --color-purple:  #c084fc;
@@ -500,6 +501,9 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Reserve the scrollbar track so centered content doesn't shift left when the
+     scrollbar appears/disappears (prevents an asymmetric right-edge gutter). */
+  scrollbar-gutter: stable;
   background: var(--bg-base);
   display: flex;
   flex-direction: column;
@@ -2965,14 +2969,41 @@ select.modal-input {
    JOURNAL PAGE v3 — Notion-style, heatmap-driven (no sidebar)
    ═══════════════════════════════════════════════════════════════════ */
 .jnx-page {
+  /* Fill the already-centered .sunsama-tab-transition shell (max-width 1600, 36px
+     padding). Imposing our own max-width/margin here double-centered the page and
+     produced the asymmetric right-edge gutter. Horizontal spacing is the tab's job. */
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 28px 80px;
+  max-width: none;
+  margin: 0;
+  padding: 8px 0 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   box-sizing: border-box;
+}
+
+/* ── Split layout: canvas (left, hero) + ambient metadata (right) ──
+   Mobile-first base is a single stacked column (canvas above metadata);
+   the ≥768 / ≥1024 breakpoints below promote it to a side-by-side grid. */
+.jnx-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: start;
+}
+.jnx-write-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+/* Ambient metadata — borderless, no card, bleeds into the sanctuary */
+.jnx-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 2px 2px 24px;
 }
 
 /* ── Heatmap (compact weekly widget) ── */
@@ -2984,10 +3015,13 @@ select.modal-input {
   display: flex;
   flex-direction: column;
 }
-.jnx-heatmap-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* Stacked header rows so nothing wraps awkwardly in the narrow panel */
+.jnx-heatmap-head { display: flex; flex-direction: column; gap: 10px; }
+.jnx-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .jnx-heatmap-stats { display: flex; flex-direction: column; gap: 3px; }
-.jnx-heatmap-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
-.jnx-heatmap-sub { display: flex; align-items: center; gap: 7px; font-size: 0.76rem; color: var(--text-secondary); }
+.jnx-heatmap-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; white-space: nowrap; }
+.jnx-heatmap-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 0.76rem; color: var(--text-secondary); }
+.jnx-view-toggle { flex-shrink: 0; }
 .jnx-streak { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--color-amber, #f59e0b); }
 .jnx-dot-sep { color: var(--text-faint); }
 .jnx-collapse-btn {
@@ -3007,28 +3041,35 @@ select.modal-input {
 .jnx-week-nav { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .jnx-nav-arrow.jnx-nav-arrow-sm { width: 26px; height: 26px; }
 
-/* 7 chunky day tiles */
-.jnx-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.jnx-week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
-.jnx-week-dow { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+/* Day cards — default is a vertical list (calendar sits in the narrow left column).
+   The mobile breakpoint (<768px) below flips this back to a horizontal strip. */
+.jnx-week { display: flex; flex-direction: column; gap: 6px; }
+.jnx-week-day {
+  display: flex; flex-direction: row; align-items: center; gap: 10px;
+  width: 100%; min-width: 0; padding: 3px 6px; border-radius: 10px;
+  transition: background 0.15s ease;
+}
+.jnx-week-day:hover { background: var(--bg-hover); }
+.jnx-week-dow { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); width: 34px; flex: 0 0 auto; text-align: left; }
 .jnx-week-cell {
-  width: 100%; aspect-ratio: 1 / 1; max-height: 58px; min-height: 40px;
+  width: 40px; height: 40px; aspect-ratio: 1 / 1; flex: 0 0 auto;
   border-radius: 11px; border: 1px solid var(--border); padding: 0;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.35s ease, border-color 0.15s ease;
 }
+.jnx-week-wc { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
 .jnx-week-cell:not(:disabled):hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .jnx-week-cell:disabled { opacity: 0.45; cursor: default; }
 .jnx-week-date { font-size: 0.92rem; font-weight: 700; color: var(--text-primary); }
-.jnx-week-cell.jnx-today { border-color: var(--accent); border-width: 2px; }
-.jnx-week-cell.jnx-active { box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px var(--accent); }
+.jnx-week-cell.jnx-today { border-color: var(--jnx-amber); border-width: 2px; }
+.jnx-week-cell.jnx-active { box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px var(--jnx-amber); }
 
-/* Intensity scale — floor raised to --bg-elevated so empty cells read as a grid */
+/* Intensity scale — warm amber (journal signature), floor at --bg-elevated */
 .jnx-lvl-0 { background: var(--bg-elevated); }
-.jnx-lvl-1 { background: color-mix(in srgb, var(--accent) 24%, var(--bg-elevated)); }
-.jnx-lvl-2 { background: color-mix(in srgb, var(--accent) 48%, var(--bg-elevated)); }
-.jnx-lvl-3 { background: color-mix(in srgb, var(--accent) 72%, var(--bg-elevated)); }
-.jnx-lvl-4 { background: var(--accent); }
+.jnx-lvl-1 { background: color-mix(in srgb, var(--jnx-amber) 24%, var(--bg-elevated)); }
+.jnx-lvl-2 { background: color-mix(in srgb, var(--jnx-amber) 48%, var(--bg-elevated)); }
+.jnx-lvl-3 { background: color-mix(in srgb, var(--jnx-amber) 72%, var(--bg-elevated)); }
+.jnx-lvl-4 { background: var(--jnx-amber); }
 .jnx-week-cell.jnx-lvl-3 .jnx-week-date,
 .jnx-week-cell.jnx-lvl-4 .jnx-week-date { color: #fff; }
 
@@ -3037,6 +3078,48 @@ select.modal-input {
 .jnx-heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.68rem; color: var(--text-muted); }
 .jnx-heatmap-legend span:first-child { margin-right: 2px; }
 .jnx-heatmap-legend span:last-child { margin-left: 2px; }
+
+/* ── Panel header right cluster: view toggle + collapse ── */
+.jnx-heatmap-head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.jnx-view-toggle {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 8px; padding: 2px;
+}
+.jnx-view-opt {
+  font-family: inherit; font-size: 0.68rem; font-weight: 600;
+  padding: 3px 9px; border-radius: 6px; border: none; cursor: pointer;
+  background: transparent; color: var(--text-muted); transition: all var(--ease);
+}
+.jnx-view-opt:hover { color: var(--text-secondary); }
+.jnx-view-active { background: var(--jnx-amber-soft); color: var(--jnx-amber); }
+
+/* ── Month grid (fills the narrow panel; reuses jnx-lvl-* intensity scale) ── */
+.jnx-month { display: flex; flex-direction: column; gap: 6px; }
+.jnx-month-dows,
+.jnx-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.jnx-month-dow { text-align: center; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.jnx-mcell {
+  aspect-ratio: 1 / 1; min-width: 0; padding: 0; box-sizing: border-box;
+  border-radius: 8px; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.35s ease, border-color 0.15s ease;
+}
+.jnx-mcell:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.jnx-mcell:disabled { opacity: 0.4; cursor: default; }
+.jnx-mcell-num { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+/* Days with no entry — no fill, muted number */
+.jnx-mcell.jnx-lvl-0 { background: transparent; }
+.jnx-mcell.jnx-lvl-0 .jnx-mcell-num { color: var(--text-muted); font-weight: 500; }
+/* High-intensity fills get a white number for contrast */
+.jnx-mcell.jnx-lvl-3 .jnx-mcell-num,
+.jnx-mcell.jnx-lvl-4 .jnx-mcell-num { color: #fff; }
+/* Leading / trailing days from adjacent months — dimmed, still clickable */
+.jnx-mcell.jnx-out { opacity: 0.4; }
+.jnx-mcell.jnx-out .jnx-mcell-num { color: var(--text-faint); }
+/* Today + selected day — same treatment as the week strip */
+.jnx-mcell.jnx-today { border-color: var(--accent); border-width: 2px; }
+.jnx-mcell.jnx-active { box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px var(--accent); }
 
 /* ── Entry header (Notion-style) ── */
 .jnx-header { display: flex; flex-direction: column; gap: 6px; }
@@ -3110,18 +3193,306 @@ select.modal-input {
 }
 .jnx-tb-sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; flex-shrink: 0; }
 
-/* ── Borderless full-width editor (reuses .journal-rich-editor typography) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   JOURNAL — "Dark Inky Sanctuary" premium redesign
+   Warm near-black canvas, Newsreader serif hero type, amber ambient glow.
+   Tokens are scoped to .jnx-page so the rest of the app's purple is untouched.
+   ═══════════════════════════════════════════════════════════════════ */
+.jnx-page {
+  --jnx-serif: 'Newsreader', 'Iowan Old Style', 'Georgia', serif;
+  /* Dark is the app default — warm off-white ink on inky charcoal */
+  --jnx-ink:        #ece4d6;   /* warm off-white — primary ink */
+  --jnx-ink-soft:   #a89f8f;   /* muted warm grey — metadata   */
+  --jnx-ink-faint:  #6b6456;
+  --jnx-line:       rgba(224, 216, 200, 0.12);
+  --jnx-amber:      #e6b370;   /* warm gold accent — readable on inky bg */
+  --jnx-amber-soft: rgba(230, 179, 112, 0.16);
+  --jnx-grain:      rgba(255, 255, 255, 0.02);
+  --jnx-glow:       240, 200, 150; /* ambient-glow rgb — tinted per time of day below */
+}
+/* Light mode — warm charcoal ink on paper, deepened gold for contrast (both themes designed together) */
+:root[data-theme="light"] .jnx-page {
+  --jnx-ink:        #2b2520;   /* warm dark charcoal ink — ~13:1 on paper */
+  --jnx-ink-soft:   #6b6154;   /* ~5.5:1 */
+  --jnx-ink-faint:  #a99f8d;
+  --jnx-line:       rgba(60, 50, 35, 0.14);
+  --jnx-amber:      #b06f1e;   /* deep amber — ~4.6:1 on white, AA for the eyebrow */
+  --jnx-amber-soft: rgba(176, 111, 30, 0.12);
+  --jnx-grain:      rgba(60, 50, 35, 0.03);
+}
+/* Time-of-day tints ONLY the ambient glow (contrast-independent) — text accent stays fixed & readable */
+.jnx-page.jnx-mood-dawn  { --jnx-glow: 250, 190, 120; }
+.jnx-page.jnx-mood-day   { --jnx-glow: 242, 205, 150; }
+.jnx-page.jnx-mood-dusk  { --jnx-glow: 232, 150, 108; }
+.jnx-page.jnx-mood-night { --jnx-glow: 150, 172, 214; }
+
+/* ── Writing panel becomes the stage for the aura ── */
+.jnx-write-panel { position: relative; }
+.jnx-aura {
+  position: absolute; inset: -40px -10px auto -10px; height: 70vh; z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(52% 46% at 50% 30%,
+    rgba(var(--jnx-glow), calc(0.05 + 0.18 * var(--jnx-aura, 0))) 0%,
+    rgba(var(--jnx-glow), calc(0.02 + 0.07 * var(--jnx-aura, 0))) 38%,
+    transparent 72%);
+  filter: blur(6px);
+  transition: background 0.7s ease;
+}
+.jnx-write-panel > *:not(.jnx-aura) { position: relative; z-index: 1; }
+
+/* ── Premium header — timestamp + atmosphere on the left, stats/actions right ── */
+.jnx-header { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.jnx-header-lead { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.jnx-eyebrow { display: flex; align-items: center; gap: 7px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--jnx-amber); margin-bottom: 3px; }
+.jnx-mood-glyph { display: inline-flex; color: var(--jnx-amber); filter: drop-shadow(0 0 6px rgba(var(--jnx-glow), 0.4)); }
+.jnx-eyebrow-text { line-height: 1; }
+.jnx-title {
+  font-family: var(--jnx-serif);
+  font-size: 2.5rem; font-weight: 500; letter-spacing: -0.01em; line-height: 1.08;
+  color: var(--jnx-ink); margin: 0; word-break: break-word;
+}
+.jnx-header .jnx-readonly-note { color: var(--jnx-ink-faint); letter-spacing: 0.04em; }
+
+/* Header actions cluster */
+.jnx-header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+.jnx-action-sep { width: 1px; height: 22px; background: var(--jnx-line); flex-shrink: 0; }
+.jnx-icon-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  background: transparent; border: 1px solid transparent; color: var(--jnx-ink-soft);
+  cursor: pointer; transition: all 0.2s ease;
+}
+.jnx-icon-action:hover { background: rgba(255,255,255,0.05); color: var(--jnx-ink); border-color: var(--jnx-line); transform: translateY(-1px); }
+
+/* Word-count meter */
+.jnx-meter { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
+.jnx-meter-svg { transform: rotate(-90deg); }
+.jnx-meter-track { fill: none; stroke: var(--jnx-line); stroke-width: 3; }
+.jnx-meter-fill  { fill: none; stroke: var(--jnx-amber); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.6s cubic-bezier(0.16,1,0.3,1); filter: drop-shadow(0 0 4px rgba(var(--jnx-glow), 0.5)); }
+.jnx-meter-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.66rem; font-weight: 700; color: var(--jnx-ink); font-variant-numeric: tabular-nums; }
+
+/* Streak "chain" of glowing links */
+.jnx-streak-chain { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.jnx-chain-flame { display: inline-flex; color: var(--jnx-amber); filter: drop-shadow(0 0 5px rgba(var(--jnx-glow), 0.45)); animation: jnxBreathe 3.6s ease-in-out infinite; }
+.jnx-chain-dots { display: inline-flex; align-items: center; gap: 4px; }
+.jnx-chain-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--jnx-line); transition: all 0.3s ease; }
+.jnx-chain-on { background: var(--jnx-amber); box-shadow: 0 0 6px rgba(var(--jnx-glow), 0.55); }
+.jnx-chain-today.jnx-chain-on { box-shadow: 0 0 9px rgba(var(--jnx-glow), 0.8); }
+.jnx-chain-today:not(.jnx-chain-on) { outline: 1px solid var(--jnx-amber); outline-offset: 1px; }
+.jnx-streak-num { font-size: 0.9rem; font-weight: 700; color: var(--jnx-ink); font-variant-numeric: tabular-nums; }
+@keyframes jnxBreathe { 0%,100% { opacity: 0.75; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+
+/* ── The canvas — serif writing sanctuary ── */
+.jnx-canvas {
+  position: relative; margin-top: 22px;
+  border-top: 1px solid var(--jnx-line);
+  padding-top: 26px;
+  /* faint paper grain (theme-aware) */
+  background-image: radial-gradient(var(--jnx-grain) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
 .jnx-editor {
-  background: transparent;
-  border: none;
-  padding: 4px 0 0;
-  max-width: none;
-  min-height: 320px;
-  font-size: 1.05rem;
-  line-height: 1.8;
+  background: transparent; border: none;
+  padding: 0; max-width: none; min-height: 46vh;
+  font-family: var(--jnx-serif);
+  font-size: 1.32rem; line-height: 1.85; font-weight: 400;
+  letter-spacing: 0.003em; color: var(--jnx-ink);
   overflow-y: visible;
 }
-.jnx-editor.journal-editor-readonly { background: transparent; }
+.jnx-editor.journal-editor-readonly { background: transparent; opacity: 0.92; }
+.jnx-editor[data-empty="true"]::before { font-family: var(--jnx-serif); font-style: italic; font-size: 1.28rem; color: var(--jnx-ink-faint); }
+.jnx-editor h1, .jnx-editor h2, .jnx-editor h3 { font-family: var(--jnx-serif); font-weight: 600; color: var(--jnx-ink); letter-spacing: -0.01em; }
+.jnx-editor blockquote { border-left: 2px solid var(--jnx-amber); color: var(--jnx-ink-soft); font-style: italic; padding-left: 18px; margin-left: 0; }
+.jnx-editor::selection, .jnx-editor *::selection { background: var(--jnx-amber-soft); }
+/* No harsh focus box on the writing canvas — the caret is the indicator (Notion/Medium style) */
+.jnx-editor:focus, .jnx-editor:focus-visible { outline: none; box-shadow: none; }
+/* Cinematic parallax fade-in when navigating between days */
+.jnx-entry-in { animation: jnxEntryFade 0.42s cubic-bezier(0.16,1,0.3,1); }
+@keyframes jnxEntryFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   AMBIENT METADATA PANEL (right) — borderless, bleeds into the sanctuary
+   ═══════════════════════════════════════════════════════════════════ */
+/* Compact, fit-content sidebar: ONE consistent 32px gap between sections, no stretch.
+   (The grid already uses align-items:start, so the column was never height-stretched —
+   the oversized gaps came from divider elements each consuming a full gap on both sides.) */
+.jnx-meta { gap: 32px; padding: 8px 4px 40px; align-self: start; height: fit-content; }
+.jnx-meta-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--jnx-ink-faint); }
+/* Thin fading rule between sections (1px, warm, low opacity) */
+.jnx-meta-rule { height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--jnx-amber) 22%, transparent), transparent 78%); max-width: 300px; }
+
+/* ── Header: time-of-day + date ── */
+.jnx-meta-head { display: flex; flex-direction: column; gap: 8px; }
+.jnx-meta-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 0.69rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--jnx-amber); }
+.jnx-meta-eyebrow .jnx-mood-glyph { filter: drop-shadow(0 0 6px rgba(var(--jnx-glow), 0.4)); }
+.jnx-meta-date { font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em; color: var(--jnx-ink); line-height: 1.15; }
+
+/* ── Stats — prominent, breathing ── */
+.jnx-meta-stats { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+/* Three equal-width metrics on one row, all the same size */
+.jnx-stat-row { display: flex; align-items: flex-start; gap: 14px; width: 100%; max-width: 340px; }
+.jnx-stat { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.jnx-stat-ico { display: inline-flex; color: var(--jnx-amber); margin-bottom: 4px; filter: drop-shadow(0 0 6px rgba(var(--jnx-glow), 0.4)); }
+.jnx-stat-num { font-family: 'Inter', sans-serif; font-size: 2.1rem; font-weight: 400; line-height: 0.95; color: var(--jnx-ink); font-variant-numeric: tabular-nums; }
+.jnx-stat-unit { font-size: 0.64rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--jnx-ink-soft); line-height: 1.3; }
+.jnx-stat-streak .jnx-stat-ico { animation: jnxBreathe 3.6s ease-in-out infinite; }
+
+/* ── Calendar section ── */
+.jnx-meta-cal { display: flex; flex-direction: column; gap: 14px; }
+.jnx-meta-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.jnx-meta-cal-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; max-width: 300px; }
+.jnx-meta-period { font-size: 0.76rem; color: var(--jnx-ink-soft); }
+
+/* Calendar fills the (now right-sized) sidebar column, in the writing serif */
+.jnx-meta .jnx-month { max-width: 340px; font-family: var(--jnx-serif); }
+.jnx-meta .jnx-mcell-num { font-family: var(--jnx-serif); }
+.jnx-meta .jnx-month-dow { font-family: var(--jnx-serif); }
+.jnx-meta .jnx-month-dows,
+.jnx-meta .jnx-month-grid { gap: 6px; }
+/* Subtle day-of-week headers (not bold) */
+.jnx-meta .jnx-month-dow { font-weight: 500; opacity: 0.65; }
+
+/* Borderless day cells: hollow ring, dot = has entry, filled amber = selected */
+.jnx-meta .jnx-mcell {
+  border-radius: 50%; border: 1px solid var(--jnx-line); background: transparent;
+  position: relative;
+  transition: transform 0.14s ease, box-shadow 0.2s ease, background 0.25s ease, border-color 0.2s ease;
+}
+.jnx-meta .jnx-mcell .jnx-mcell-num { color: var(--jnx-ink-soft); font-weight: 500; }
+/* entry indicator dot */
+.jnx-meta .jnx-mcell.jnx-has-entry::after {
+  content: ''; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--jnx-amber);
+  box-shadow: 0 0 5px rgba(var(--jnx-glow), 0.6);
+}
+.jnx-meta .jnx-mcell:not(:disabled):hover { transform: scale(1.08); border-color: color-mix(in srgb, var(--jnx-amber) 60%, transparent); box-shadow: 0 0 10px rgba(var(--jnx-glow), 0.3); }
+/* today (not the one being viewed) — a soft amber ring */
+.jnx-meta .jnx-mcell.jnx-today:not(.jnx-active) { border-color: var(--jnx-amber); }
+/* selected day — filled amber circle */
+.jnx-meta .jnx-mcell.jnx-active { background: var(--jnx-amber); border-color: transparent; box-shadow: 0 0 16px rgba(var(--jnx-glow), 0.5); }
+.jnx-meta .jnx-mcell.jnx-active .jnx-mcell-num { color: #1a1510; font-weight: 700; }
+.jnx-meta .jnx-mcell.jnx-active.jnx-has-entry::after { background: #1a1510; box-shadow: none; }
+.jnx-meta .jnx-mcell.jnx-out { opacity: 0.38; }
+
+/* ── Less / More segmented control (bottom right) ── */
+.jnx-seg-wrap { display: flex; justify-content: flex-end; max-width: 300px; }
+.jnx-seg {
+  position: relative; display: inline-flex; padding: 3px; border-radius: 999px;
+  background: var(--bg-elevated); border: 1px solid var(--jnx-line);
+}
+.jnx-seg-opt {
+  position: relative; z-index: 1; min-width: 58px; padding: 6px 16px; border-radius: 999px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--jnx-ink-soft); transition: color 0.25s ease;
+}
+.jnx-seg-opt.jnx-seg-on { color: #1a1510; }
+.jnx-seg-thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
+  border-radius: 999px; background: var(--jnx-amber);
+  box-shadow: 0 0 12px rgba(var(--jnx-glow), 0.5);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.jnx-seg-thumb[data-side="right"] { transform: translateX(100%); }
+
+/* Collapse the calendar body when "Less" */
+.jnx-meta-cal.jnx-heatmap-collapsed .jnx-heatmap-body { grid-template-rows: 0fr; }
+
+/* ── On this day / Recent entries — fill the lower sidebar with useful content ── */
+.jnx-meta-section { display: flex; flex-direction: column; gap: 12px; max-width: 340px; }
+.jnx-recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.jnx-recent-item {
+  display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  background: color-mix(in srgb, var(--jnx-ink) 3%, transparent);
+  border: 1px solid var(--jnx-line);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.jnx-recent-item:hover {
+  background: color-mix(in srgb, var(--jnx-amber) 8%, transparent);
+  border-color: color-mix(in srgb, var(--jnx-amber) 40%, transparent);
+  transform: translateX(2px);
+}
+.jnx-recent-active { border-color: var(--jnx-amber); background: var(--jnx-amber-soft); }
+.jnx-recent-date { font-size: 0.7rem; font-weight: 600; color: var(--jnx-amber); letter-spacing: 0.03em; text-transform: uppercase; }
+.jnx-recent-prev { font-family: var(--jnx-serif); font-size: 0.9rem; color: var(--jnx-ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jnx-meta-empty {
+  display: flex; align-items: center; gap: 10px; max-width: 340px;
+  padding: 14px 14px; border-radius: 12px; border: 1px dashed var(--jnx-line);
+  color: var(--jnx-ink-faint); font-size: 0.8rem; line-height: 1.4;
+}
+.jnx-meta-empty svg { flex-shrink: 0; color: var(--jnx-ink-faint); }
+
+/* ── Floating selection toolbar (glass FAB) ── */
+.jnx-fab {
+  position: fixed; z-index: 320;
+  transform: translate(-50%, calc(-100% - 12px));
+  display: flex; align-items: center; gap: 2px;
+  padding: 5px 6px; border-radius: 12px;
+  background: rgba(24, 22, 20, 0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.2);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  animation: jnxFabIn 0.16s cubic-bezier(0.16,1,0.3,1);
+}
+.jnx-fab::after { /* little pointer */
+  content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(24, 22, 20, 0.72); border-right: 1px solid rgba(255,255,255,0.10); border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+@keyframes jnxFabIn { from { opacity: 0; transform: translate(-50%, calc(-100% - 4px)) scale(0.96); } to { opacity: 1; transform: translate(-50%, calc(-100% - 12px)) scale(1); } }
+.jnx-fab-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px;
+  background: transparent; border: none; cursor: pointer;
+  /* FAB is always dark glass chrome, in both themes → fixed light ink */
+  color: #f0ebe2; font-family: 'Inter', sans-serif; font-size: 0.92rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.jnx-fab-btn:hover { background: rgba(255,255,255,0.10); }
+.jnx-fab-mono { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em; }
+.jnx-fab-italic em { font-style: italic; }
+.jnx-fab-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.12); margin: 0 3px; }
+
+/* ── Focus (Zen) mode ── */
+.jnx-zen-exit {
+  position: fixed; top: 20px; right: 24px; z-index: 240;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 0.78rem; font-weight: 600;
+  color: #cfc7ba; background: rgba(20,18,16,0.72);
+  border: 1px solid rgba(255,255,255,0.10); backdrop-filter: blur(12px);
+  animation: jnxFadeSoft 0.5s ease 0.3s both;
+}
+.jnx-zen-exit:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
+@keyframes jnxFadeSoft { from { opacity: 0; } to { opacity: 1; } }
+
+/* When Zen is on, chrome fades away and the canvas takes the stage. */
+.jnx-page.jnx-zen { position: relative; }
+.jnx-zen .jnx-split { grid-template-columns: 1fr !important; column-gap: 0 !important; }
+.jnx-zen .jnx-meta { opacity: 0; max-width: 0; max-height: 0; padding: 0; margin: 0; overflow: hidden; pointer-events: none; transition: opacity 0.4s ease, max-width 0.5s ease; }
+.jnx-zen .jnx-header-actions,
+.jnx-zen .jnx-header-nav,
+.jnx-zen .jnx-icon-slot { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.jnx-zen .jnx-write-panel { border-left: none !important; padding-left: 0 !important; }
+.jnx-zen .jnx-header,
+.jnx-zen .jnx-canvas,
+.jnx-zen .jnx-editor { margin-left: auto; margin-right: auto; max-width: 720px; }
+.jnx-zen .jnx-header { justify-content: center; text-align: center; }
+.jnx-zen .jnx-header-lead { justify-content: center; }
+.jnx-zen .jnx-canvas { border-top-color: transparent; }
+/* Cinematic vignette that deepens the focus */
+.jnx-zen::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0,0,0,0.55) 100%);
+  animation: jnxFadeSoft 0.6s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jnx-entry-in, .jnx-fab, .jnx-chain-flame, .jnx-zen-exit, .jnx-zen::before { animation: none !important; }
+  .jnx-meter-fill { transition: none; }
+}
 
 /* ── Command palette ── */
 .jnx-palette-overlay {
@@ -3160,9 +3531,71 @@ select.modal-input {
 .jnx-palette-preview { font-size: 0.76rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jnx-palette-empty { padding: 28px 16px; text-align: center; font-size: 0.85rem; color: var(--text-muted); }
 
+/* ── Split responsive behavior ──────────────────────────────────────
+   Canvas is the hero (left); ambient metadata expands on the right.
+   Desktop ≥1024 : 64 / 36 side-by-side, sticky borderless metadata.
+   Tablet 768–1023: 60 / 40 side-by-side.
+   Mobile <768    : stacked — canvas first, metadata below (borderless). */
+
+/* Desktop — canvas flexes, metadata is a right-sized fixed column (content fills it,
+   so there's no wide empty band on the right and padding stays symmetric). */
+@media (min-width: 1024px) {
+  .jnx-split {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+    column-gap: 56px;
+  }
+  .jnx-meta {
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding-top: 6px;
+  }
+}
+
+/* Tablet — flexible canvas + right-sized metadata column */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .jnx-split {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+    column-gap: 36px;
+  }
+  .jnx-meta {
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+  }
+}
+
+/* Mobile — stacked; week view reverts to a horizontal scrollable strip */
+@media (max-width: 767px) {
+  .jnx-meta-stats { gap: 8px; }
+  .jnx-metric-num { font-size: 1.7rem; }
+  .jnx-week {
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .jnx-week-day {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 46px;
+    flex: 0 0 46px;
+    padding: 0;
+  }
+  .jnx-week-day:hover { background: transparent; }
+  .jnx-week-dow { width: auto; text-align: center; }
+  .jnx-week-cell { width: 44px; height: 44px; }
+  .jnx-week-wc { display: none; }
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .jnx-page { padding: 16px 16px 60px; gap: 18px; }
+  .jnx-page { padding: 8px 0 60px; gap: 18px; }
   .jnx-title { font-size: 1.5rem; }
   .jnx-header-actions { gap: 6px; }
   .jnx-search-btn .jnx-kbd { display: none; }
@@ -5275,6 +5708,17 @@ select.modal-input {
   cursor: default;
 }
 
+/* Preferences (avatar) dropdown — tighter vertical rhythm so it doesn't waste
+   space. Scoped so the shared notifications dropdown keeps its own spacing. */
+.prefs-dropdown {
+  padding: 10px;
+  gap: 2px;
+}
+.prefs-dropdown .main-nav-btn {
+  padding: 6px 11px;
+  margin: 0;
+}
+
 .yartu-mini-bar-row {
   display: flex;
   flex-direction: column;
@@ -5392,6 +5836,33 @@ select.modal-input {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+/* ── Pomodoro Circular Ring ── */
+.yartu-pomo-ring-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.yartu-pomo-ring-wrap .yartu-mini-timer {
+  position: absolute;
+  font-size: 1.6rem;
+}
+
+/* ── Progress Sparklines ── */
+.yartu-sparkline {
+  display: block;
+  opacity: 0.85;
+  margin-top: -4px;
+}
+
+/* ── Heatmap Day Transition ── */
+.yartu-cal-day {
+  transition: background-color 0.3s ease;
 }
 
 .yartu-streak-list {
@@ -5534,6 +6005,9 @@ select.modal-input {
   background: var(--surface-nested);
   border: 1px solid transparent;
   border-radius: 10px;
+  /* Anchors the derived deadline-urgency bar's clip layer (inset:0). Does NOT
+     move the kebab dropdown, which is anchored to .linear-task-actions. */
+  position: relative;
   transition: background 0.12s ease, border-color 0.12s ease;
   cursor: pointer;
   gap: 10px;
