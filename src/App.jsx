@@ -29,6 +29,8 @@ import {
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
+import { handleDriveBackupCallback } from './utils/driveBackup';
+import { maybeRunAutoBackup } from './utils/autoBackup';
 import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { setTickSeconds, getTickSeconds } from './utils/timerTickStore';
@@ -215,23 +217,41 @@ export default function App() {
 
   // ── OAuth Callback & Initial Sync ──
   useEffect(() => {
-    // Handle Google Calendar OAuth callback first (state=gcal), then Tasks
-    handleCalendarAuthCallback().then(calSuccess => {
-      if (calSuccess) {
-        showToast('Connected to Google Calendar!', 'success');
+    // Callbacks are distinguished by OAuth `state`: Drive backup (state=
+    // drivebackup) and Calendar (state=gcal) each no-op unless their state
+    // matches, so order is safe; Tasks matches a bare `code` and runs last.
+    handleDriveBackupCallback().then(driveSuccess => {
+      if (driveSuccess) {
+        showToast('Google Drive connected for backups!', 'success');
         return;
       }
-      handleAuthCallback().then(success => {
-        if (success) {
-          showToast('Connected to Google Tasks!', 'success');
-          setSyncStatus('Syncing...');
-          syncTasks(tasks, setTasks, setSyncStatus);
-        } else if (localStorage.getItem('nook_sync_enabled') === 'true') {
-          syncTasks(tasks, setTasks, setSyncStatus);
+      handleCalendarAuthCallback().then(calSuccess => {
+        if (calSuccess) {
+          showToast('Connected to Google Calendar!', 'success');
+          return;
         }
+        handleAuthCallback().then(success => {
+          if (success) {
+            showToast('Connected to Google Tasks!', 'success');
+            setSyncStatus('Syncing...');
+            syncTasks(tasks, setTasks, setSyncStatus);
+          } else if (localStorage.getItem('nook_sync_enabled') === 'true') {
+            syncTasks(tasks, setTasks, setSyncStatus);
+          }
+        });
       });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Automated Drive backup: check on load (and window focus) whether a
+  // backup is due for the user's chosen frequency. No-op unless opted in and
+  // Drive is connected; failures are logged to backup_runs, not thrown here.
+  useEffect(() => {
+    maybeRunAutoBackup();
+    const onFocus = () => maybeRunAutoBackup();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   // ── One-Time Cleanup for Keystroke Bug Duplicates ──
   useEffect(() => {

@@ -4,6 +4,7 @@ import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
 import { exportBackup } from '../utils/backup';
+import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, setBackupFrequency, getRecentRuns } from '../utils/driveBackup';
 import Select from './Select';
 
 const PRESETS = [
@@ -64,6 +65,35 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
   const [form, setForm] = useState(settings);
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem('nook-week-start') || 'monday');
   const [backupBusy, setBackupBusy] = useState(false);
+
+  // ── Auto backup to Google Drive ──
+  const [driveConfig, setDriveConfig] = useState(null);
+  const [driveFreq, setDriveFreq] = useState('off');
+  const [driveRuns, setDriveRuns] = useState([]);
+  useEffect(() => {
+    if (!isAuthConfigured) return;
+    let active = true;
+    (async () => {
+      const cfg = await getBackupConfig();
+      if (!active) return;
+      setDriveConfig(cfg);
+      setDriveFreq(cfg?.frequency || 'off');
+      setDriveRuns(await getRecentRuns());
+    })().catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const changeDriveFreq = async (freq) => {
+    const prev = driveFreq;
+    setDriveFreq(freq); // optimistic
+    try {
+      await setBackupFrequency(freq);
+      setDriveConfig(c => ({ ...(c || {}), frequency: freq }));
+    } catch (err) {
+      setDriveFreq(prev);
+      alert(`Couldn't save backup frequency: ${err?.message || 'unknown error'}`);
+    }
+  };
 
   // Save effects
   useEffect(() => {
@@ -534,6 +564,73 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
             Clear All
           </button>
         </div>
+
+        {/* ── Auto Backup to Google Drive ── */}
+        {isAuthConfigured && (
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Auto Backup to Google Drive</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: 3 }}>
+                  Backs up automatically in the background while Nook is open.
+                </div>
+              </div>
+              <div style={{ width: 150, flexShrink: 0 }}>
+                <Select
+                  value={driveFreq}
+                  onChange={e => changeDriveFreq(e.target.value)}
+                  options={[
+                    { value: 'off',    label: 'Off' },
+                    { value: 'daily',  label: 'Daily' },
+                    { value: 'weekly', label: 'Weekly' },
+                  ]}
+                  style={{ background: 'var(--surface-nested)', border: '1px solid var(--border)', borderRadius: 10, height: 38, padding: '0 12px', fontSize: '0.84rem' }}
+                />
+              </div>
+            </div>
+
+            {/* Connect prompt (until a Drive refresh token exists) */}
+            {!isDriveConnected(driveConfig) && (
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={connectGoogleDriveBackup}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                  Connect Google Drive
+                </button>
+                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                  Needed once to allow background uploads to a private “Nook Backups” folder.
+                </span>
+              </div>
+            )}
+
+            {/* Last-backup status */}
+            {isDriveConnected(driveConfig) && (
+              <div style={{ marginTop: 12, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                {driveConfig?.last_backup_at
+                  ? <>Last backed up: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date(driveConfig.last_backup_at).toLocaleString()}</span>
+                      {driveConfig.last_status === 'error' && <span style={{ color: 'var(--color-red)' }}> · last run failed</span>}</>
+                  : <>Connected. No backup has run yet{driveFreq === 'off' ? ' (choose Daily or Weekly to enable).' : '.'}</>}
+              </div>
+            )}
+
+            {/* Recent runs */}
+            {driveRuns.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 6, fontWeight: 700 }}>Recent backups</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {driveRuns.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.76rem' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: r.status === 'success' ? 'var(--color-green)' : 'var(--color-red)' }} />
+                      <span style={{ color: 'var(--text-secondary)' }}>{new Date(r.ran_at).toLocaleString()}</span>
+                      <span style={{ color: r.status === 'success' ? 'var(--text-primary)' : 'var(--color-red)', fontWeight: 600 }}>
+                        {r.status === 'success' ? (r.file_name || 'backed up') : `failed: ${r.error || 'error'}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* About */}

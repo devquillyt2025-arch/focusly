@@ -86,14 +86,14 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-// Build the unified backup and trigger a .zip download. Read-only — never
-// mutates localStorage or Supabase. Returns the manifest counts so the caller
-// can surface a summary to the user.
-export async function exportBackup() {
+// Assemble the unified backup object (schemaVersion 1) without downloading or
+// mutating anything. Shared source of truth for both the manual .zip export and
+// the automated Drive backup, so the two formats can never diverge. Read-only.
+export async function buildBackup() {
   const local = collectLocalData();
   const { remote, userId } = await collectRemoteData();
 
-  const backup = {
+  return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     app: 'nook',
     exportedAt: new Date().toISOString(),
@@ -105,6 +105,13 @@ export async function exportBackup() {
     },
     data: { local, remote },
   };
+}
+
+// Build the unified backup and trigger a .zip download. Read-only — never
+// mutates localStorage or Supabase. Returns the manifest counts so the caller
+// can surface a summary to the user.
+export async function exportBackup() {
+  const backup = await buildBackup();
 
   const zip = new JSZip();
   zip.file('backup.json', JSON.stringify(backup, null, 2));
