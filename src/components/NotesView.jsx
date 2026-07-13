@@ -643,10 +643,10 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
       <div style={{ padding: '8px 24px 12px', flexShrink: 0 }}>
 
         {/* ROW 1: search → palette → all tags → date range → view toggle → count */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0 }}>
 
-          {/* 1. Search */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 190, flexShrink: 0 }}>
+          {/* 1. Search — first in the row */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 0 340px', width: 340 }}>
             <svg style={{ position: 'absolute', left: 9, color: 'var(--text-muted)', pointerEvents: 'none' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
               type="search"
@@ -654,9 +654,16 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
               placeholder="Search notes..."
               value={localSearchQuery}
               onChange={e => setLocalSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px 7px 28px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', outline: 'none', fontSize: '0.8rem', height: 34, boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '7px 10px 7px 28px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.8rem', height: 34, boxSizing: 'border-box' }}
             />
           </div>
+
+          {/* New Note — primary action, after search */}
+          <button type="button" className="hv-new-btn" onClick={() => openNew()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', border: 'none', borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Note
+          </button>
 
           {/* 3. Color palette — compact 22 px swatches */}
           <div role="group" aria-label="Filter by color" style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg-input)', padding: '0 8px', height: 34, borderRadius: 9999, border: '1px solid var(--border)', flexShrink: 0, boxSizing: 'border-box' }}>
@@ -744,18 +751,12 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
           </div>
 
           {/* 6. Entry count — pushed to far right */}
-          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0, textAlign: 'right', minWidth: 110 }}>
             {(localSearchQuery.trim() || globalSearchQuery.trim() || activeTag || activeColor || dateRange.start || dateRange.end)
               ? `${filtered.length} of ${notes.length} entries`
               : `${notes.length} entries`}
           </span>
 
-          {/* 7. New Note — primary action, moved here from the removed page header */}
-          <button type="button" className="hv-new-btn" onClick={() => openNew()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', border: 'none', borderRadius: 10, fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 700, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%)', boxShadow: '0 10px 22px -8px var(--accent), inset 0 1px 0 rgba(255,255,255,0.22)' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New Note
-          </button>
         </div>
 
       </div>

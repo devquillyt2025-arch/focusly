@@ -471,14 +471,10 @@ export default memo(function LinksView() {
               style={{ width: '100%', height: 36, padding: '0 10px 0 32px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.84rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
           </div>
 
-          {/* Category filter */}
-          {allCats.length > 0 && (
-            <CategoryDropdown value={catFilter} onChange={setCatFilter} options={allCats} />
-          )}
+          {/* Add Link — primary action, right after search */}
+          <button className="add-task-btn" style={{ flexShrink: 0 }} onClick={() => setModal('add')}>＋ Add Link</button>
 
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flex: 1 }}>{countLabel}</span>
-
-          {/* View toggle */}
+          {/* View toggle — beside Add Link */}
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             {vmBtn('grid', 'Grid view',
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -488,8 +484,13 @@ export default memo(function LinksView() {
             )}
           </div>
 
-          {/* Add Link — primary action, moved here from the removed page header */}
-          <button className="add-task-btn" style={{ flexShrink: 0 }} onClick={() => setModal('add')}>＋ Add Link</button>
+          {/* Category filter */}
+          {allCats.length > 0 && (
+            <CategoryDropdown value={catFilter} onChange={setCatFilter} options={allCats} />
+          )}
+
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flex: 1 }}>{countLabel}</span>
+
         </div>
       </div>
 
