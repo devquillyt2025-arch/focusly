@@ -6975,43 +6975,6 @@ select.modal-input {
     inset 0 0 44px rgba(160, 180, 255, 0.05);
 }
 
-.liquid-glass__refract {
-  position: absolute;
-  inset: -8%;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.85;
-  mix-blend-mode: screen;
-  background:
-    radial-gradient(
-      28% 22% at 28% 18%,
-      hsla(var(--ambient-hue), 95%, 80%, 0.5),
-      transparent 60%
-    ),
-    radial-gradient(
-      34% 30% at 82% 72%,
-      hsla(calc(var(--ambient-hue) + 45), 95%, 75%, 0.42),
-      transparent 62%
-    ),
-    radial-gradient(24% 24% at 62% 40%, rgba(255, 255, 255, 0.28), transparent 60%);
-  filter: url(#nook-liquid);
-}
-
-.liquid-glass__specular {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  border-radius: inherit;
-  mix-blend-mode: screen;
-  background: radial-gradient(
-    200px 200px at var(--mx, 50%) var(--my, -10%),
-    rgba(255, 255, 255, 0.28),
-    transparent 60%
-  );
-  transition: background 0.12s ease-out;
-}
-
 .liquid-glass::after {
   content: '';
   position: absolute;
@@ -7026,7 +6989,7 @@ select.modal-input {
     transparent 66%
   );
   background-size: 250% 100%;
-  animation: shimmer 9s linear infinite;
+  background-position: 100% 50%;
 }
 
 .liquid-input {

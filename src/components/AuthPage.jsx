@@ -1,10 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, friendlyAuthError } from '../utils/authClient';
 
 // ─── Liquid Glass Full-screen login + signup ────────────────────────
 export default function AuthPage() {
-  const cardRef = useRef(null);
   const [mode,     setMode]     = useState('signin'); // 'signin' | 'signup'
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -14,14 +13,6 @@ export default function AuthPage() {
   const [notice,   setNotice]   = useState('');
 
   const switchMode = (m) => { setMode(m); setError(''); setNotice(''); };
-
-  const onMove = (e) => {
-    const el = cardRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-    el.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
-  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -84,28 +75,13 @@ export default function AuthPage() {
       background: '#050505',
       fontFamily: 'var(--font)',
     }}>
-      {/* The liquid displacement filter — animated turbulence drives the warp. */}
-      <svg aria-hidden style={{ position: 'absolute', width: 0, height: 0 }} focusable="false">
-        <filter id="nook-liquid" x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.016" numOctaves={2} seed={4} result="turb">
-            <animate attributeName="baseFrequency" dur="20s" values="0.012 0.016; 0.017 0.011; 0.012 0.016" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="turb" scale={36} xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </svg>
-
       <motion.div
-        ref={cardRef}
-        onPointerMove={onMove}
         initial={{ opacity: 0, y: 30, scale: 0.96, filter: 'blur(14px)' }}
         animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
         className="liquid-glass"
         style={{ width: '100%', maxWidth: 440, padding: '40px' }}
       >
-        <div className="liquid-glass__refract" />
-        <div className="liquid-glass__specular" />
-
         <div style={{ position: 'relative', zIndex: 2 }}>
           {/* Brand */}
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
