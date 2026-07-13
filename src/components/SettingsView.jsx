@@ -3,6 +3,7 @@ import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksS
 import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
+import { exportBackup } from '../utils/backup';
 import Select from './Select';
 
 const PRESETS = [
@@ -62,6 +63,7 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
   // Preferences state
   const [form, setForm] = useState(settings);
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem('nook-week-start') || 'monday');
+  const [backupBusy, setBackupBusy] = useState(false);
 
   // Save effects
   useEffect(() => {
@@ -92,23 +94,27 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     alert('Settings saved!');
   };
 
-  const exportData = () => {
-    const data = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k.startsWith('nook-')) {
-        data[k] = localStorage.getItem(k);
-      }
+  // Full unified backup — all localStorage content + the user's Supabase
+  // reminders/prefs, zipped and downloaded. Read-only. (Restore is a separate,
+  // still-in-review feature.)
+  const handleFullBackup = async () => {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const counts = await exportBackup();
+      alert(
+        `Backup downloaded ✓\n\n` +
+        `• ${counts.local} local data set${counts.local === 1 ? '' : 's'} (tasks, notes, journal, etc.)\n` +
+        `• ${counts.reminders} reminder${counts.reminders === 1 ? '' : 's'}\n` +
+        `• ${counts.notification_prefs} preference row${counts.notification_prefs === 1 ? '' : 's'}\n\n` +
+        `Keep this .zip somewhere safe.`
+      );
+    } catch (err) {
+      console.error('[Backup] export failed:', err);
+      alert(`Backup failed: ${err?.message || 'unknown error'}`);
+    } finally {
+      setBackupBusy(false);
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nook-data-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const handleImport = (e) => {
@@ -507,13 +513,14 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
       <section className="settings-card">
         <h3 className="settings-card-title">Data Management</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: 14 }}>
-          Everything is stored locally in your browser ({calculateStorage()} KB used).
+          Your content is stored locally in your browser ({calculateStorage()} KB used).
+          A full backup also bundles your reminders and notification preferences.
         </p>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={exportData}>
+          <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.84rem', cursor: backupBusy ? 'default' : 'pointer', opacity: backupBusy ? 0.65 : 1, display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={handleFullBackup} disabled={backupBusy}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export
+            {backupBusy ? 'Preparing…' : 'Export My Data (.zip)'}
           </button>
 
           <label className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
