@@ -1,4 +1,4 @@
-import { memo,  useState, useEffect, useRef } from 'react';
+import { memo,  useState, useEffect, useRef, useMemo } from 'react';
 import Select from './Select';
 import { genId } from '../trackers/trackerUtils';
 import { logActivity, diffObjects } from '../utils/activityLog';
@@ -133,9 +133,9 @@ export default memo(function CountdownsView() {
   const completedCount = countdowns.filter(c => c.completed).length;
   const overdueCount   = countdowns.filter(c => !c.completed && today > c.endDate).length;
   const activeCount    = totalCount - completedCount;
-  const avgPct         = countdowns.length
+  const avgPct         = useMemo(() => countdowns.length
     ? Math.round(countdowns.reduce((s, c) => s + computeCd(c).pct, 0) / countdowns.length)
-    : 0;
+    : 0, [countdowns]);
 
   const categoryOptions = [
     { value: 'all', label: 'All Categories' },
@@ -156,24 +156,27 @@ export default memo(function CountdownsView() {
     });
   };
 
-  let filtered = countdowns.filter(c => {
-    if (filterCategory !== 'all' && c.category !== filterCategory) return false;
-    if (filterPriorities.size > 0 && !filterPriorities.has(c.priority)) return false;
-    return true;
-  });
-
-  filtered = [...filtered].sort((a, b) => {
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    if (sortBy === 'priority') return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
-    if (sortBy === 'progress') return computeCd(b).pct - computeCd(a).pct;
-    return new Date(a.endDate) - new Date(b.endDate);
-  });
-
-  const finalList = [...filtered].sort((a, b) => {
-    if (a.id === pinnedId) return -1;
-    if (b.id === pinnedId) return 1;
-    return 0;
-  });
+  // Filter → sort → float the pinned card to the top. The two sorts stay separate
+  // (JS sort is stable, so the pin pass preserves the primary sort order).
+  const finalList = useMemo(() => {
+    const list = countdowns.filter(c => {
+      if (filterCategory !== 'all' && c.category !== filterCategory) return false;
+      if (filterPriorities.size > 0 && !filterPriorities.has(c.priority)) return false;
+      return true;
+    });
+    list.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'priority') return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+      if (sortBy === 'progress') return computeCd(b).pct - computeCd(a).pct;
+      return new Date(a.endDate) - new Date(b.endDate);
+    });
+    list.sort((a, b) => {
+      if (a.id === pinnedId) return -1;
+      if (b.id === pinnedId) return 1;
+      return 0;
+    });
+    return list;
+  }, [countdowns, filterCategory, filterPriorities, sortBy, pinnedId]);
 
   const handleSave = (data) => {
     const isEdit = !!editingCd;
