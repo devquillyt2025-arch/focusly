@@ -15,6 +15,10 @@ let backupInFlight = false;
 
 export async function maybeRunAutoBackup() {
   if (!supabase || backupInFlight) return;
+  // Latch synchronously, before any await, so a second trigger in the same tick
+  // (e.g. mount + focus firing together) can't slip past the due-check and run a
+  // duplicate backup while the first is still reading state.
+  backupInFlight = true;
 
   try {
     const { data: userData } = await supabase.auth.getUser();
@@ -34,7 +38,6 @@ export async function maybeRunAutoBackup() {
     const last = cfg.last_backup_at ? new Date(cfg.last_backup_at).getTime() : 0;
     if (Date.now() - last < gapMs) return; // not due yet
 
-    backupInFlight = true;
     const backup = await buildBackup();
     await supabase.functions.invoke('drive-backup', { body: { backup } });
   } catch (err) {

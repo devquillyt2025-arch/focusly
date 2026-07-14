@@ -4,7 +4,7 @@ import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
 import { exportBackup } from '../utils/backup';
-import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, setBackupFrequency, getRecentRuns } from '../utils/driveBackup';
+import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, setBackupFrequency, getRecentRuns, runDriveBackup } from '../utils/driveBackup';
 import Select from './Select';
 
 const PRESETS = [
@@ -92,6 +92,45 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     } catch (err) {
       setDriveFreq(prev);
       alert(`Couldn't save backup frequency: ${err?.message || 'unknown error'}`);
+    }
+  };
+
+  // Approximate size of what a backup will upload — mirrors backup.js's key
+  // filter (nook- / nook_ keys, minus secrets/transient). bytes ≈ chars for the
+  // JSON payload that lands in Drive.
+  const backupSizeLabel = () => {
+    let bytes = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !(k.startsWith('nook-') || k.startsWith('nook_'))) continue;
+      if (['nook_google_tokens', 'nook_pkce_verifier', 'nook_sync_queue', 'nook_deleted_tasks'].includes(k)) continue;
+      const low = k.toLowerCase();
+      if (low.includes('token') || low.includes('pkce')) continue;
+      bytes += (localStorage.getItem(k) || '').length + k.length;
+    }
+    return bytes >= 1024 * 1024 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
+  };
+
+  const [runBusy, setRunBusy] = useState(false);
+  const handleBackupNow = async () => {
+    if (runBusy) return;
+    setRunBusy(true);
+    try {
+      const res = await runDriveBackup();
+      setDriveConfig(await getBackupConfig());       // refresh "Last backed up"
+      setDriveRuns(await getRecentRuns());           // refresh recent list
+      const c = res?.counts || {};
+      alert(
+        `Backed up to Google Drive ✓\n\n` +
+        `File: ${res?.file || 'nook-backup.json'}\n` +
+        `Size: ${backupSizeLabel()}\n` +
+        `${c.local ?? '?'} local data set${c.local === 1 ? '' : 's'} · ${c.reminders ?? 0} reminder${c.reminders === 1 ? '' : 's'}`
+      );
+    } catch (err) {
+      setDriveRuns(await getRecentRuns().catch(() => driveRuns)); // surface the failure row
+      alert(`Backup failed: ${err?.message || 'unknown error'}`);
+    } finally {
+      setRunBusy(false);
     }
   };
 
@@ -572,7 +611,7 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Auto Backup to Google Drive</div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: 3 }}>
-                  Backs up automatically in the background while Nook is open.
+                  Backs up automatically in the background while Nook is open · about <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{backupSizeLabel()}</span> per backup.
                 </div>
               </div>
               <div style={{ width: 150, flexShrink: 0 }}>
@@ -602,13 +641,19 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
               </div>
             )}
 
-            {/* Last-backup status */}
+            {/* Last-backup status + manual trigger */}
             {isDriveConnected(driveConfig) && (
-              <div style={{ marginTop: 12, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                {driveConfig?.last_backup_at
-                  ? <>Last backed up: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date(driveConfig.last_backup_at).toLocaleString()}</span>
-                      {driveConfig.last_status === 'error' && <span style={{ color: 'var(--color-red)' }}> · last run failed</span>}</>
-                  : <>Connected. No backup has run yet{driveFreq === 'off' ? ' (choose Daily or Weekly to enable).' : '.'}</>}
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {driveConfig?.last_backup_at
+                    ? <>Last backed up: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date(driveConfig.last_backup_at).toLocaleString()}</span>
+                        {driveRuns[0]?.counts?.local != null && <> · {driveRuns[0].counts.local} data sets, {driveRuns[0].counts.reminders ?? 0} reminders ({backupSizeLabel()})</>}
+                        {driveConfig.last_status === 'error' && <span style={{ color: 'var(--color-red)' }}> · last run failed</span>}</>
+                    : <>Connected — no backup has run yet{driveFreq === 'off' ? ' (choose Daily or Weekly to enable).' : '. It’ll run on next load, or click “Back up now”.'}</>}
+                </div>
+                <button className="secondary-btn" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.8rem', cursor: runBusy ? 'default' : 'pointer', opacity: runBusy ? 0.65 : 1, flexShrink: 0, whiteSpace: 'nowrap' }} onClick={handleBackupNow} disabled={runBusy}>
+                  {runBusy ? 'Backing up…' : 'Back up now'}
+                </button>
               </div>
             )}
 

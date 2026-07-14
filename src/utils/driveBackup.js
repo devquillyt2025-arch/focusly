@@ -16,6 +16,21 @@ function redirectUri() {
   return window.location.origin + window.location.pathname;
 }
 
+// supabase-js hides an Edge Function's JSON error body on a non-2xx response —
+// it only sets a generic FunctionsHttpError message and stashes the raw
+// Response on error.context. Pull the real { error } out of it so failures are
+// actionable instead of "returned a non-2xx status code".
+async function edgeErrorDetail(error, fallback) {
+  try {
+    const ctx = error?.context;
+    if (ctx && typeof ctx.clone === 'function') {
+      const body = await ctx.clone().json().catch(() => null);
+      if (body?.error) return body.error;
+    }
+  } catch { /* fall through */ }
+  return error?.message || fallback;
+}
+
 // Kick off the one-time consent. access_type=offline + prompt=consent forces
 // Google to return a refresh token; include_granted_scopes keeps any scopes
 // (e.g. Tasks) the user already granted on this same OAuth client.
@@ -50,7 +65,8 @@ export async function handleDriveBackupCallback() {
     const { data, error } = await supabase.functions.invoke('connect-drive', {
       body: { code, redirectUri: redirectUri() },
     });
-    if (error || data?.error) throw new Error(error?.message || data?.error);
+    if (error) throw new Error(await edgeErrorDetail(error, 'connect failed'));
+    if (data?.error) throw new Error(data.error);
     return true;
   } catch (err) {
     console.error('[DriveBackup] connect failed:', err);
@@ -108,7 +124,7 @@ export async function runDriveBackup() {
   if (!supabase) throw new Error('sync not configured');
   const backup = await buildBackup();
   const { data, error } = await supabase.functions.invoke('drive-backup', { body: { backup } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await edgeErrorDetail(error, 'backup failed'));
   if (data?.error) throw new Error(data.error);
   return data;
 }
