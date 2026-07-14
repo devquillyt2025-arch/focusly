@@ -393,8 +393,6 @@ export default memo(function LinksView() {
   const [modal,     setModal]     = useState(null); // null | 'add' | entry
   const [viewMode,  setViewMode]  = useState('grid'); // 'grid' | 'list'
 
-  const persist = (next) => { setLinks(next); save(next); };
-
   const saveLink = (link) => {
     setLinks(prev => {
       const exists = prev.find(l => l.id === link.id);
@@ -405,12 +403,12 @@ export default memo(function LinksView() {
   };
 
   const deleteLink = (id) => {
-    setLinks(prev => { 
+    setLinks(prev => {
       const existing = prev.find(l => l.id === id);
       if (existing) logActivity({ module: 'links', entity_type: 'link', entity_id: id, action: 'deleted', title: existing.name || existing.url });
-      const next = prev.filter(l => l.id !== id); 
-      save(next); 
-      return next; 
+      const next = prev.filter(l => l.id !== id);
+      save(next);
+      return next;
     });
   };
 
