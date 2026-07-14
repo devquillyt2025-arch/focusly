@@ -1648,10 +1648,14 @@ export default function App() {
         <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
-          className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}${activeTab === 'calendar' ? ' calendar-tab-active' : ''}`}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
+          className={`sunsama-tab-transition${activeTab === 'daily' ? ' yartu-tab-active' : ''}${activeTab === 'calendar' ? ' calendar-tab-active' : ''}${activeTab === 'activity' ? ' activity-tab-active' : ''}`}
+          // Opacity-only transition: animating y leaves an inline transform on this
+          // wrapper even at rest, which makes it the containing block for any
+          // position:sticky descendant (e.g. the Activity Log toolbar) and breaks
+          // sticky-to-scroll-container, causing the toolbar to drift while scrolling.
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.13, ease: 'easeOut' }}
         >
           <Suspense fallback={<TabFallback />}>

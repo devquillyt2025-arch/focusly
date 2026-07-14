@@ -4868,6 +4868,13 @@ select.modal-input {
   flex: 1 1 auto;
 }
 
+/* Activity Log's toolbar is position:sticky. Drop the tab shell's top padding so
+   the toolbar starts flush at the scroll-container top — otherwise it travels the
+   32px of padding upward before pinning, which reads as "moving on first scroll". */
+.sunsama-tab-transition.activity-tab-active {
+  padding-top: 0;
+}
+
 @keyframes checkmarkFade {
   0% { opacity: 1; transform: scale(1); }
   50% { transform: scale(1.08); opacity: 0.8; }
@@ -6237,7 +6244,10 @@ select.modal-input {
 /* ── Activity Log ─────────────────────────────────────────────────── */
 .al-view {
   width: 100%;
-  padding: 8px 24px 60px;
+  /* No top padding: the sticky toolbar is the first child, so any space above it
+     is "travel" it slides through before pinning at top:0. Start it flush (its own
+     10px padding gives breathing room) so there's no initial shift on scroll. */
+  padding: 0 24px 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -6363,11 +6373,14 @@ select.modal-input {
 }
 .al-date-btn:hover, .al-date-btn.open { background: var(--bg-hover); }
 
-/* Entry count — pinned right */
+/* Entry count — pinned right. Fixed min-width + right-aligned text so the count
+   changing ("14" → "1" entries) doesn't resize the flexible search box and jitter
+   the buttons between them. */
 .al-count-txt {
   flex-shrink: 0; margin-left: auto; padding: 0 12px;
   border-left: 1px solid var(--border); height: 100%;
-  display: flex; align-items: center;
+  display: flex; align-items: center; justify-content: flex-end;
+  min-width: 124px;
   font-size: 0.7rem; color: var(--text-muted); white-space: nowrap;
 }
 
