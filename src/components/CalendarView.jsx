@@ -251,6 +251,9 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     );
   };
 
+  // Tracks the window-level drag listeners so an unmount mid-resize can tear them down.
+  const resizeListenersRef = useRef(null);
+
   const handleResizeStart = (e, ev, startMin, endMin, edge) => {
     e.stopPropagation(); e.preventDefault();
     const iy = e.clientY, iS = startMin, iE = endMin, ds = toISO(currentDate);
@@ -273,7 +276,6 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   };
 
   // Remove any drag listeners still attached if the view unmounts mid-resize.
-  const resizeListenersRef = useRef(null);
   useEffect(() => () => {
     const l = resizeListenersRef.current;
     if (l) { window.removeEventListener('mousemove', l.onMove); window.removeEventListener('mouseup', l.onUp); }
