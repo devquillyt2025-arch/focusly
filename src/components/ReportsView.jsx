@@ -264,7 +264,7 @@ function Sparkline({ data, color, type }) {
   }).join(' ');
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H, display: 'block' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto', display: 'block' }}>
       <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
         strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
     </svg>

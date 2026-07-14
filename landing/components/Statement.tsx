@@ -54,7 +54,7 @@ export default function Statement() {
   const step = 0.6 / words.length;
 
   return (
-    <section ref={ref} className="relative z-10 h-[190vh]">
+    <section ref={ref} className="relative z-10 h-[190dvh]">
       <div className="sticky top-0 flex h-[100svh] items-center justify-center px-6">
         <p className="max-w-4xl text-center text-3xl font-light leading-snug tracking-tight text-holo-ice sm:text-5xl md:text-6xl">
           {reduced

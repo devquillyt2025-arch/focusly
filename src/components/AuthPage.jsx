@@ -57,11 +57,15 @@ export default function AuthPage() {
   const signInWithGoogle = async () => {
     setError(''); setNotice(''); setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin + '/' },
+        options: { 
+          redirectTo: window.location.origin + '/',
+          skipBrowserRedirect: true 
+        },
       });
       if (error) throw error;
+      if (data?.url) window.location.assign(data.url);
     } catch (err) {
       setError(friendlyAuthError(err?.message).toLowerCase());
       setLoading(false);

@@ -153,13 +153,16 @@ export default function LiquidGlassLogin() {
     setNotice('');
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.signInWithOAuth({
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${getAppUrl()}/` },
+        options: { 
+          redirectTo: `${getAppUrl()}/`,
+          skipBrowserRedirect: true
+        },
       });
       if (err) throw err;
-      // Browser is navigating to the provider now; the dashboard picks up
-      // the session on return via its own detectSessionInUrl.
+      // Hard redirect to avoid mobile Safari webview/ITP redirect drops
+      if (data?.url) window.location.assign(data.url);
     } catch (err) {
       setError(friendlyAuthError((err as Error)?.message));
       setBusy(false);

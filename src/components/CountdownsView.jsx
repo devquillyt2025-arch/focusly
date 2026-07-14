@@ -250,10 +250,13 @@ export default memo(function CountdownsView() {
 
       {countdowns.length === 0 ? (
         <div className="cdp-empty">
-          <CdIcoHourglass />
+          <div className="cdp-empty-orb" aria-hidden="true"><CdIcoHourglass size={32} /></div>
           <p className="cdp-empty-title">Track your first countdown</p>
           <p className="cdp-empty-sub">Watch the time between a start and end date tick by</p>
-          <button className="add-task-btn" onClick={() => setShowModal(true)}>＋ Add Countdown</button>
+          <button className="hv-new-btn cdp-empty-btn" onClick={() => setShowModal(true)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Countdown
+          </button>
         </div>
       ) : finalList.length === 0 ? (
         <div className="cdp-empty">

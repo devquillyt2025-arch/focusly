@@ -127,7 +127,7 @@ body {
   font-family: var(--font);
   background: var(--bg-base);
   color: var(--text-primary);
-  min-height: 100vh;
+  min-height: 100dvh;
   letter-spacing: -0.012em;
   line-height: 1.5;
 }
@@ -136,7 +136,7 @@ a { color: inherit; text-decoration: none; }
 input, textarea, select { font-family: inherit; }
 
 /* ─── App shell ─────────────────────────────────────────────────── */
-.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 .app-header { transition: margin-left 0.22s ease; }
 .app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; transition: margin-left 0.22s ease; }
 .sidebar-open .app-header { margin-left: 240px; }
@@ -327,7 +327,7 @@ input, textarea, select { font-family: inherit; }
   position: fixed;
   top: 0;
   left: 0;
-  height: 100vh;
+  height: 100dvh;
   width: 240px;
   min-width: 240px;
   z-index: 20;
@@ -955,8 +955,8 @@ input, textarea, select { font-family: inherit; }
 .task-detail-panel {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: 400px;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
   background: var(--bg-surface, #ffffff);
   border-left: 1px solid var(--border);
@@ -2562,7 +2562,7 @@ select.modal-input {
   grid-template-columns: 280px 1fr;
   gap: 0;
   height: 100%;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -3547,7 +3547,7 @@ select.modal-input {
   .jnx-meta {
     position: sticky;
     top: 8px;
-    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
     overflow-y: auto;
     padding-top: 6px;
   }
@@ -3562,7 +3562,7 @@ select.modal-input {
   .jnx-meta {
     position: sticky;
     top: 8px;
-    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
     overflow-y: auto;
   }
 }
@@ -3664,8 +3664,23 @@ select.modal-input {
 .cdp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; align-items: start; }
 
 .cdp-empty { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 56px 24px; text-align: center; }
-.cdp-empty-title { font-size: 0.96rem; font-weight: 600; color: var(--text-secondary); margin: 0; }
-.cdp-empty-sub   { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 6px; }
+.cdp-empty-orb {
+  position: relative; width: 84px; height: 84px; margin-bottom: 6px;
+  display: grid; place-items: center; border-radius: 50%;
+  color: var(--accent-light);
+  background: radial-gradient(circle at 50% 40%, var(--accent-glow), transparent 68%);
+  animation: hv-orb-float 4s ease-in-out infinite;
+}
+.cdp-empty-orb::before {
+  content: ''; position: absolute; inset: 12px; border-radius: 50%;
+  border: 1.5px solid var(--border-accent);
+  background: var(--surface-nested);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 26px -10px var(--accent);
+}
+.cdp-empty-orb svg { position: relative; z-index: 1; }
+.cdp-empty-btn { margin-top: 4px; flex: 0 0 auto !important; width: auto !important; padding: 10px 28px !important; }
+.cdp-empty-title { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin: 0; letter-spacing: -0.02em; }
+.cdp-empty-sub   { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 4px; }
 
 /* ── Countdown card — compact ── */
 .cdp-row {
@@ -3885,9 +3900,15 @@ select.modal-input {
   .cdp-page    { padding: 16px 14px 40px; gap: 12px; }
   .cdp-stats   { grid-template-columns: repeat(2, 1fr); }
   .cdp-grid    { grid-template-columns: 1fr; }
+  .cdp-empty   { padding: 28px 16px 20px; gap: 10px; }
+  .cdp-filterbar { padding: 6px 8px; gap: 8px; }
+  .cdp-filter-group { gap: 6px; }
 }
 @media (max-width: 480px) {
-  .cdp-stats { grid-template-columns: 1fr; }
+  .cdp-stats { grid-template-columns: repeat(2, 1fr); }
+  .cdp-stat { padding: 10px 10px; gap: 8px; }
+  .cdp-stat-value { font-size: 1.25rem; }
+  .cdp-stat-icon { width: 28px; height: 28px; border-radius: 7px; }
   .cdp-row-footer { flex-direction: column; align-items: stretch; gap: 8px; }
   .cdp-row-actions { justify-content: space-between; }
   .cdp-field-row { grid-template-columns: 1fr; }
@@ -4158,8 +4179,6 @@ select.modal-input {
 }
 .hc:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
 .hc:hover::after { opacity: 1; }
-.hc.hc-done { opacity: 0.6; }
-.hc.hc-done:hover { opacity: 0.85; }
 
 .hc-left { display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0; }
 .hc-icon {
@@ -4237,6 +4256,13 @@ select.modal-input {
   .hc { flex-wrap: wrap; }
   .hc-strip { order: 3; margin: 6px 0 0; margin-right: auto; }
   .hc-right { margin-left: auto; }
+
+  /* Fix filter bar: New Habit button always occupies its own full-width row */
+  .hv-filters { gap: 6px; }
+  .hv-new-btn { flex: 1 1 100%; justify-content: center; margin-left: 0 !important; }
+
+  /* Reduce empty-state padding so orb doesn't float in excess whitespace */
+  .hv-empty { padding: 32px 20px; }
 }
 .hc-btn-done {
   background: linear-gradient(135deg, #10b981, #34d399); color: #fff; border-color: transparent;
@@ -4334,25 +4360,31 @@ select.modal-input {
 }
 
 @media (max-width: 768px) {
-  .app-body { flex-direction: column-reverse; height: auto; min-height: calc(100vh - 50px); }
+  .app-body { flex-direction: column-reverse; height: auto; min-height: calc(100dvh - 50px); }
   .main-nav {
-    flex-direction: row; width: 100%; min-width: unset; height: auto;
-    border-right: none; border-top: 1px solid var(--border);
-    padding: 0; position: sticky; top: unset; bottom: 0; left: unset; z-index: 19;
-    overflow-x: auto; overflow-y: hidden;
-    background: var(--bg-sidebar);
+    display: none;
   }
+  .mobile-bottom-nav {
+    display: flex;
+    flex-direction: row; width: 100%; min-width: unset; height: auto;
+    border-top: 1px solid var(--border);
+    padding: 0 0 env(safe-area-inset-bottom, 4px); position: sticky; bottom: 0; z-index: 19;
+    background: var(--bg-sidebar);
+    justify-content: space-around;
+  }
+  
+  .mobile-bottom-nav .main-nav-btn {
+    flex: 1; min-width: 0;
+    flex-direction: column; align-items: center; gap: 2px;
+    padding: 10px 0 10px; border-left: none;
+    border-top: 2px solid transparent; font-size: 0.66rem;
+    margin: 0; border-radius: 0;
+  }
+
   .sidebar-open .app-header,
   .sidebar-open .app-body { margin-left: 0; }
   .sidebar-brand { display: none; }
   .nav-section-label, .nav-divider, .nav-spacer { display: none; }
-  .main-nav-btn {
-    flex: 0 0 auto; min-width: 62px;
-    flex-direction: column; align-items: center; gap: 2px;
-    padding: 8px 5px 6px; border-left: none;
-    border-top: 2px solid transparent; font-size: 0.66rem;
-    margin: 0; border-radius: 0; width: auto;
-  }
   .nav-active { border-top-color: var(--accent) !important; background: rgba(120,105,252,0.1) !important; }
   .nav-badge  { top: 4px; right: calc(50% - 18px); transform: none; }
   .nav-label  { font-size: 0.6rem; }
@@ -5705,7 +5737,7 @@ select.modal-input {
   border-radius: 16px;
   padding: 16px;
   min-width: 240px;
-  max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   z-index: 100;
@@ -6583,7 +6615,6 @@ select.modal-input {
   padding: 4px 12px; font-size: 0.79rem; font-weight: 600;
   color: #fff; cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
 }
-.al-undo-btn:hover { opacity: 0.85; }
 
 /* Fix for Issue 1: New Note Input Card Bug */
 .new-note-container {
@@ -7029,3 +7060,21 @@ select.modal-input {
   background: rgba(255, 255, 255, 0.09);
   box-shadow: 0 0 0 3px hsla(var(--ambient-hue), 90%, 70%, 0.18);
 }
+
+@media (max-width: 768px) {
+  .task-check, .tdp-subtask-check, .quick-task-check { position: relative; }
+  .task-check::after, .tdp-subtask-check::after, .quick-task-check::after { content: ''; position: absolute; inset: -14px; }
+  .task-action-btn, .timer-adj-btn, .modal-close { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}
+
+
+@media (max-width: 768px) {
+  .modal-overlay, .cdp-overlay, .overlay { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(0,0,0,0.8) !important; }
+  .page-hdr { backdrop-filter: blur(4px) !important; -webkit-backdrop-filter: blur(4px) !important; }
+  input, textarea, select { font-size: 16px !important; }
+}
+
+@media (max-height: 500px) and (max-width: 768px) {
+  .main-nav { display: none !important; }
+}
+
