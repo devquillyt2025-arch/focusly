@@ -59,6 +59,11 @@ function addHour(timeStr) {
 const LABEL_STYLE = { display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 };
 const INPUT_STYLE = { width: '100%', padding: '11px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 11, color: 'var(--text-primary)', fontSize: '0.92rem', boxSizing: 'border-box' };
 
+const CATEGORY_OPTIONS = [
+  { value: 'work', label: 'Work' }, { value: 'learning', label: 'Learning' }, { value: 'fitness', label: 'Fitness' },
+  { value: 'mental', label: 'Mental' }, { value: 'finance', label: 'Finance' }, { value: 'growth', label: 'Growth' },
+];
+
 export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   const [currentDate,   setCurrentDate]   = useState(() => new Date());
   const [viewMode,      setViewMode]      = useState('day');
@@ -230,11 +235,14 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   };
   const getEventStyle = ev => ev.type === 'gcal' ? (c => ({ bg: `${c}1a`, text: c, border: c }))(gcalColor(ev.colorId)) : getCategoryColor(ev.category);
 
+  // gcal events open their source in Google Calendar; everything else opens the detail modal.
+  const openEvent = ev => { ev.htmlLink ? window.open(ev.htmlLink, '_blank') : setDetailEvent(ev); };
+
   const renderChip = (ev, compact = false) => {
     const c = getEventStyle(ev);
     return (
       <div key={ev.id} title={ev.title + (ev.location ? ` · ${ev.location}` : '')}
-        onClick={e2 => { e2.stopPropagation(); ev.htmlLink ? window.open(ev.htmlLink, '_blank') : setDetailEvent(ev); }}
+        onClick={e2 => { e2.stopPropagation(); openEvent(ev); }}
         style={{ background: c.bg, borderLeft: `3px solid ${c.border}`, color: c.text, padding: compact ? '3px 7px' : '5px 9px', borderRadius: '0 6px 6px 0', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.08)' }}>
         {ev.type === 'gcal' && <GCalIcon size={11}/>}
         {ev.time && <span style={{ opacity: .7, fontSize: '0.67rem', fontWeight: 700 }}>{ev.time}</span>}
@@ -444,7 +452,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                             const c = getEventStyle(ev);
                             return (
                               <div key={ev.id} style={{ background: c.bg, border: `1px solid ${c.border}`, borderLeft: `4px solid ${c.border}`, padding: '5px 8px', borderRadius: 6, cursor: 'pointer' }}
-                                onClick={e2 => { e2.stopPropagation(); ev.htmlLink ? window.open(ev.htmlLink,'_blank') : setDetailEvent(ev); }}>
+                                onClick={e2 => { e2.stopPropagation(); openEvent(ev); }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', textDecoration: ev.completed?'line-through':'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
                                 <span style={{ fontSize: '0.68rem', color: c.text, fontWeight: 600 }}>{ev.time}{ev.endTime ? ` – ${ev.endTime}` : ''}</span>
                               </div>
@@ -482,7 +490,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                     return (
                       <div key={ev.id} draggable={ev.type !== 'gcal'}
                         onDragStart={e => dragStart(e, ev.id, ev.type)} onDragEnd={dragEnd}
-                        onClick={e => { e.stopPropagation(); ev.htmlLink ? window.open(ev.htmlLink,'_blank') : setDetailEvent(ev); }}
+                        onClick={e => { e.stopPropagation(); openEvent(ev); }}
                         style={{ background: c.bg, border: `1px solid ${c.border}`, borderLeft: `3px solid ${c.border}`, padding: '5px 12px', borderRadius: 7, fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
                         {ev.type === 'gcal' && <GCalIcon size={12}/>}
                         <span style={{ textDecoration: ev.completed?'line-through':'none', color: 'var(--text-primary)' }}>{ev.title}</span>
@@ -570,7 +578,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                       <div key={ev.id}
                         draggable={ev.type !== 'gcal'}
                         onDragStart={e => dragStart(e, ev.id, ev.type)} onDragEnd={dragEnd}
-                        onClick={e => { e.stopPropagation(); ev.htmlLink ? window.open(ev.htmlLink,'_blank') : setDetailEvent(ev); }}
+                        onClick={e => { e.stopPropagation(); openEvent(ev); }}
                         style={{ position: 'absolute', top: `${top}px`, height: `${ht}px`, left: `calc(${ev.left}% + 3px)`, width: `calc(${ev.width}% - 6px)`, background: c.bg, border: `1px solid ${c.border}`, borderLeft: `4px solid ${c.border}`, borderRadius: 8, padding: '7px 10px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'grab', boxShadow: '0 2px 8px rgba(0,0,0,.07)', zIndex: isR ? 50 : 10, pointerEvents: 'auto', transition: isR ? 'none' : 'box-shadow .15s ease' }}
                         onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.15)'}
                         onMouseLeave={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.07)'}
@@ -685,7 +693,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
               <form onSubmit={handleModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label style={LABEL_STYLE}>Title</label>
-                  <input type="text" value={modalTitle} onChange={e => setModalTitle(e.target.value)} placeholder="What's the event?" autoFocus required style={{ ...INPUT_STYLE }} onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                  <input type="text" value={modalTitle} onChange={e => setModalTitle(e.target.value)} placeholder="What's the event?" autoFocus required style={INPUT_STYLE} onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div>
@@ -704,8 +712,8 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                 <div>
                   <label style={LABEL_STYLE}>Category</label>
                   <Select value={modalCategory} onChange={e => setModalCategory(e.target.value)}
-                    options={[{value:'work',label:'Work'},{value:'learning',label:'Learning'},{value:'fitness',label:'Fitness'},{value:'mental',label:'Mental'},{value:'finance',label:'Finance'},{value:'growth',label:'Growth'}]}
-                    style={{ ...INPUT_STYLE }} />
+                    options={CATEGORY_OPTIONS}
+                    style={INPUT_STYLE} />
                 </div>
                 <div>
                   <label style={LABEL_STYLE}>Notes</label>
@@ -759,7 +767,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                 <div>
                   <label style={LABEL_STYLE}>Category</label>
                   <Select value={detailEvent.category || 'work'} onChange={e => setDetailEvent({ ...detailEvent, category: e.target.value })}
-                    options={[{value:'work',label:'Work'},{value:'learning',label:'Learning'},{value:'fitness',label:'Fitness'},{value:'mental',label:'Mental'},{value:'finance',label:'Finance'},{value:'growth',label:'Growth'}]}
+                    options={CATEGORY_OPTIONS}
                     style={INPUT_STYLE} />
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '11px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 11 }}>
