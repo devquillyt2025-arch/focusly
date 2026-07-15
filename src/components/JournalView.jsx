@@ -3,12 +3,21 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { localDateStr } from '../utils/date';
+import { exportJournalDocx } from '../utils/journalDocx';
 
 // ─── Shared SVG props ───────────────────────────────────────────────
 const S = { fill:'none', stroke:'currentColor', strokeWidth:'2', strokeLinecap:'round', strokeLinejoin:'round' };
 // Framer-motion variants — staggered fade-in for the ambient metadata panel.
 const META_CONTAINER = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } } };
 const META_ITEM = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } } };
+
+// Scopes offered by the .docx export panel, all anchored to the viewed date.
+const EXPORT_SCOPES = [
+  { key: 'day',   label: 'Day' },
+  { key: 'week',  label: 'Week' },
+  { key: 'month', label: 'Month' },
+  { key: 'year',  label: 'Year' },
+];
 
 // ─── Storage helpers ────────────────────────────────────────────────
 const jKey = d => `nook_journal_${d}`;
@@ -94,6 +103,36 @@ function relLabel(ds, today) {
   if (diff === 1) return 'Tomorrow';
   const yr = new Date(ds + 'T12:00:00').getFullYear();
   return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: yr !== new Date().getFullYear() ? 'numeric' : undefined });
+}
+
+// ─── Export ranges ──────────────────────────────────────────────────
+// All bounds are inclusive [from, to] local date strings. Week is Monday-start,
+// matching mondayOf() / App.jsx's getWeekStart convention.
+function monthBounds(ds) {
+  const d = new Date(ds + 'T12:00:00');
+  const y = d.getFullYear(), m = d.getMonth();
+  return { from: localDateStr(new Date(y, m, 1)), to: localDateStr(new Date(y, m + 1, 0)) };
+}
+function yearBounds(ds) {
+  const y = new Date(ds + 'T12:00:00').getFullYear();
+  return { from: localDateStr(new Date(y, 0, 1)), to: localDateStr(new Date(y, 11, 31)) };
+}
+
+function scopeRange(scope, ds) {
+  if (scope === 'day')   return { from: ds, to: ds };
+  if (scope === 'week')  { const from = mondayOf(ds); return { from, to: addDays(from, 6) }; }
+  if (scope === 'month') return monthBounds(ds);
+  return yearBounds(ds);
+}
+
+// Human title + file slug for a finished export.
+function scopeMeta(scope, ds, range) {
+  const d = new Date(ds + 'T12:00:00');
+  if (scope === 'day')   return { title: `Journal — ${fmtTitleDate(ds)}`, slug: ds };
+  if (scope === 'week')  return { title: `Journal — Week of ${fmtDate(range.from)}`, slug: `week-${range.from}` };
+  if (scope === 'month') return { title: `Journal — ${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, slug: `${ds.slice(0, 7)}` };
+  if (scope === 'year')  return { title: `Journal — ${d.getFullYear()}`, slug: `${d.getFullYear()}` };
+  return { title: `Journal — ${fmtDate(range.from)} to ${fmtDate(range.to)}`, slug: `${range.from}_${range.to}` };
 }
 
 // ─── Heatmap builder — single Monday-start week ─────────────────────
@@ -231,9 +270,18 @@ export default memo(function JournalView() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState(() => addDays(todayDate, -30));
+  const [rangeTo,   setRangeTo]   = useState(todayDate);
+  const [exporting, setExporting] = useState(null); // scope key while building
+  const [exportMsg, setExportMsg] = useState('');
+
   const editorRef        = useRef(null);
   const savedTimerRef    = useRef(null);
   const autoSaveTimerRef = useRef(null);
+  const exportMsgTimerRef = useRef(null);
+  const exportMenuRef    = useRef(null);
   const viewingDateRef   = useRef(viewingDate);
 
   const isToday = viewingDate === todayDate;
@@ -324,7 +372,54 @@ export default memo(function JournalView() {
   useEffect(() => () => {
     clearTimeout(autoSaveTimerRef.current);
     clearTimeout(savedTimerRef.current);
+    clearTimeout(exportMsgTimerRef.current);
   }, []);
+
+  // ── .docx export ──
+  const flashExportMsg = useCallback((msg) => {
+    setExportMsg(msg);
+    if (exportMsgTimerRef.current) clearTimeout(exportMsgTimerRef.current);
+    exportMsgTimerRef.current = setTimeout(() => setExportMsg(''), 4000);
+  }, []);
+
+  // scope: 'day' | 'week' | 'month' | 'year' | 'range'. Everything but 'range' is
+  // anchored to the date being viewed, not to the calendar's month offset.
+  const runExport = useCallback(async (scope, custom) => {
+    const range = scope === 'range' ? custom : scopeRange(scope, viewingDate);
+    if (range.from > range.to) return flashExportMsg('Start date is after end date');
+
+    // The editor may hold unsaved keystrokes; history lags behind it by the
+    // autosave debounce, so flush first or the current day exports stale.
+    if (editorRef.current && saveStatus === 'saving') {
+      clearTimeout(autoSaveTimerRef.current);
+      saveCurrentEntry(editorRef.current.innerHTML);
+    }
+
+    setExporting(scope);
+    try {
+      const picked = loadAllEntries()
+        .filter(e => e.date >= range.from && e.date <= range.to && hasContentHtml(e))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(e => {
+          const html = toHtml(e.content ?? '');
+          return { date: e.date, heading: fmtTitleDate(e.date), html, wordCount: wordCountFromHtml(html), icon: iconMap[e.date] };
+        });
+
+      if (!picked.length) return flashExportMsg('No entries in that range');
+
+      const { title, slug } = scopeMeta(scope, viewingDate, range);
+      const words = picked.reduce((s, e) => s + e.wordCount, 0);
+      const subtitle = `${picked.length} ${picked.length === 1 ? 'entry' : 'entries'} · ${words.toLocaleString()} words · ${fmtDate(range.from)} – ${fmtDate(range.to)}`;
+
+      await exportJournalDocx({ title, subtitle, entries: picked, filename: `nook-journal-${slug}.docx` });
+      logActivity({ module: 'journal', entity_type: 'journal_export', entity_id: slug, action: 'exported', title: `${title} (${picked.length} ${picked.length === 1 ? 'entry' : 'entries'})` });
+      flashExportMsg(`Downloaded ${picked.length} ${picked.length === 1 ? 'entry' : 'entries'} ✓`);
+    } catch {
+      flashExportMsg('Export failed — try again');
+    } finally {
+      setExporting(null);
+    }
+  }, [viewingDate, iconMap, saveStatus, saveCurrentEntry, flashExportMsg]);
 
   // ── Formatting toolbar ──
   const execFormat = useCallback((cmd, value = null) => {
@@ -352,11 +447,19 @@ export default memo(function JournalView() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o); }
       // Cmd/Ctrl+. toggles Zen (Focus) mode
       if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); setZenMode(z => !z); }
-      if (e.key === 'Escape') { setPaletteOpen(false); setIconPickerOpen(false); setZenMode(false); }
+      if (e.key === 'Escape') { setPaletteOpen(false); setIconPickerOpen(false); setZenMode(false); setExportMenuOpen(false); }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const handler = (e) => { if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) { setExportMenuOpen(false); setRangeOpen(false); } };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportMenuOpen]);
 
   // ── Floating selection toolbar — appears only when text is selected in the canvas ──
   useEffect(() => {
@@ -492,13 +595,88 @@ export default memo(function JournalView() {
         initial="hidden"
         animate="show"
       >
-        {/* Time-of-day + date */}
-        <motion.div className="jnx-meta-head" variants={META_ITEM}>
-          <span className="jnx-meta-eyebrow">
-            <span className="jnx-mood-glyph" aria-hidden="true"><MoodGlyph phase={mood.phase} /></span>
-            {isToday ? mood.label : relLabel(viewingDate, todayDate)}
-          </span>
-          <span className="jnx-meta-date">{fmtPremiumDate(viewingDate)}</span>
+        {/* Time-of-day + date, with the export dropdown anchored top-right */}
+        <motion.div className="jnx-meta-head jnx-meta-head-row" variants={META_ITEM}>
+          <div className="jnx-meta-head-col">
+            <span className="jnx-meta-eyebrow">
+              <span className="jnx-mood-glyph" aria-hidden="true"><MoodGlyph phase={mood.phase} /></span>
+              {isToday ? mood.label : relLabel(viewingDate, todayDate)}
+            </span>
+            <span className="jnx-meta-date">{fmtPremiumDate(viewingDate)}</span>
+          </div>
+
+          <div className="jnx-export-dropdown" ref={exportMenuRef}>
+            <button
+              className="jnx-export-trigger"
+              onClick={() => setExportMenuOpen(o => !o)}
+              disabled={!!exporting}
+              aria-haspopup="true"
+              aria-expanded={exportMenuOpen}
+              title="Export journal as .docx"
+            >
+              {exporting ? <span className="jnx-export-spin" aria-hidden="true" /> : <JIcoDoc />}
+              Export
+              <JIcoChevronDown />
+            </button>
+
+            {exportMenuOpen && (
+              <div className="jnx-export-menu" role="menu">
+                <div className="jnx-export-menu-label">Download .docx · from {fmtDate(viewingDate)}</div>
+
+                {EXPORT_SCOPES.map(s => {
+                  const r = scopeRange(s.key, viewingDate);
+                  return (
+                    <button
+                      key={s.key}
+                      className="jnx-export-item"
+                      role="menuitem"
+                      onClick={() => runExport(s.key)}
+                      disabled={!!exporting}
+                      title={`${fmtDate(r.from)}${r.from === r.to ? '' : ` – ${fmtDate(r.to)}`}`}
+                    >
+                      <span>{s.label}</span>
+                      <span className="jnx-export-item-range">{fmtDate(r.from)}{r.from === r.to ? '' : `–${fmtDate(r.to)}`}</span>
+                    </button>
+                  );
+                })}
+
+                <div className="jnx-export-menu-sep" />
+
+                <button
+                  className={`jnx-export-item${rangeOpen ? ' jnx-export-item-active' : ''}`}
+                  role="menuitem"
+                  onClick={() => setRangeOpen(o => !o)}
+                  disabled={!!exporting}
+                  aria-expanded={rangeOpen}
+                >
+                  <span>Custom range…</span>
+                  <JIcoChevronDown style={{ transform: rangeOpen ? 'rotate(180deg)' : 'none' }} />
+                </button>
+
+                {rangeOpen && (
+                  <div className="jnx-export-range">
+                    <label className="jnx-export-field">
+                      <span>From</span>
+                      <input type="date" value={rangeFrom} max={rangeTo} onChange={e => setRangeFrom(e.target.value)} />
+                    </label>
+                    <label className="jnx-export-field">
+                      <span>To</span>
+                      <input type="date" value={rangeTo} min={rangeFrom} onChange={e => setRangeTo(e.target.value)} />
+                    </label>
+                    <button
+                      className="jnx-export-go"
+                      onClick={() => { runExport('range', { from: rangeFrom, to: rangeTo }); }}
+                      disabled={!!exporting || !rangeFrom || !rangeTo}
+                    >
+                      {exporting === 'range' ? <><span className="jnx-export-spin" aria-hidden="true" /> Building…</> : <><JIcoDoc /> Download .docx</>}
+                    </button>
+                  </div>
+                )}
+
+                {exportMsg && <div className="jnx-export-msg" role="status" aria-live="polite">{exportMsg}</div>}
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {/* Stats — today's essence, one row, equal size */}
@@ -526,10 +704,10 @@ export default memo(function JournalView() {
             <span className="jnx-meta-label">Activity</span>
             <div className="jnx-week-nav">
               <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o - 1)} title="Previous month" aria-label="Previous month">
-                <svg width="14" height="14" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
               </button>
               <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o + 1)} title="Next month" aria-label="Next month">
-                <svg width="14" height="14" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
           </div>
@@ -718,6 +896,12 @@ function JIcoZenExit() {
   return <svg width="15" height="15" viewBox="0 0 24 24" {...S}><path d="M3 8V5a2 2 0 0 1 2-2h3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
 }
 
+function JIcoDoc() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" {...S} style={{ flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>;
+}
+function JIcoChevronDown({ style } = {}) {
+  return <svg width="11" height="11" viewBox="0 0 24 24" {...S} style={{ flexShrink: 0, transition: 'transform 0.2s ease', ...style }}><polyline points="6 9 12 15 18 9"/></svg>;
+}
 function JIcoSearch() {
   return <svg width="15" height="15" viewBox="0 0 24 24" {...S} style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 }
