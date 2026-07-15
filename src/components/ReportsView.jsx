@@ -1,11 +1,10 @@
-import { memo,  useState, useRef } from 'react';
+import { memo, useState, useRef, lazy, Suspense } from 'react';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
   getLogForDate, todayStr, dateStrOf, isScheduledOn, computeGlobalStats, getSparklineData,
   upsertLog, toggleMilestone, getConfig
 } from '../trackers/trackerUtils';
-import { lazy, Suspense } from 'react';
 const HabitStreakChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitStreakChart })));
 const HabitDayOfWeekChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitDayOfWeekChart })));
 const TargetProgressChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.TargetProgressChart })));
@@ -601,41 +600,6 @@ function ProjectDetail({ tracker, onToggle }) {
 }
 
 // ─── SVG Charts ───────────────────────────────────────────────────
-function TargetLineChart({ tracker }) {
-  const logs = [...(tracker.logs || [])].sort((a, b) => a.date.localeCompare(b.date));
-  const { startValue = 0, targetValue = 100 } = getConfig(tracker);
-  const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
-  const data = [{ value: startValue }, ...logs];
-
-  const W = 100, H = 80;
-  const vals = data.map(d => d.value);
-  const max = Math.max(...vals, targetValue) * 1.05;
-  const min = Math.min(...vals, startValue, 0);
-  const range = max - min || 1;
-
-  const px = (i) => (i / (data.length - 1)) * W;
-  const py = (v) => H - 4 - ((v - min) / range) * (H - 8);
-
-  const pts = data.map((d, i) => `${px(i)},${py(d.value)}`).join(' ');
-  const targetY = py(targetValue);
-
-  return (
-    <div className="detail-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 120 }}>
-        <line x1="0" y1={targetY} x2={W} y2={targetY} stroke={color} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.4" />
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {data.map((d, i) => (
-          <circle key={i} cx={px(i)} cy={py(d.value)} r="2.5" fill={color} />
-        ))}
-      </svg>
-      <div className="chart-axis-row">
-        <span>{data[0]?.date ?? ''}</span>
-        <span style={{ color, fontWeight: 700 }}>Target: {targetValue}{getConfig(tracker).unit}</span>
-        <span>{data[data.length - 1]?.date ?? ''}</span>
-      </div>
-    </div>
-  );
-}
 
 function AverageBarChart({ tracker }) {
   const today = new Date();
@@ -686,13 +650,6 @@ function StatCard({ val, lbl, color }) {
 }
 
 // ─── Icons ─────────────────────────────────────────────────────────
-function IconBarChart() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
-    </svg>
-  );
-}
 
 function IconPlusCircle() {
   return (
