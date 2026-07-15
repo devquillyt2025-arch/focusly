@@ -7,7 +7,6 @@ import ErrorBoundary from './ErrorBoundary';
 import Select from './Select';
 import ReminderField from './ReminderField';
 import CalendarDatePicker from './CalendarDatePicker';
-import TimePicker from './TimePicker';
 import { syncTaskField } from '../utils/googleTasksSync';
 
 
@@ -89,8 +88,6 @@ function displayName(name) {
     return w;
   });
 }
-
-const ALL_CATS_STATIC = Object.keys(CAT_META);
 
 function TaskRow({
   task,
