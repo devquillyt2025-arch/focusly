@@ -1,9 +1,11 @@
-import { memo,  useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { memo, useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { localDateStr } from '../utils/date';
 
+// ─── Shared SVG props ───────────────────────────────────────────────
+const S = { fill:'none', stroke:'currentColor', strokeWidth:'2', strokeLinecap:'round', strokeLinejoin:'round' };
 // Framer-motion variants — staggered fade-in for the ambient metadata panel.
 const META_CONTAINER = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } } };
 const META_ITEM = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } } };
@@ -235,7 +237,7 @@ export default memo(function JournalView() {
   const [iconMap,     setIconMap]     = useState(loadIcons);
   const [currentWc,   setCurrentWc]   = useState(0);
   const [saveStatus,  setSaveStatus]  = useState('idle'); // 'idle' | 'saving' | 'saved'
-  const [heatmapOpen, setHeatmapOpen] = useState(true);
+
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [viewMode,    setViewMode]    = useState(() => {
@@ -274,13 +276,7 @@ export default memo(function JournalView() {
   // Persist the chosen calendar view
   useEffect(() => { try { localStorage.setItem('nook_journal_calview', viewMode); } catch {} }, [viewMode]);
 
-  // Period-aware nav (chevrons drive months in month view, weeks in week view)
-  const isMonth = viewMode === 'month';
-  const periodLabel   = isMonth ? monthLabel(monthOffset, month.first) : weekLabel(weekOffset, week.start, week.end);
-  const periodEntries = isMonth ? monthEntries : totalEntries;
-  const goPrevPeriod  = () => isMonth ? setMonthOffset(o => o - 1) : setWeekOffset(o => o - 1);
-  const goNextPeriod  = () => isMonth ? setMonthOffset(o => Math.min(0, o + 1)) : setWeekOffset(o => Math.min(0, o + 1));
-  const periodNextDisabled = isMonth ? monthOffset >= 0 : weekOffset >= 0;
+
 
   // ── Load content into editor when the viewed date changes ──
   useEffect(() => {
@@ -321,7 +317,7 @@ export default memo(function JournalView() {
     }
     flagSaved();
     setTimeout(() => setHistory(loadAllEntries()), 0);
-  }, [todayDate, flagSaved]);
+  }, [flagSaved]);
 
   // ── Editor events ──
   const handleEditorInput = useCallback(() => {
@@ -707,22 +703,7 @@ function CommandPalette({ entries, todayDate, onClose, onJump }) {
 }
 
 // ─── Atmosphere components ──────────────────────────────────────────
-// Circular word-count meter — the ring fills toward the daily goal and the
-// number ticks up as you write (transition handled in CSS).
-function WordMeter({ count, goal }) {
-  const r = 15;
-  const C = 2 * Math.PI * r;
-  const pct = Math.min(1, count / goal);
-  return (
-    <div className="jnx-meter" title={`${count} ${count === 1 ? 'word' : 'words'} · goal ${goal}`} aria-label={`${count} words written`}>
-      <svg width="38" height="38" viewBox="0 0 38 38" className="jnx-meter-svg">
-        <circle className="jnx-meter-track" cx="19" cy="19" r={r} />
-        <circle className="jnx-meter-fill" cx="19" cy="19" r={r} style={{ strokeDasharray: C, strokeDashoffset: C * (1 - pct) }} />
-      </svg>
-      <span className="jnx-meter-num">{count}</span>
-    </div>
-  );
-}
+
 
 // Sun / moon glyph reflecting the time of day.
 function MoodGlyph({ phase }) {
@@ -745,14 +726,8 @@ function MoodGlyph({ phase }) {
 }
 
 // ─── Icons ──────────────────────────────────────────────────────────
-const S = { fill:'none', stroke:'currentColor', strokeWidth:'2', strokeLinecap:'round', strokeLinejoin:'round' };
 
-function JIcoHistory() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 3"/></svg>;
-}
-function JIcoSpark() {
-  return <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2c.4 3.6 1.4 6 3.4 8S20 12.6 22 13c-3.6.4-6 1.4-8 3.4S12.4 20 12 22c-.4-3.6-1.4-6-3.4-8S3.4 13.4 2 13c3.6-.4 6-1.4 8-3.4S11.6 5.4 12 2z"/></svg>;
-}
+
 function JIcoZen() {
   return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>;
 }
@@ -781,6 +756,4 @@ function JIcoLock() {
 function JIcoCheck() {
   return <svg width="12" height="12" viewBox="0 0 24 24" {...S} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>;
 }
-function JIcoFlame() {
-  return <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ flexShrink: 0 }}><path d="M12 2c1 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .3-1.8.5-2.3C7 8 6 9.5 6 12a6 6 0 0 0 12 0c0-4.5-3.5-7-6-10z"/></svg>;
-}
+
