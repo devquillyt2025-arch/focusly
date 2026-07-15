@@ -75,14 +75,6 @@ function hasContentHtml(e) {
   return htmlToText(e.content ?? '').trim().length > 0;
 }
 
-// First non-empty line of an entry, for sidebar previews.
-function firstLine(e, n = 58) {
-  const t = htmlToText(toHtml(e?.content ?? '')).trim();
-  if (!t) return '';
-  const line = t.split('\n').find(l => l.trim()) || t;
-  return line.trim().slice(0, n);
-}
-
 // ─── Date helpers ───────────────────────────────────────────────────
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -139,15 +131,6 @@ function buildWeek(today, weekOffset, wcMap) {
     });
   }
   return { days, start, end: addDays(start, 6) };
-}
-
-function weekLabel(weekOffset, start, end) {
-  if (weekOffset === 0) return 'This week';
-  if (weekOffset === -1) return 'Last week';
-  const opt = { month: 'short', day: 'numeric' };
-  const s = new Date(start + 'T12:00:00').toLocaleDateString('en-US', opt);
-  const e = new Date(end + 'T12:00:00').toLocaleDateString('en-US', opt);
-  return `${s} – ${e}`;
 }
 
 // ─── Month grid builder (Monday-start, same convention as the week strip) ──
