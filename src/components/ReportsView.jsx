@@ -345,6 +345,7 @@ function TrackerDetail({ tracker, onClose, onDelete, onEdit, onUpdateTracker }) 
 
 // ─── Habit detail ──────────────────────────────────────────────────
 function HabitDetail({ tracker, onLog }) {
+  const color = TRACKER_CATS[tracker.category]?.color ?? 'var(--accent)';
   const { current, longest, successRate, doneCount, logged } = computeHabitStreaks(tracker);
   const today = todayStr();
   const todayLog = getLogForDate(tracker, today);
