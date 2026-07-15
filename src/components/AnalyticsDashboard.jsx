@@ -1,6 +1,5 @@
-import { useRef } from 'react';
 import { Doughnut, Line } from 'react-chartjs-2';
-import { computeGlobalStats, TRACKER_CATS, isScheduledToday, isLoggedToday } from '../trackers/trackerUtils';
+import { computeGlobalStats, TRACKER_CATS } from '../trackers/trackerUtils';
 import { calculateDailyScore, getScoreHistory, getGlobalWeeklyHeatmap, getCategoryBreakdown } from '../trackers/analyticsUtils';
 import { todayStr as getTodayStr } from '../utils/date';
 

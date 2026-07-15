@@ -11,7 +11,7 @@ import {
   Filler,
   ArcElement
 } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import { isScheduledOn, dateStrOf, getConfig } from '../trackers/trackerUtils';
 
 ChartJS.register(
