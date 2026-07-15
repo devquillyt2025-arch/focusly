@@ -1,5 +1,4 @@
-import { memo,  useState, useMemo, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import Select from './Select';
@@ -18,10 +17,6 @@ const NOTE_COLORS = [
   { id: 'blue',    label: 'Blue',    bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.4)' },
   { id: 'purple',  label: 'Purple',  bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.4)' },
   { id: 'pink',    label: 'Pink',    bg: 'rgba(236,72,153,0.12)', border: 'rgba(236,72,153,0.4)' },
-];
-
-const COLOR_DOTS = [
-  'var(--color-red)','#f97316','#eab308','var(--color-green)','#14b8a6','var(--color-blue)','#a855f7','#ec4899',
 ];
 
 // Solid accent color per note color id — used for tag pill text and toolbar swatch
