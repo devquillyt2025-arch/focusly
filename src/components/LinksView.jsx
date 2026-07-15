@@ -1,4 +1,4 @@
-import { memo,  useState, useMemo, useRef, useEffect } from 'react';
+import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logActivity } from '../utils/activityLog';
 import { genId } from '../utils/id';
@@ -433,12 +433,8 @@ export default memo(function LinksView() {
   }, [links, query, catFilter]);
 
   const catCount = allCats.length;
-  const countLabel = (() => {
-    const n = filtered.length;
-    const parts = [`${n} link${n !== 1 ? 's' : ''}`];
-    if (catCount) parts.push(`${catCount} categor${catCount !== 1 ? 'ies' : 'y'}`);
-    return parts.join(' · ');
-  })();
+  const n = filtered.length;
+  const countLabel = `${n} link${n !== 1 ? 's' : ''}` + (catCount ? ` · ${catCount} categor${catCount !== 1 ? 'ies' : 'y'}` : '');
 
   const vmBtn = (mode, title, svgPath) => (
     <button onClick={() => setViewMode(mode)} aria-label={title} title={title}
