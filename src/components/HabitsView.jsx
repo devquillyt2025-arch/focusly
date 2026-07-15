@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import {
   HABIT_CATS, ACCENT_COLORS, localDateStr,
   isScheduledToday, isScheduledOn, isCompletedToday, isCompletedOn,
