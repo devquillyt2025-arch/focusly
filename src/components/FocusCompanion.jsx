@@ -213,7 +213,7 @@ export default function FocusCompanion({
               <div style={{
                 width: 10, height: 10, borderRadius: 2,
                 background: 'var(--color-blue)',
-                opacity: cyclePos === 0 && totalCycles > 0 ? 1 : cyclePos === LONG_BREAK_AFTER ? 1 : 0.22,
+                opacity: cyclePos === 0 && totalCycles > 0 ? 1 : 0.22,
                 transition: 'opacity 0.3s ease',
               }} />
               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>☕</span>
