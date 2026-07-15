@@ -1,12 +1,21 @@
 /*
  * GOOGLE TASKS TWO-WAY SYNC ENGINE
- * 
+ *
  * LIMITATION TO NOTE:
- * This sync only works on the device/browser where Google Tasks was connected, since all sync state lives in localStorage. 
+ * This sync only works on the device/browser where Google Tasks was connected, since all sync state lives in localStorage.
  * If the user opens Nook on another device, it will not see previously synced data and may create duplicates.
  * Note: Tokens are stored in localStorage (`nook_google_tokens`). This should move to httpOnly cookies or a backend if multi-device support is ever added.
  * This integration is scoped to the tasks/tracker module only (habits, goals, and journal modules are untouched).
+ *
+ * The auth-code → token exchange and the token refresh both run in the
+ * `google-oauth` Edge Function (server-side, so the client_secret is never
+ * bundled into client JS). Consent still happens in the browser, which only
+ * needs the public client_id. Because that function verifies the caller's
+ * Supabase session, connecting/refreshing Google Tasks requires Supabase to
+ * be configured and the user signed in.
  */
+
+import { invokeGoogleOAuth } from './googleOAuthClient';
 
 // ─── PKCE OAuth Helper Functions ────────────────────────────────────────────────────────
 function generateRandomString(length) {
@@ -72,42 +81,17 @@ export async function handleAuthCallback() {
   // Immediately remove verifier to prevent React StrictMode double-execution
   localStorage.removeItem('nook_pkce_verifier');
 
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
   const redirectUri = window.location.origin + window.location.pathname;
 
-  if (!clientId || !clientSecret) {
-    alert('VITE_GOOGLE_CLIENT_ID or VITE_GOOGLE_CLIENT_SECRET not found in .env.local. Please make sure .env.local is created and restart your Vite dev server.');
-    authCallbackInProgress = false;
-    return false;
-  }
-
-
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        code_verifier: verifier,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      })
+    // Exchanged server-side — the client_secret must never reach the browser.
+    const data = await invokeGoogleOAuth({
+      grant: 'authorization_code',
+      code,
+      codeVerifier: verifier,
+      redirectUri,
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('[Google Tasks Sync] Failed to exchange token:', errText);
-      alert(`Google Tasks Auth Failed during token exchange.\nError: ${errText}\n\nPlease check that your Redirect URI (${redirectUri}) is exactly matched in Google Cloud Console.`);
-      authCallbackInProgress = false;
-      return false;
-    }
-
-    const data = await res.json();
     const expiresAt = Date.now() + (data.expires_in || 3600) * 1000;
-
 
     localStorage.setItem('nook_google_tokens', JSON.stringify({
       accessToken: data.access_token,
@@ -149,37 +133,9 @@ export async function getValidAccessToken(onStatusChange) {
     return null;
   }
 
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
-
-  if (!clientId || !clientSecret) {
-    console.error('[Google Tasks Sync] Client credentials missing in .env.local.');
-    if (onStatusChange) onStatusChange('Sync failed — retry');
-    return null;
-  }
-
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: tokens.refreshToken,
-        grant_type: 'refresh_token'
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('[Google Tasks Sync] Token refresh failed:', errText);
-      if (onStatusChange) onStatusChange('Sync failed — retry');
-      alert(`Your Google Tasks connection has expired or was revoked.\nError: ${errText}\n\nPlease reconnect in Settings.`);
-      disconnectGoogleTasks();
-      return null;
-    }
-
-    const data = await res.json();
+    // Refreshed server-side — the client_secret must never reach the browser.
+    const data = await invokeGoogleOAuth({ grant: 'refresh_token', refreshToken: tokens.refreshToken });
     const expiresAt = Date.now() + (data.expires_in || 3600) * 1000;
     const newTokens = {
       accessToken: data.access_token,
@@ -192,6 +148,13 @@ export async function getValidAccessToken(onStatusChange) {
   } catch (err) {
     console.error('[Google Tasks Sync] Refresh token error:', err);
     if (onStatusChange) onStatusChange('Sync failed — retry');
+    // Only tear the connection down when Google itself rejected the refresh
+    // token (expired/revoked). A transport or Edge Function failure is
+    // transient — disconnecting there would sign the user out over a blip.
+    if (String(err?.message || '').startsWith('token_exchange_failed')) {
+      alert(`Your Google Tasks connection has expired or was revoked.\nError: ${err.message}\n\nPlease reconnect in Settings.`);
+      disconnectGoogleTasks();
+    }
     return null;
   }
 }

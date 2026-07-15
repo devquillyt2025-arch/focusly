@@ -6,9 +6,14 @@
  *
  * OAuth flow: PKCE (same as Tasks). The `state=gcal` param + separate verifier key
  * ensures Tasks and Calendar callbacks don't conflict.
+ *
+ * The auth-code → token exchange and the token refresh both run in the
+ * `google-oauth` Edge Function (server-side, so the client_secret is never
+ * bundled into client JS) — see utils/googleOAuthClient.js.
  */
 
 import { localDateStr } from './date';
+import { invokeGoogleOAuth } from './googleOAuthClient';
 
 // 'YYYY-MM-DD' + 1 calendar day (local), for events whose end time crosses midnight.
 function addOneDay(dateStr) {
@@ -90,26 +95,16 @@ export async function handleCalendarAuthCallback() {
   calCallbackInProgress = true;
   localStorage.removeItem(GCAL_VERIFIER_KEY);
 
-  const clientId     = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
-  const redirectUri  = window.location.origin + window.location.pathname;
+  const redirectUri = window.location.origin + window.location.pathname;
 
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId, client_secret: clientSecret,
-        code, code_verifier: verifier,
-        redirect_uri: redirectUri, grant_type: 'authorization_code',
-      }),
+    // Exchanged server-side — the client_secret must never reach the browser.
+    const data = await invokeGoogleOAuth({
+      grant: 'authorization_code',
+      code,
+      codeVerifier: verifier,
+      redirectUri,
     });
-    if (!res.ok) {
-      alert(`Google Calendar auth failed: ${await res.text()}`);
-      calCallbackInProgress = false;
-      return false;
-    }
-    const data = await res.json();
     localStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({
       accessToken:  data.access_token,
       refreshToken: data.refresh_token,
@@ -137,20 +132,9 @@ export async function getCalendarToken() {
 
   if (!tokens.refreshToken) { disconnectGoogleCalendar(); return null; }
 
-  const clientId     = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
-
   try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId, client_secret: clientSecret,
-        refresh_token: tokens.refreshToken, grant_type: 'refresh_token',
-      }),
-    });
-    if (!res.ok) { disconnectGoogleCalendar(); return null; }
-    const data = await res.json();
+    // Refreshed server-side — the client_secret must never reach the browser.
+    const data = await invokeGoogleOAuth({ grant: 'refresh_token', refreshToken: tokens.refreshToken });
     const next = {
       accessToken:  data.access_token,
       refreshToken: data.refresh_token || tokens.refreshToken,
@@ -158,7 +142,13 @@ export async function getCalendarToken() {
     };
     localStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify(next));
     return next.accessToken;
-  } catch { return null; }
+  } catch (err) {
+    // Only disconnect when Google itself rejected the refresh token; a
+    // transport/Edge Function failure is transient and must not sign the
+    // user out (matches the pre-existing !res.ok vs throw distinction).
+    if (String(err?.message || '').startsWith('token_exchange_failed')) disconnectGoogleCalendar();
+    return null;
+  }
 }
 
 // ─── API calls ─────────────────────────────────────────────────────
