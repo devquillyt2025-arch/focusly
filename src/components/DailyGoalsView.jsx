@@ -1,18 +1,11 @@
-import { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import DailyIntentions from './DailyIntentions';
+import { useState, useMemo, useSyncExternalStore } from 'react';
 import Select from './Select';
 import { getTickSeconds, subscribeTick } from '../utils/timerTickStore';
+import { TRACKER_CATS, isScheduledToday, isLoggedToday } from '../trackers/trackerUtils';
 import {
-  TRACKER_CATS, TRACKER_TYPES,
-  isScheduledToday, isLoggedToday, getLogForDate,
-  upsertLog, toggleMilestone, computeHabitStreaks, computeTargetStats, computeAverageStats,
-  computeProjectStats, computeGlobalStats,
-} from '../trackers/trackerUtils';
-import { getDailyInsight } from '../trackers/insightsEngine';
-import {
-  HABIT_CATS, isScheduledToday as isHabitScheduledToday,
+  isScheduledToday as isHabitScheduledToday,
   isCompletedToday as isHabitCompletedToday, isScheduledOn as isHabitScheduledOn,
-  isCompletedOn as isHabitCompletedOn, calcStreak as habitStreak, fmtFrequency,
+  isCompletedOn as isHabitCompletedOn, calcStreak as habitStreak,
 } from '../habitsStore';
 import { CAT_META } from '../utils/categoryMeta';
 import { localDateStr } from '../utils/date';
@@ -45,19 +38,6 @@ function getJournalPreview(content) {
   const text = content.replace(/<\/?[^>]+(>|$)/g, '').trim();
   if (!text) return 'No entry yet';
   return text.length > 50 ? text.slice(0, 50) + '...' : text;
-}
-
-function fmtTaskDueDate(dateStr) {
-  if (!dateStr) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr + 'T00:00:00');
-  const diff = Math.round((due - today) / 86400000);
-  if (diff < 0) {
-    return { text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'var(--color-red)' };
-  }
-  if (diff === 0) return { text: 'Today', color: 'var(--color-amber)' };
-  if (diff === 1) return { text: 'Tomorrow', color: 'var(--color-amber)' };
-  return { text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), color: 'var(--text-secondary)' };
 }
 
 function loadActiveGoals() {
