@@ -265,7 +265,6 @@ export default memo(function JournalView() {
   const [viewMode,    setViewMode]    = useState(() => {
     try { return localStorage.getItem('nook_journal_calview') === 'week' ? 'week' : 'month'; } catch { return 'month'; }
   });
-  const [zenMode,     setZenMode]     = useState(false);
   const [selToolbar,  setSelToolbar]  = useState({ show: false, x: 0, y: 0 });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -445,9 +444,7 @@ export default memo(function JournalView() {
   useEffect(() => {
     const h = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o); }
-      // Cmd/Ctrl+. toggles Zen (Focus) mode
-      if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); setZenMode(z => !z); }
-      if (e.key === 'Escape') { setPaletteOpen(false); setIconPickerOpen(false); setZenMode(false); setExportMenuOpen(false); }
+      if (e.key === 'Escape') { setPaletteOpen(false); setIconPickerOpen(false); setExportMenuOpen(false); }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
@@ -508,252 +505,238 @@ export default memo(function JournalView() {
 
   return (
     <div
-      className={`jnx-page jnx-mood-${mood.phase}${zenMode ? ' jnx-zen' : ''}`}
+      className={`jnx-page jnx-mood-${mood.phase}`}
       style={{ '--jnx-aura': auraIntensity }}
     >
       <div className="jnx-split">
 
-      {/* ═══ LEFT: the canvas — hero ═══ */}
-      <div className="jnx-write-panel">
-        {/* Ambient glow — radiates from the canvas, brightens with word count, tinted by time of day */}
-        <div className="jnx-aura" aria-hidden="true" />
+        {/* ══════════════════════════════════════════════════
+            LEFT COLUMN — Unified Control + Metadata Hub
+            (moved from the right — writing canvas is now on the right)
+            ══════════════════════════════════════════════════ */}
+        <motion.aside
+          className="jnx-meta"
+          aria-label="Journal controls and activity"
+          variants={META_CONTAINER}
+          initial="hidden"
+          animate="show"
+        >
 
-        <header className="jnx-header">
-          <div className="jnx-header-lead">
-            <div className="jnx-header-nav">
-              <button className="jnx-nav-arrow" onClick={goPrev} title="Previous day" aria-label="Previous day">
-                <svg width="18" height="18" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
+          {/* ── Row 1: Controls (search, autosave) ── */}
+          <motion.div className="jnx-right-controls" variants={META_ITEM}>
+            <div className="jnx-right-cluster">
+              <div className="jnx-right-actions">
+                <button className="jnx-icon-action" onClick={() => setPaletteOpen(true)} title="Search entries (Ctrl+K)" aria-label="Search entries">
+                  <JIcoSearch />
+                </button>
+                {/* Today + Export + Autosave grouped in one non-wrapping unit: if the row
+                    is too narrow for everything, this whole group drops to its own line
+                    together (still Today-Export-Autosave side by side) instead of Autosave
+                    splitting off alone — the exact "disconnected" problem this is fixing.
+                    Only this outer placement changed — the export dropdown's own
+                    contents/logic below are untouched. */}
+                <div className="jnx-right-today-group">
+                {!isToday && <button className="jnx-today-btn" onClick={goToToday}>Today</button>}
+            <div className="jnx-export-dropdown" ref={exportMenuRef}>
+              <button
+                className="jnx-export-trigger"
+                onClick={() => setExportMenuOpen(o => !o)}
+                disabled={!!exporting}
+                aria-haspopup="true"
+                aria-expanded={exportMenuOpen}
+                title="Export journal as .docx"
+              >
+                {exporting ? <span className="jnx-export-spin" aria-hidden="true" /> : <JIcoDoc />}
+                Export
+                <JIcoChevronDown />
               </button>
-              <button className="jnx-nav-arrow" onClick={goNext} disabled={!canGoNext} title="Next day" aria-label="Next day">
-                <svg width="18" height="18" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            </div>
 
-            <div className="jnx-icon-slot">
-              <button className="jnx-icon-btn" onClick={() => setIconPickerOpen(o => !o)} title="Change icon" aria-label="Change entry icon">
-                {entryIcon ? <span className="jnx-icon-emoji">{entryIcon}</span> : <JIcoBook />}
-              </button>
-              {iconPickerOpen && (
-                <div className="jnx-icon-picker" onMouseLeave={() => setIconPickerOpen(false)}>
-                  {['📓','✍️','🌤️','🌙','💭','🔥','🎯','🌱','☕','🎉','😌','📌'].map(em => (
-                    <button key={em} className="jnx-icon-choice" onClick={() => setEntryIcon(em)}>{em}</button>
-                  ))}
-                  <button className="jnx-icon-choice jnx-icon-clear" onClick={() => setEntryIcon(null)} title="Default icon">✕</button>
+              {exportMenuOpen && (
+                <div className="jnx-export-menu" role="menu">
+                  <div className="jnx-export-menu-label">Download .docx · from {fmtDate(viewingDate)}</div>
+
+                  {EXPORT_SCOPES.map(s => {
+                    const r = scopeRange(s.key, viewingDate);
+                    return (
+                      <button
+                        key={s.key}
+                        className="jnx-export-item"
+                        role="menuitem"
+                        onClick={() => runExport(s.key)}
+                        disabled={!!exporting}
+                        title={`${fmtDate(r.from)}${r.from === r.to ? '' : ` – ${fmtDate(r.to)}`}`}
+                      >
+                        <span>{s.label}</span>
+                        <span className="jnx-export-item-range">{fmtDate(r.from)}{r.from === r.to ? '' : `–${fmtDate(r.to)}`}</span>
+                      </button>
+                    );
+                  })}
+
+                  <div className="jnx-export-menu-sep" />
+
+                  <button
+                    className={`jnx-export-item${rangeOpen ? ' jnx-export-item-active' : ''}`}
+                    role="menuitem"
+                    onClick={() => setRangeOpen(o => !o)}
+                    disabled={!!exporting}
+                    aria-expanded={rangeOpen}
+                  >
+                    <span>Custom range…</span>
+                    <JIcoChevronDown style={{ transform: rangeOpen ? 'rotate(180deg)' : 'none' }} />
+                  </button>
+
+                  {rangeOpen && (
+                    <div className="jnx-export-range">
+                      <label className="jnx-export-field">
+                        <span>From</span>
+                        <input type="date" value={rangeFrom} max={rangeTo} onChange={e => setRangeFrom(e.target.value)} />
+                      </label>
+                      <label className="jnx-export-field">
+                        <span>To</span>
+                        <input type="date" value={rangeTo} min={rangeFrom} onChange={e => setRangeTo(e.target.value)} />
+                      </label>
+                      <button
+                        className="jnx-export-go"
+                        onClick={() => { runExport('range', { from: rangeFrom, to: rangeTo }); }}
+                        disabled={!!exporting || !rangeFrom || !rangeTo}
+                      >
+                        {exporting === 'range' ? <><span className="jnx-export-spin" aria-hidden="true" /> Building…</> : <><JIcoDoc /> Download .docx</>}
+                      </button>
+                    </div>
+                  )}
+
+                  {exportMsg && <div className="jnx-export-msg" role="status" aria-live="polite">{exportMsg}</div>}
                 </div>
               )}
             </div>
+                <span className={`jnx-status jnx-status-${saveStatus}`}>
+                  {saveStatus === 'saving' && <><span className="jnx-status-dot" /> Saving…</>}
+                  {saveStatus === 'saved' && <><JIcoCheck /> Saved</>}
+                  {saveStatus === 'idle' && <span className="jnx-status-idle">Autosave</span>}
+                </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
 
-            <div className="jnx-title-col">
-              <div className="jnx-eyebrow">
+          {/* ── Row 2: Context (mood badge + week range) ── */}
+          <motion.div className="jnx-meta-context-header" variants={META_ITEM}>
+            <div className="jnx-meta-context-title">
+              <span className="jnx-meta-eyebrow">
                 <span className="jnx-mood-glyph" aria-hidden="true"><MoodGlyph phase={mood.phase} /></span>
-                <span className="jnx-eyebrow-text">{isToday ? mood.label : relLabel(viewingDate, todayDate)}</span>
-                {!isToday && <span className="jnx-readonly-note"><JIcoLock /> Read-only</span>}
-              </div>
-              <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
+                {isToday ? mood.label : relLabel(viewingDate, todayDate)}
+              </span>
             </div>
-          </div>
+            <div className="jnx-meta-context-range">
+              Week of {fmtDate(scopeRange("week", viewingDate).from)} – {fmtDate(scopeRange("week", viewingDate).to)}
+            </div>
+          </motion.div>
 
-          <div className="jnx-header-actions">
-            <button className="jnx-icon-action" onClick={() => setZenMode(true)} title="Focus mode (Ctrl+.)" aria-label="Enter focus mode">
-              <JIcoZen />
-            </button>
-            <button className="jnx-icon-action" onClick={() => setPaletteOpen(true)} title="Search entries (Ctrl+K)" aria-label="Search entries">
-              <JIcoSearch />
-            </button>
-            {!isToday && <button className="jnx-today-btn" onClick={goToToday}>Today</button>}
-            <span className={`jnx-status jnx-status-${saveStatus}`}>
-              {saveStatus === 'saving' && <><span className="jnx-status-dot" /> Saving…</>}
-              {saveStatus === 'saved' && <><JIcoCheck /> Saved</>}
-              {saveStatus === 'idle' && <span className="jnx-status-idle">Autosave</span>}
-            </span>
-          </div>
-        </header>
+          {/* ── Row 3: KPI Metrics ── */}
+          <motion.div className="jnx-kpi-grid" variants={META_ITEM}>
+            <div className="jnx-kpi-card">
+              <span className="jnx-kpi-num">{currentWc}</span>
+              <span className="jnx-kpi-label">WORDS</span>
+            </div>
+            <div className="jnx-kpi-card">
+              <span className="jnx-kpi-num">{totalEntries}</span>
+              <span className="jnx-kpi-label">ENTRIES</span>
+            </div>
+            <div className="jnx-kpi-card">
+              <span className="jnx-kpi-num">{streak}</span>
+              <span className="jnx-kpi-label">STREAK</span>
+            </div>
+          </motion.div>
 
-        {/* ── THE CANVAS — serif writing sanctuary ── */}
-        <div className="jnx-canvas">
-          <div
-            ref={editorRef}
-            className="journal-rich-editor jnx-editor"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleEditorInput}
-            onBlur={handleEditorBlur}
-            data-placeholder={isToday
-              ? (streak > 0 ? `Keep your ${streak}-day streak alive — begin where you are…` : 'Begin where you are. Write your thoughts, reflections, or notes for today…')
-              : 'Write your reflections for this day…'}
-            data-empty="true"
-            spellCheck
-          />
-        </div>
-      </div>{/* /jnx-write-panel */}
-
-      {/* ═══ RIGHT: ambient metadata — borderless, bleeds into the sanctuary ═══ */}
-      <motion.aside
-        className="jnx-meta"
-        aria-label="Writing activity"
-        variants={META_CONTAINER}
-        initial="hidden"
-        animate="show"
-      >
-        {/* Time-of-day + date, with the export dropdown anchored top-right */}
-        <motion.div className="jnx-meta-head jnx-meta-head-row" variants={META_ITEM}>
-          <div className="jnx-meta-head-col">
-            <span className="jnx-meta-eyebrow">
-              <span className="jnx-mood-glyph" aria-hidden="true"><MoodGlyph phase={mood.phase} /></span>
-              {isToday ? mood.label : relLabel(viewingDate, todayDate)}
-            </span>
-            <span className="jnx-meta-date">{fmtPremiumDate(viewingDate)}</span>
-          </div>
-
-          <div className="jnx-export-dropdown" ref={exportMenuRef}>
-            <button
-              className="jnx-export-trigger"
-              onClick={() => setExportMenuOpen(o => !o)}
-              disabled={!!exporting}
-              aria-haspopup="true"
-              aria-expanded={exportMenuOpen}
-              title="Export journal as .docx"
-            >
-              {exporting ? <span className="jnx-export-spin" aria-hidden="true" /> : <JIcoDoc />}
-              Export
-              <JIcoChevronDown />
-            </button>
-
-            {exportMenuOpen && (
-              <div className="jnx-export-menu" role="menu">
-                <div className="jnx-export-menu-label">Download .docx · from {fmtDate(viewingDate)}</div>
-
-                {EXPORT_SCOPES.map(s => {
-                  const r = scopeRange(s.key, viewingDate);
-                  return (
-                    <button
-                      key={s.key}
-                      className="jnx-export-item"
-                      role="menuitem"
-                      onClick={() => runExport(s.key)}
-                      disabled={!!exporting}
-                      title={`${fmtDate(r.from)}${r.from === r.to ? '' : ` – ${fmtDate(r.to)}`}`}
-                    >
-                      <span>{s.label}</span>
-                      <span className="jnx-export-item-range">{fmtDate(r.from)}{r.from === r.to ? '' : `–${fmtDate(r.to)}`}</span>
-                    </button>
-                  );
-                })}
-
-                <div className="jnx-export-menu-sep" />
-
-                <button
-                  className={`jnx-export-item${rangeOpen ? ' jnx-export-item-active' : ''}`}
-                  role="menuitem"
-                  onClick={() => setRangeOpen(o => !o)}
-                  disabled={!!exporting}
-                  aria-expanded={rangeOpen}
-                >
-                  <span>Custom range…</span>
-                  <JIcoChevronDown style={{ transform: rangeOpen ? 'rotate(180deg)' : 'none' }} />
+          {/* ── Row 4: Activity Calendar ── */}
+          <motion.div className="jnx-meta-cal" variants={META_ITEM}>
+            <div className="jnx-meta-cal-head">
+              <span className="jnx-meta-label">Activity</span>
+              <div className="jnx-week-nav">
+                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o - 1)} title="Previous month" aria-label="Previous month">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
+                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o + 1)} title="Next month" aria-label="Next month">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
 
-                {rangeOpen && (
-                  <div className="jnx-export-range">
-                    <label className="jnx-export-field">
-                      <span>From</span>
-                      <input type="date" value={rangeFrom} max={rangeTo} onChange={e => setRangeFrom(e.target.value)} />
-                    </label>
-                    <label className="jnx-export-field">
-                      <span>To</span>
-                      <input type="date" value={rangeTo} min={rangeFrom} onChange={e => setRangeTo(e.target.value)} />
-                    </label>
-                    <button
-                      className="jnx-export-go"
-                      onClick={() => { runExport('range', { from: rangeFrom, to: rangeTo }); }}
-                      disabled={!!exporting || !rangeFrom || !rangeTo}
-                    >
-                      {exporting === 'range' ? <><span className="jnx-export-spin" aria-hidden="true" /> Building…</> : <><JIcoDoc /> Download .docx</>}
-                    </button>
+            <div className="jnx-heatmap-body">
+              <div className="jnx-heatmap-body-inner">
+                <div className="jnx-meta-cal-sub">
+                  <span className="jnx-meta-period">{monthLabel(monthOffset, month.first)} · {monthEntries} entr{monthEntries === 1 ? "y" : "ies"}</span>
+                </div>
+
+                <div className="jnx-month">
+                  <div className="jnx-month-dows">
+                    {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+                      <span className="jnx-month-dow" key={i}>{l}</span>
+                    ))}
                   </div>
-                )}
-
-                {exportMsg && <div className="jnx-export-msg" role="status" aria-live="polite">{exportMsg}</div>}
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Stats — today's essence, one row, equal size */}
-        <motion.div className="jnx-meta-stats" variants={META_ITEM}>
-          <span className="jnx-meta-label">Today’s essence</span>
-          <div className="jnx-stat-row">
-            <div className="jnx-stat">
-              <span className="jnx-stat-num">{currentWc}</span>
-              <span className="jnx-stat-unit">{currentWc === 1 ? 'word' : 'words'}</span>
-            </div>
-            <div className="jnx-stat">
-              <span className="jnx-stat-num">{totalEntries}</span>
-              <span className="jnx-stat-unit">{totalEntries === 1 ? 'entry' : 'entries'}</span>
-            </div>
-            <div className="jnx-stat">
-              <span className="jnx-stat-num">{streak}</span>
-              <span className="jnx-stat-unit">day{streak === 1 ? '' : 's'} streak</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Activity calendar — last section */}
-        <motion.div className="jnx-meta-cal" variants={META_ITEM}>
-          <div className="jnx-meta-cal-head">
-            <span className="jnx-meta-label">Activity</span>
-            <div className="jnx-week-nav">
-              <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o - 1)} title="Previous month" aria-label="Previous month">
-                <svg width="17" height="17" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
-              </button>
-              <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o + 1)} title="Next month" aria-label="Next month">
-                <svg width="17" height="17" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div className="jnx-heatmap-body">
-            <div className="jnx-heatmap-body-inner">
-              <div className="jnx-meta-cal-sub">
-                <span className="jnx-meta-period">{monthLabel(monthOffset, month.first)} · {monthEntries} entr{monthEntries === 1 ? 'y' : 'ies'}</span>
-              </div>
-
-              {/* Month grid — hollow circles, dot = entry, filled = selected */}
-              <div className="jnx-month">
-                <div className="jnx-month-dows">
-                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((l, i) => (
-                    <span className="jnx-month-dow" key={i}>{l}</span>
-                  ))}
-                </div>
-                <div className="jnx-month-grid">
-                  {month.days.map(d => (
-                    <button
-                      key={d.date}
-                      className={`jnx-mcell${d.wc ? ' jnx-has-entry' : ''}${d.isToday ? ' jnx-today' : ''}${d.date === viewingDate ? ' jnx-active' : ''}${!d.inMonth ? ' jnx-out' : ''}`}
-                      onClick={() => setViewingDate(d.date)}
-                      title={`${fmtDate(d.date)} — ${d.wc ? `${d.wc} words` : 'no entry'}`}
-                      aria-label={`${fmtDate(d.date)}, ${d.wc ? `${d.wc} words` : 'no entry'}`}
-                    >
-                      <span className="jnx-mcell-num">{d.num}</span>
-                    </button>
-                  ))}
+                  <div className="jnx-month-grid">
+                    {month.days.map(d => (
+                      <button
+                        key={d.date}
+                        className={`jnx-mcell${d.wc ? " jnx-has-entry" : ""}${d.isToday ? " jnx-today" : ""}${d.date === viewingDate ? " jnx-active" : ""}${!d.inMonth ? " jnx-out" : ""}`}
+                        onClick={() => setViewingDate(d.date)}
+                        title={`${fmtDate(d.date)} — ${d.wc ? `${d.wc} words` : "no entry"}`}
+                        aria-label={`${fmtDate(d.date)}, ${d.wc ? `${d.wc} words` : "no entry"}`}
+                      >
+                        <span className="jnx-mcell-num">{d.num}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
+          </motion.div>
+
+        </motion.aside>
+
+        {/* ══════════════════════════════════════════════════
+            RIGHT COLUMN — Pure Writing Sanctuary
+            Contains ONLY: date heading + editable text area
+            ══════════════════════════════════════════════════ */}
+        <main className="jnx-write-panel">
+          {/* Ambient glow layer — must be a direct child of .jnx-write-panel: its
+              position:absolute is scoped by .jnx-write-panel's position:relative
+              (see index.css), and .jnx-write-panel > *:not(.jnx-aura) relies on this
+              exact nesting too. Living anywhere else (e.g. sibling of .jnx-split)
+              lets it escape to the nearest positioned ancestor up the tree instead,
+              ballooning it across the full page width/height. */}
+          <div className="jnx-aura" aria-hidden="true" />
+          <div className="jnx-canvas">
+            <div className="jnx-title-row">
+              <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
+              <div className="jnx-title-nav">
+                <button className="jnx-nav-arrow" onClick={goPrev} title="Previous day" aria-label="Previous day">
+                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button className="jnx-nav-arrow" onClick={goNext} disabled={!canGoNext} title="Next day" aria-label="Next day">
+                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+            <div
+              ref={editorRef}
+              className="journal-rich-editor jnx-editor"
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              onBlur={handleEditorBlur}
+              data-placeholder={isToday
+                ? (streak > 0 ? `Keep your ${streak}-day streak alive — begin where you are…` : 'Begin where you are. Write your thoughts, reflections, or notes for today…')
+                : 'Write your reflections for this day…'}
+              data-empty="true"
+              spellCheck
+            />
           </div>
-        </motion.div>
-      </motion.aside>
+        </main>
 
       </div>{/* /jnx-split */}
 
-      {/* ── Focus (Zen) mode exit affordance ── */}
-      {zenMode && (
-        <button className="jnx-zen-exit" onClick={() => setZenMode(false)} title="Exit focus mode (Esc)" aria-label="Exit focus mode">
-          <JIcoZenExit /> Exit focus
-        </button>
-      )}
-
-      {/* ── Floating selection toolbar — appears only over a text selection ── */}
+      {/* ── Floating selection toolbar ── */}
       {selToolbar.show && createPortal(
         <div
           className="jnx-fab"
@@ -888,13 +871,6 @@ function MoodGlyph({ phase }) {
 
 // ─── Icons ──────────────────────────────────────────────────────────
 
-
-function JIcoZen() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>;
-}
-function JIcoZenExit() {
-  return <svg width="15" height="15" viewBox="0 0 24 24" {...S}><path d="M3 8V5a2 2 0 0 1 2-2h3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
-}
 
 function JIcoDoc() {
   return <svg width="13" height="13" viewBox="0 0 24 24" {...S} style={{ flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>;

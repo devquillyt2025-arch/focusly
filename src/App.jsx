@@ -1644,7 +1644,7 @@ export default function App() {
       </nav>
 
       {/* ── Tab content ── */}
-      <div className="tab-content">
+      <div className={`tab-content${activeTab === 'journal' ? ' tab-content-journal' : ''}`}>
         <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
