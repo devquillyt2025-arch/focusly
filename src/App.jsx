@@ -39,12 +39,12 @@ import { clearReminder } from './utils/reminders';
 import { localDateStr, todayStr } from './utils/date';
 import { genId } from './utils/id';
 import FocusCompanion from './components/FocusCompanion';
+import SidebarSearch, { useNookSearch, ResultsList } from './components/SidebarSearch';
 import nookLogo from './nook-favicon.png';
 
 // ── Code-split route-level views (each tab's chunk loads only when that tab is opened) ──
 const ReportsView     = lazy(() => import('./components/ReportsView'));
 const CalendarView    = lazy(() => import('./components/CalendarView'));
-const AnalyticsModal  = lazy(() => import('./components/AnalyticsModal'));
 const TaskList        = lazy(() => import('./components/TaskList'));
 const SettingsView    = lazy(() => import('./components/SettingsView'));
 const JournalView     = lazy(() => import('./components/JournalView'));
@@ -59,7 +59,6 @@ const RemindersView   = lazy(() => import('./components/RemindersView'));
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
-const PRIO_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
 const DEFAULT_SETTINGS = {
   focusDuration: 25, shortDuration: 5, longDuration: 15, customDuration: 25,
   autoSwitch: false, sound: true,
@@ -190,21 +189,8 @@ function nextDueDate(dueDateStr, recurrence, recurrenceDays) {
   return '';
 }
 
-// Real relative-time label for a genuine past event (e.g. a logged pomodoro timestamp).
-function fmtRelativeTime(isoOrDate) {
-  const then = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
-  const mins = Math.max(0, Math.round((Date.now() - then.getTime()) / 60000));
-  if (mins < 1)   return 'Just now';
-  if (mins < 60)  return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24)   return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  return `${days}d ago`;
-}
-
 // ─── App ─────────────────────────────────────────────────────────
 export default function App() {
-  const isMac = typeof window !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
   const initSettings = useMemo(loadSettings, []); // eslint-disable-line
 
   // ── Existing state ──
@@ -1071,31 +1057,10 @@ export default function App() {
   const unloggedToday  = scheduledToday.filter(t=>!isLoggedToday(t));
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [avatarOpen, setAvatarOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [notifsCleared, setNotifsCleared] = useState(false);
-  const [snoozedIds, setSnoozedIds] = useState(new Set());
+  // Mirrors whichever SidebarSearch/MobileMoreModal instance is currently live —
+  // NotesView falls back to this as `globalSearchQuery` to live-filter its own
+  // list when the sidebar search box is used while on the Notes tab.
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const avatarRef = useRef(null);
-  const notifRef  = useRef(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-  const [isPushEnabled, setIsPushEnabled] = useState(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return false;
-    return localStorage.getItem('nook-push-enabled') === 'true' && Notification.permission === 'granted';
-  });
   const [profileName, setProfileName] = useState(() => localStorage.getItem('nook-profile-name') || 'Productivity User');
   const [profileEmail, setProfileEmail] = useState(() => {
     const saved = localStorage.getItem('nook-profile-email');
@@ -1116,76 +1081,8 @@ export default function App() {
     }
   };
 
-  const handlePushToggle = () => {
-    if (!('Notification' in window)) {
-      return;
-    }
-    if (isPushEnabled) {
-      setIsPushEnabled(false);
-      localStorage.setItem('nook-push-enabled', 'false');
-    } else {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          setIsPushEnabled(true);
-          localStorage.setItem('nook-push-enabled', 'true');
-          new Notification('Nook Notifications Enabled', {
-            body: 'You will receive task reminders and updates here.',
-            icon: '/nook-favicon.png',
-          });
-        } else {
-          setIsPushEnabled(false);
-          localStorage.setItem('nook-push-enabled', 'false');
-        }
-      });
-    }
-  };
-
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
   const activeHabitsCount = habits.filter(h => !h.archived).length;
-
-  // ── Notification derived data ──
-  const notifYesterdayStr = localDateStr(new Date(Date.now() - 86400000));
-  const yesterdayPomos = pomodoroLog.filter(ts => ts.startsWith(notifYesterdayStr)).length;
-  const completedToday = tasks.filter(t => t.completed && t.completedAt?.startsWith(todayStr())).length;
-  const totalTasksForPct = tasks.filter(t => !t.completed || t.completedAt?.startsWith(todayStr())).length;
-  const completionPct = totalTasksForPct > 0 ? Math.round((completedToday / totalTasksForPct) * 100) : 0;
-  const { urgentTask, urgentDueHrs, quickestTask } = useMemo(() => {
-    const urgent = tasks.filter(t => !t.completed && t.dueDate)
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]
-      || tasks.filter(t => !t.completed)
-        .sort((a, b) => (PRIO_ORDER[a.priority] ?? 3) - (PRIO_ORDER[b.priority] ?? 3))[0];
-    const dueHrs = urgent?.dueDate
-      ? Math.round((new Date(urgent.dueDate + 'T23:59:59') - Date.now()) / 3600000)
-      : null;
-    const quickest = tasks.filter(t => !t.completed)
-      .sort((a, b) => (a.timeEstimate || 25) - (b.timeEstimate || 25))[0];
-    return { urgentTask: urgent, urgentDueHrs: dueHrs, quickestTask: quickest };
-  }, [tasks]);
-
-  const notifItems = useMemo(() => [
-    {
-      // Live summaries, not discrete past events — 'Live' reflects that honestly
-      // instead of a fabricated elapsed time.
-      id: 1, title: '🎯 Tasks Reminder', time: 'Live', type: 'task',
-      desc: urgentTask
-        ? `You have ${pendingTasksCount} pending. "${urgentTask.name}"${urgentDueHrs !== null ? ` is due in ${urgentDueHrs}h.` : ' needs your attention.'}`
-        : `You have ${pendingTasksCount} pending tasks. Keep up the momentum!`,
-    },
-    {
-      id: 2, title: '⚡ Habit Tracker', time: 'Live', type: 'habit',
-      desc: `You have ${activeHabitsCount || 0} habit${activeHabitsCount !== 1 ? 's' : ''} active today. Remember to maintain your daily streaks!`,
-    },
-    {
-      // Real relative time from the most recent logged pomodoro, when one exists.
-      id: 3, title: '📊 Analytics Insight', time: pomodoroLog.length ? fmtRelativeTime(pomodoroLog[pomodoroLog.length - 1]) : 'Live', type: 'analytics',
-      desc: pomodoroLog.length === 0
-        ? 'Ready for your first focus session? Tap to start.'
-        : yesterdayPomos > 0
-          ? `Yesterday you did ${yesterdayPomos} pomodoro${yesterdayPomos !== 1 ? 's' : ''}! Beat that today?`
-          : `Great focus! You've logged ${pomodoroLog.length} session${pomodoroLog.length !== 1 ? 's' : ''} today.`,
-      progressPct: completionPct,
-    },
-  ], [urgentTask, urgentDueHrs, pendingTasksCount, activeHabitsCount, pomodoroLog, yesterdayPomos, completionPct]);
 
   // Automated trigger for notifications when enabled
   useEffect(() => {
@@ -1199,351 +1096,8 @@ export default function App() {
     }
   }, [pendingTasksCount, activeHabitsCount]);
 
-  const getInitials = (name) => {
-    if (!name) return 'PU'; // matches the 'Productivity User' default profile name
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const searchResults = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (q.length < 2) return [];
-    const results = [];
-
-    tasks.forEach(t => {
-      if (t.name?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q)) {
-        results.push({ type: 'task', id: t.id, title: t.name, sub: t.notes?.slice(0, 60) || t.category, tab: 'tasks' });
-      }
-    });
-
-    try {
-      JSON.parse(localStorage.getItem('nook_notes') || '[]').forEach(n => {
-        if (n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q)) {
-          results.push({ type: 'note', id: n.id, title: n.title || 'Untitled note', sub: n.content?.slice(0, 60), tab: 'notes' });
-        }
-      });
-    } catch {}
-
-    try {
-      JSON.parse(localStorage.getItem('nook_countdowns') || '[]').forEach(c => {
-        if (c.name?.toLowerCase().includes(q)) {
-          results.push({ type: 'countdown', id: c.id, title: c.name, sub: `${c.startDate} – ${c.endDate}`, tab: 'countdowns' });
-        }
-      });
-    } catch {}
-
-    habits.forEach(h => {
-      if (h.name?.toLowerCase().includes(q)) {
-        results.push({ type: 'habit', id: h.id, title: h.name, sub: 'Habit tracker', tab: 'habits' });
-      }
-    });
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key?.startsWith('nook_journal_')) continue;
-      try {
-        const e = JSON.parse(localStorage.getItem(key));
-        const content = e?.content || '';
-        if (content.toLowerCase().includes(q)) {
-          const idx = content.toLowerCase().indexOf(q);
-          const preview = content.slice(Math.max(0, idx - 20), idx + 60).trim();
-          results.push({ type: 'journal', id: e.date, title: `Journal — ${e.date}`, sub: preview, tab: 'journal' });
-        }
-      } catch {}
-    }
-
-    try {
-      JSON.parse(localStorage.getItem('nook_vault') || '[]').forEach(v => {
-        if (v.name?.toLowerCase().includes(q) || v.username?.toLowerCase().includes(q) || v.url?.toLowerCase().includes(q)) {
-          results.push({ type: 'vault', id: v.id, title: v.name, sub: v.username || v.url, tab: 'vault' });
-        }
-      });
-    } catch {}
-
-    try {
-      JSON.parse(localStorage.getItem('nook_links') || '[]').forEach(l => {
-        if (l.title?.toLowerCase().includes(q) || l.url?.toLowerCase().includes(q) || l.category?.toLowerCase().includes(q)) {
-          results.push({ type: 'link', id: l.id, title: l.title, sub: l.url, tab: 'links' });
-        }
-      });
-    } catch {}
-
-    const allTabs = [
-      { id: 'daily', label: 'Today' },
-      { id: 'tasks', label: 'Tasks' },
-      { id: 'notes', label: 'Notes' },
-      { id: 'calendar', label: 'Calendar' },
-      { id: 'reminders', label: 'Reminders' },
-      { id: 'vault', label: 'Saved Logins' },
-      { id: 'links', label: 'Links' },
-      { id: 'countdowns', label: 'Countdowns' },
-      { id: 'habits', label: 'Habits' },
-      { id: 'timer', label: 'Focus Timer' },
-      { id: 'journal', label: 'Journal' },
-      { id: 'reports', label: 'Reports' },
-      { id: 'activity', label: 'Activity Log' },
-      { id: 'settings', label: 'Settings' }
-    ];
-    allTabs.forEach(t => {
-      if (t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)) {
-        results.push({ type: 'tab', id: 'nav-' + t.id, title: `Go to ${t.label}`, sub: 'Navigation', tab: t.id });
-      }
-    });
-
-    return results.slice(0, 8);
-  }, [searchQuery, tasks, habits]);
-
-  useEffect(() => {
-    const handler = e => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
-      if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarOpen(false);
-      if (notifRef.current  && !notifRef.current.contains(e.target))  setNotifOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const activeNotifs = notifsCleared ? [] : notifItems.filter(item => !snoozedIds.has(item.id));
-  const notifCount = activeNotifs.length;
-
   return (
     <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
-      <header className="app-header">
-        {!sidebarOpen && (
-          <button className="hdr-btn sidebar-reopen-btn" onClick={() => setSidebarOpen(true)} title="Open Sidebar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          </button>
-        )}
-        {/* ── Timestamp on far left ── */}
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          <HeaderClock />
-        </div>
-
-        <div className="yartu-top-search-wrapper">
-          <div className="yartu-top-search" ref={searchRef} onClick={() => searchInputRef.current?.focus()}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search for anything..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              onFocus={() => { if (searchQuery.length >= 2) setSearchOpen(true); }}
-              onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); e.target.blur(); } }}
-            />
-            {searchQuery ? (
-              <button className="search-clear-btn" onClick={() => { setSearchQuery(''); setSearchOpen(false); }} title="Clear">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            ) : (
-              <span className="search-shortcut-badge">{isMac ? '⌘K' : 'Ctrl K'}</span>
-            )}
-
-            {searchOpen && searchQuery.length >= 2 && (
-              <div className="search-dropdown" onMouseDown={e => e.stopPropagation()}>
-                {searchResults.length === 0 ? (
-                  <div className="search-empty">No results for "{searchQuery}"</div>
-                ) : (
-                  searchResults.map(r => (
-                    <button key={r.type + r.id} className="search-result-item" onMouseDown={e => e.preventDefault()} onClick={() => { setActiveTab(r.tab); setSearchOpen(false); setSearchQuery(''); }}>
-                      <span className="search-result-icon" data-type={r.type}>
-                        {r.type === 'task'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
-                        {r.type === 'note'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-                        {r.type === 'goal'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>}
-                        {r.type === 'habit'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>}
-                        {r.type === 'journal' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}
-                        {r.type === 'countdown' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>}
-                        {r.type === 'vault'   && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-                        {r.type === 'link'    && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
-                        {r.type === 'tab'     && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>}
-                      </span>
-                      <div className="search-result-text">
-                        <span className="search-result-title">{r.title}</span>
-                        {r.sub && <span className="search-result-sub">{r.sub}</span>}
-                      </div>
-                      <span className="search-result-badge">{r.type}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="header-right">
-          <HeaderGreeting />
-          <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
-          <button className="hdr-btn" title="Analytics" onClick={() => setOpenModal('analytics')}>
-            <IconChart />
-          </button>
-          <div style={{ position: 'relative' }} ref={notifRef}>
-            <button className="hdr-btn" style={{ position: 'relative' }} title="Notifications" onClick={() => setNotifOpen(n => !n)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" {...S}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              {notifCount > 0 ? (
-                <span className="hdr-notif-badge is-number">{notifCount}</span>
-              ) : (
-                <span className="hdr-notif-badge is-dot" />
-              )}
-            </button>
-
-            <AnimatePresence>
-            {notifOpen && (
-              <motion.div
-                className="yartu-avatar-dropdown"
-                initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
-                style={{ width: 340, right: 0, padding: 16, cursor: 'default' }}
-                onClick={e => e.stopPropagation()}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0 12px 0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Notifications</div>
-                    {!notifsCleared && notifItems.length > 0 && (
-                      <button
-                        onClick={() => setNotifsCleared(true)}
-                        style={{ background: 'transparent', border: 'none', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}
-                      >Clear all</button>
-                    )}
-                  </div>
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'Notification' in window ? 'pointer' : 'not-allowed', opacity: 'Notification' in window ? 1 : 0.4 }}
-                    title={!('Notification' in window) ? 'Notifications not supported in this browser' : isPushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
-                    onClick={handlePushToggle}
-                  >
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Push</span>
-                    <div style={{ width: 36, height: 20, borderRadius: 10, background: isPushEnabled ? '#22c55e' : 'var(--border-strong, #cbd5e1)', position: 'relative', transition: 'background 0.18s ease', flexShrink: 0 }}>
-                      <div style={{ position: 'absolute', top: 3, left: isPushEnabled ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'left 0.18s ease' }} />
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {notifsCleared ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>No notifications</div>
-                  ) : (() => {
-                    const visible = notifItems.filter(item => !snoozedIds.has(item.id));
-                    if (visible.length === 0) return <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>All snoozed · back in 15 min</div>;
-                    return visible.map(item => (
-                      <div key={item.id} style={{ background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                        <div style={{ padding: '10px 12px 8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <span style={{ fontSize: '0.83rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.title}</span>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{item.time}</span>
-                          </div>
-                          <div
-                            style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', lineHeight: 1.45, cursor: item.type === 'analytics' && pomodoroLog.length === 0 ? 'pointer' : 'default' }}
-                            onClick={() => { if (item.type === 'analytics' && pomodoroLog.length === 0) { setActiveTab('timer'); setNotifOpen(false); } }}
-                          >{item.desc}</div>
-                          {item.progressPct !== undefined && (
-                            <div style={{ marginTop: 7, width: '100%', height: 5, background: 'var(--ring-track)', borderRadius: 9999, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${Math.min(100, item.progressPct)}%`, background: 'var(--accent)', borderRadius: 9999, transition: 'width 0.4s ease' }} />
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 6, padding: '6px 10px 8px', borderTop: '1px solid var(--border)' }}>
-                          {item.type === 'task' && (<>
-                            <button
-                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
-                              onClick={() => { if (quickestTask) { toggleComplete(quickestTask.id); showToast(`"${quickestTask.name}" done ✓`, 'success'); } }}
-                            >Mark Quickest Done</button>
-                            <button
-                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
-                              onClick={() => { setActiveTab('tasks'); setNotifOpen(false); }}
-                            >View All</button>
-                          </>)}
-                          {item.type === 'habit' && (<>
-                            <button
-                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
-                              onClick={() => { setActiveTab('habits'); setNotifOpen(false); }}
-                            >Log Habit</button>
-                            <button
-                              style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
-                              onClick={() => {
-                                setSnoozedIds(prev => new Set([...prev, item.id]));
-                                setTimeout(() => setSnoozedIds(prev => { const n = new Set(prev); n.delete(item.id); return n; }), 15 * 60 * 1000);
-                              }}
-                            >Snooze 15m</button>
-                          </>)}
-                          {item.type === 'analytics' && (
-                            <button
-                              style={{ background: 'transparent', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 500, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-strong)', cursor: 'pointer' }}
-                              onClick={() => { switchMode('focus'); setActiveTab('timer'); setNotifOpen(false); }}
-                            >Start 25-min Timer</button>
-                          )}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-                <div className="nav-divider" style={{ margin: '12px 0 8px' }} />
-                <button className="main-nav-btn" style={{ justifyContent: 'center', width: '100%', padding: '8px 0' }} onClick={() => { setActiveTab('settings'); setNotifOpen(false); }}>
-                  <span className="nav-label" style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>Configure in Settings</span>
-                </button>
-              </motion.div>
-            )}
-            </AnimatePresence>
-          </div>
-
-          <div className="yartu-top-avatar" ref={avatarRef} onClick={() => setAvatarOpen(a => !a)}>
-            <div className="yartu-avatar-circle" style={{ padding: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {profileAvatar.startsWith('data:image') ? <img src={profileAvatar} alt="avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : profileAvatar !== '😎' ? profileAvatar : getInitials(profileName)}
-            </div>
-            
-            <AnimatePresence>
-            {avatarOpen && (
-              <motion.div
-                className="yartu-avatar-dropdown prefs-dropdown"
-                initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
-                onClick={e => e.stopPropagation()}
-              >
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Preferences</div>
-                <button className="main-nav-btn" onClick={() => { setOpenModal('shortcuts'); setAvatarOpen(false); }}>
-                  <span className="nav-icon"><IconKeyboard /></span>
-                  <span className="nav-label">Shortcuts (?)</span>
-                </button>
-                <button className="main-nav-btn" onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setAvatarOpen(false); }}>
-                  <span className="nav-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
-                  <span className="nav-label">Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
-                </button>
-                <div className="nav-divider" style={{ margin: '3px 0' }} />
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 11px', marginBottom: 0 }}>Connections</div>
-                <button className="main-nav-btn" style={{ justifyContent: 'space-between' }} onClick={() => { setActiveTab('settings'); setAvatarOpen(false); }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="nav-icon"><NavIcoCheckSquare /></span>
-                    <span className="nav-label">Tasks</span>
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span className={`status-dot ${syncStatus === 'Sync failed' ? 'red' : syncStatus !== 'Not connected' ? 'green' : 'gray'}`} />
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      {syncStatus === 'Sync failed' ? 'Error' : syncStatus !== 'Not connected' ? 'Synced' : 'Not connected'}
-                    </span>
-                  </span>
-                </button>
-                <button className="main-nav-btn" style={{ justifyContent: 'space-between' }} onClick={() => { if (!isGCalConnected()) { connectGoogleCalendar(); } else { setActiveTab('calendar'); setAvatarOpen(false); } }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="nav-icon"><NavIcoCalendar /></span>
-                    <span className="nav-label">Calendar</span>
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span className={`status-dot ${isGCalConnected() ? 'green' : 'gray'}`} />
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      {isGCalConnected() ? 'Connected' : 'Not connected'}
-                    </span>
-                  </span>
-                </button>
-                <div className="nav-divider" style={{ margin: '3px 0' }} />
-                <button className="hdr-cta-btn" style={{ width: '100%' }} onClick={() => { setAvatarOpen(false); if (activeTab === 'tasks') setOpenModal('add'); else openAddTracker(); }}>
-                  {activeTab === 'tasks' ? '＋ Add Task' : '＋ Add Tracker'}
-                </button>
-              </motion.div>
-            )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </header>
-
       {/* ── Body: sidebar nav + content ── */}
       <div className="app-body">
 
@@ -1551,6 +1105,8 @@ export default function App() {
         {sidebarOpen && (
           <motion.nav
             className="main-nav desktop-only"
+            role="navigation"
+            aria-label="Main navigation"
             initial={{ x: -240, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -240, opacity: 0 }}
@@ -1563,6 +1119,7 @@ export default function App() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
           </div>
+          <SidebarSearch tasks={tasks} habits={habits} setActiveTab={setActiveTab} onQueryChange={setSearchQuery} />
           {/* ── Section: Main ── */}
           <span className="nav-section-label">Main</span>
           {[
@@ -1604,7 +1161,6 @@ export default function App() {
             </button>
           ))}
 
-          {/* ── Settings pinned to bottom ── */}
           <div className="nav-spacer" />
           <div className="nav-settings-separator" />
           <button
@@ -1617,6 +1173,12 @@ export default function App() {
           </motion.nav>
         )}
       </AnimatePresence>
+
+      {!sidebarOpen && (
+        <button className="hdr-btn sidebar-reopen-btn sidebar-reopen-floating desktop-only" onClick={() => setSidebarOpen(true)} title="Open Sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      )}
 
       {/* ── Mobile Bottom Nav ── */}
       <nav className="mobile-bottom-nav">
@@ -1782,7 +1344,7 @@ export default function App() {
               onDeleteHabit={deleteHabit}
             />
           )}
-          {activeTab === 'journal'  && <JournalView />}
+          {activeTab === 'journal'  && <JournalView sidebarOpen={sidebarOpen} />}
           {activeTab === 'countdowns' && <CountdownsView />}
           {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchQuery} />}
           {activeTab === 'vault'    && <VaultView />}
@@ -1857,9 +1419,16 @@ export default function App() {
           </Suspense>
         )}
         {openModal==='add'       && <AddTaskModal  key="add-task" onAdd={addTask}     onClose={()=>setOpenModal(null)} existingTasks={tasks} />}
-        {openModal==='mobile-more' && <MobileMoreModal key="mobile-more" onClose={() => setOpenModal(null)} onSelect={(id) => { setActiveTab(id); setOpenModal(null); }} />}
+        {openModal==='mobile-more' && (
+          <MobileMoreModal
+            key="mobile-more"
+            onClose={() => setOpenModal(null)}
+            onSelect={(id) => { setActiveTab(id); setOpenModal(null); }}
+            tasks={tasks} habits={habits}
+            onQueryChange={setSearchQuery}
+          />
+        )}
         {editingTask             && <AddTaskModal  key="edit-task" onEdit={updateTaskData} onClose={()=>setEditingTask(null)} editTask={editingTask} />}
-        {openModal==='analytics' && <Suspense fallback={null}><AnalyticsModal key="analytics" tasks={tasks} pomodoroLog={pomodoroLog} settings={settings} onClose={()=>setOpenModal(null)} /></Suspense>}
         {openModal==='shortcuts' && <ShortcutsModal key="shortcuts" onClose={()=>setOpenModal(null)} />}
         {openModal==='weekly-review' && (
           <WeeklyReviewModal
@@ -1890,36 +1459,6 @@ export default function App() {
   );
 }
 
-// ─── Header clock (isolated 1s tick so the app tree doesn't re-render every second) ──
-function HeaderClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const dayStr  = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-  return (
-    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-      {timeStr} • {dayStr}
-    </span>
-  );
-}
-
-// ─── Header greeting (updates hourly; own slow tick keeps it out of the app re-render) ──
-function HeaderGreeting() {
-  const [hour, setHour] = useState(() => new Date().getHours());
-  useEffect(() => {
-    const id = setInterval(() => setHour(new Date().getHours()), 60000);
-    return () => clearInterval(id);
-  }, []);
-  const greeting = hour >= 5 && hour < 12 ? 'Good Morning'
-    : hour >= 12 && hour < 17 ? 'Good Afternoon'
-    : hour >= 17 && hour < 21 ? 'Good Evening'
-    : 'Good Night';
-  return <span className="header-greeting-text" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{greeting}</span>;
-}
-
 // ─── Lazy-view loading fallback ───────────────────────────────────
 function TabFallback() {
   return (
@@ -1929,8 +1468,10 @@ function TabFallback() {
   );
 }
 
-// ─── Mobile More Navigation Drawer ────────────────────────────────
-function MobileMoreModal({ onClose, onSelect }) {
+// ─── Mobile More Drawer: nav grid + Search/Avatar (mobile has no
+// sidebar to host them — folded in here per the sidebar-only-layout redesign) ──
+function MobileMoreModal(props) {
+  const { onClose, onSelect, tasks, habits, onQueryChange } = props;
   const tabs = [
     { id: 'notes', label: 'Notes', Icon: NavIcoNotes },
     { id: 'calendar', label: 'Calendar', Icon: NavIcoCalendar },
@@ -1943,9 +1484,17 @@ function MobileMoreModal({ onClose, onSelect }) {
     { id: 'activity', label: 'Activity Log', Icon: NavIcoHistory },
     { id: 'settings', label: 'Settings', Icon: NavIcoSettings },
   ];
+
+  const { searchQuery, setSearchQuery, searchResults, searchInputRef } = useNookSearch(tasks, habits);
+
+  // Notes' own list view falls back to this as `globalSearchQuery` — see App.jsx.
+  useEffect(() => { onQueryChange?.(searchQuery); }, [searchQuery, onQueryChange]);
+
+  const select = (tab) => { setSearchQuery(''); onSelect(tab); };
+
   return (
     <div className="mobile-more-overlay" onClick={onClose}>
-      <motion.div 
+      <motion.div
         className="mobile-more-drawer"
         onClick={e => e.stopPropagation()}
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
@@ -1954,6 +1503,26 @@ function MobileMoreModal({ onClose, onSelect }) {
           <h3>More</h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
+
+        <div className="mm-search" role="search" aria-label="Search Nook">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            ref={searchInputRef}
+            type="text"
+            aria-label="Search Nook"
+            placeholder="Search for anything..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {searchQuery.length >= 2 && (
+          <div className="mm-search-results">
+            <ResultsList searchQuery={searchQuery} searchResults={searchResults} onSelect={select} />
+          </div>
+        )}
+
+        <div className="nav-divider" style={{ margin: '4px 14px 10px' }} />
+
         <div className="mobile-more-grid">
           {tabs.map(t => (
             <button key={t.id} className="mobile-more-item" onClick={() => onSelect(t.id)}>
@@ -1998,10 +1567,6 @@ const S = { fill:'none', stroke:'currentColor', strokeWidth:'1.75', strokeLineca
 
 // App logo — crosshair/focus mark
 // Header action icons (16px)
-function IconChart()    { return <svg width="18" height="18" viewBox="0 0 24 24" {...S}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>; }
-function IconKeyboard() { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>; }
-function IconSun()      { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>; }
-function IconMoon()     { return <svg width="16" height="16" viewBox="0 0 24 24" {...S}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>; }
 
 // ─── Sidebar nav icons (18px) ─────────────────────────────────────
 // Section 1 — Daily

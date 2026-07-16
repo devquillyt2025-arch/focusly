@@ -136,83 +136,10 @@ a { color: inherit; text-decoration: none; }
 input, textarea, select { font-family: inherit; }
 
 /* ─── App shell ─────────────────────────────────────────────────── */
+:root { --sidebar-width: 240px; }
 .app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
-.app-header { transition: margin-left 0.22s ease; }
 .app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; transition: margin-left 0.22s ease; }
-.sidebar-open .app-header { margin-left: 240px; }
-.sidebar-open .app-body   { margin-left: 240px; }
-
-/* ═══════════════════════════════════════════════════════════════════
-   HEADER
-   ═══════════════════════════════════════════════════════════════════ */
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 28px 12px 20px;
-  min-height: 56px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-}
-
-.app-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--brand-gradient);
-  opacity: 0.45;
-  z-index: 21;
-}
-
-.app-logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.app-logo svg { display: block; flex-shrink: 0; }
-.app-logo h1 {
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  background: linear-gradient(125deg, var(--text-primary) 0%, var(--accent-light) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-:root[data-theme="light"] .app-logo h1 {
-  background: linear-gradient(125deg, #0f1623 0%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.header-center {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--bg-input);
-  padding: 5px 16px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-}
-
-@media (max-width: 1024px) {
-  .header-center { display: none; }
-}
-
-.hdr-status-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  letter-spacing: -0.01em;
-}
+.sidebar-open .app-body { margin-left: var(--sidebar-width); }
 
 .status-dot {
   width: 7px;
@@ -225,8 +152,6 @@ input, textarea, select { font-family: inherit; }
 .status-dot.amber { background: var(--color-amber); box-shadow: 0 0 8px var(--color-amber); }
 .status-dot.red  { background: var(--color-red, #ef4444); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
 .status-dot.gray { background: var(--text-muted, #6b7280); }
-
-.header-right { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; margin-left: auto; }
 
 .hdr-cta-btn {
   background: var(--accent);
@@ -294,13 +219,6 @@ input, textarea, select { font-family: inherit; }
 /* ═══════════════════════════════════════════════════════════════════
    LAYOUT
    ═══════════════════════════════════════════════════════════════════ */
-.app-layout {
-  display: grid;
-  grid-template-columns: 210px 1fr;
-  flex: 1;
-  min-height: 0;
-}
-
 .sidebar {
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -328,8 +246,8 @@ input, textarea, select { font-family: inherit; }
   top: 0;
   left: 0;
   height: 100dvh;
-  width: 240px;
-  min-width: 240px;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   z-index: 20;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -392,6 +310,16 @@ input, textarea, select { font-family: inherit; }
 
 .sidebar-reopen-btn {
   flex-shrink: 0;
+}
+
+.sidebar-reopen-floating {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 25;
+  background: var(--bg-surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08));
 }
 
 .main-nav::-webkit-scrollbar { width: 0; }
@@ -1872,7 +1800,6 @@ kbd {
    RESPONSIVE GRID
    ═══════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .app-layout { grid-template-columns: 1fr; }
   .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 44vh; }
   .main-area { padding: 18px 16px 32px; }
   .stats-cards { grid-template-columns: repeat(2,1fr); }
@@ -4826,8 +4753,8 @@ select.modal-input {
 .hv-ghost-row:hover { background: var(--accent-glow2); color: var(--accent-light); border-color: var(--border-accent); }
 
 @media (max-width: 1024px) {
-  .app-layout { grid-template-columns: 64px 1fr; }
-  .main-nav { width: 64px; min-width: 64px; padding: 16px 8px; }
+  :root { --sidebar-width: 64px; }
+  .main-nav { padding: 16px 8px; }
   .nav-label, .nav-badge, .nav-section-label, .sidebar-brand-name { display: none; }
   .main-nav-btn { justify-content: center; padding: 12px 0; }
   .nav-icon { margin: 0; font-size: 1.2rem; }
@@ -4968,8 +4895,8 @@ select.modal-input {
     margin: 0; border-radius: 0;
   }
 
-  .sidebar-open .app-header,
   .sidebar-open .app-body { margin-left: 0; }
+  .sidebar-reopen-floating { display: none; }
   .sidebar-brand { display: none; }
   .nav-section-label, .nav-divider, .nav-spacer { display: none; }
   .nav-active { border-top-color: var(--accent) !important; background: rgba(120,105,252,0.1) !important; }
@@ -5002,16 +4929,18 @@ select.modal-input {
   font-weight: 600 !important;
   border-radius: var(--radius-md) !important;
 }
+/* background/border/box-shadow are set here for specificity but are actually
+   inert: "Shared primary buttons" below (.hdr-cta-btn among others) repaints
+   them with its own !important gradient in BOTH themes, and !important always
+   wins regardless of how specific this selector is. color and border-radius
+   are the only properties that rule doesn't touch, so they're what actually
+   render — var(--accent-dark) instead of the hand-picked #6355d8 that used to
+   be here, so text still reads as the one accent token, not a second purple.
+   Left unset: background/border/box-shadow, to avoid implying they do
+   something they don't. */
 :root[data-theme="light"] .hdr-cta-btn {
-  background: #f0efff;
-  color: #6355d8;
-  border: 1px solid #e0ddff;
-  box-shadow: 0 2px 8px rgba(99,85,216,0.15);
+  color: var(--accent-dark);
   border-radius: var(--radius-full);
-}
-:root[data-theme="light"] .hdr-cta-btn:hover {
-  background: #e6e4ff;
-  box-shadow: 0 4px 12px rgba(99,85,216,0.25);
 }
 :root[data-theme="light"] .header-center {
   background: #ffffff;
@@ -6046,15 +5975,8 @@ select.modal-input {
   border-color: var(--accent);
 }
 
-.yartu-top-search-wrapper {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-  margin: 0 var(--space-4);
-}
-
-.yartu-top-search {
+/* Sidebar search — full 240px rail: always-visible inline pill under the brand row */
+.sb-search-full {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6062,52 +5984,68 @@ select.modal-input {
   border: 1px solid var(--border);
   padding: 0 var(--space-3);
   width: 100%;
-  max-width: 600px;
-  height: 40px;
+  height: 38px;
   border-radius: var(--radius-full);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  margin-bottom: 10px;
+  flex-shrink: 0;
 }
 
-@media (max-width: 1024px) {
-  .yartu-top-search { max-width: 360px; }
-}
-@media (max-width: 1024px) {
-  .yartu-top-search { max-width: 200px; }
-}
-
-.yartu-top-search .search-icon {
+.sb-search-full .search-icon {
   color: var(--text-muted);
   flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
-.yartu-top-search input {
+.sb-search-full input {
   background: transparent;
   border: none;
   width: 100%;
+  min-width: 0;
   color: var(--text-primary);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   outline: none;
   height: 100%;
 }
 
-.yartu-top-search input::placeholder {
+.sb-search-full input::placeholder {
   color: var(--text-secondary);
 }
 
-.yartu-top-search:hover {
+.sb-search-full:hover {
   border-color: var(--border-strong);
   background: var(--bg-hover);
 }
 
-.yartu-top-search:focus-within {
+.sb-search-full:focus-within {
   border-color: var(--accent) !important;
   background: var(--bg-input) !important;
   box-shadow: 0 0 0 3px var(--accent-glow) !important;
 }
+
+/* Sidebar search — 64px rail: icon-only trigger, flyout hosts the real input */
+.sb-search-rail { position: relative; margin-bottom: 6px; }
+.sb-search-flyout-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-search-flyout-input input {
+  background: transparent;
+  border: none;
+  width: 100%;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+}
+.sb-search-flyout-input .search-icon { color: var(--text-muted); flex-shrink: 0; display: flex; }
+
+.search-results-list { display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; }
 
 .search-clear-btn {
   background: none;
@@ -6145,38 +6083,6 @@ select.modal-input {
   user-select: none;
   flex-shrink: 0;
   box-shadow: var(--shadow-xs);
-}
-
-.hdr-notif-badge {
-  position: absolute;
-  background: linear-gradient(135deg, #f87171, #ef4444);
-  color: #ffffff;
-  font-size: 0.62rem;
-  font-weight: 850;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 8px -2px rgba(239, 68, 68, 0.5);
-  pointer-events: none;
-  border: 1.5px solid var(--bg-surface);
-  box-sizing: border-box;
-}
-
-.hdr-notif-badge.is-number {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
-  top: -3px;
-  right: -3px;
-}
-
-.hdr-notif-badge.is-dot {
-  width: 7px;
-  height: 7px;
-  top: 5px;
-  right: 5px;
-  border: none;
 }
 
 .search-dropdown {
@@ -6263,76 +6169,21 @@ select.modal-input {
   flex-shrink: 0;
 }
 
-.yartu-top-avatar {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-  position: relative;
-  flex-shrink: 0;
-}
-.yartu-top-avatar:hover {
-  background: var(--bg-hover);
-  border-color: var(--border);
-}
-.yartu-avatar-circle {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--brand-gradient);
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.yartu-avatar-text {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-  min-width: 0;
-  overflow: hidden;
-  width: 160px;
-}
-.yartu-avatar-name {
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.yartu-avatar-email {
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.yartu-avatar-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+/* ══════ Shared flyout panel (currently just Search's 64px-rail flyout) ══════
+   Portalled to <body> by SidebarFlyout so it escapes .main-nav's overflow
+   clipping; position:fixed left/top|bottom set inline per anchor rect. */
+.sb-flyout {
+  position: fixed;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: 16px;
-  padding: 16px;
-  min-width: 240px;
-  max-height: calc(100dvh - 80px);
-  overflow-y: auto;
   box-shadow: var(--shadow-lg);
   z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
   cursor: default;
 }
+.sb-flyout-search { width: 320px; max-width: calc(100vw - 24px); padding: 0; }
 
 /* Preferences (avatar) dropdown — tighter vertical rhythm so it doesn't waste
    space. Scoped so the shared notifications dropdown keeps its own spacing. */
@@ -7315,12 +7166,10 @@ select.modal-input {
   border-color: var(--border-strong) !important;
   transform: translateY(-1px) !important;
 }
-.yartu-top-search input {
+.sb-search-full input, .sb-search-flyout-input input {
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.yartu-top-search input:focus-visible {
-  border-color: var(--border-accent) !important;
-  box-shadow: 0 0 0 4px var(--accent-glow2) !important;
+.sb-search-full input:focus-visible, .sb-search-flyout-input input:focus-visible {
   outline: none;
 }
 
@@ -7380,55 +7229,15 @@ select.modal-input {
 .ntv-hero { padding: 26px 24px 14px; }
 @media (max-width: 768px) { .ntv-hero { padding: 20px 16px 12px; } }
 
-/* ══════ Phase 1: Top App Bar Mobile Layout ══════ */
-@media (max-width: 768px) {
-  .header-greeting-text {
-    display: none;
-  }
-  .yartu-top-search-wrapper {
-    flex: 0 0 auto;
-    margin: 0;
-  }
-  .yartu-top-search {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    padding: 0;
-    justify-content: center;
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-  .yartu-top-search input {
-    width: 0;
-    padding: 0;
-    opacity: 0;
-    position: absolute;
-    pointer-events: none;
-  }
-  .yartu-top-search .search-shortcut-badge {
-    display: none;
-  }
-  .yartu-top-search:focus-within {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-width: none;
-    z-index: 1000;
-    border-radius: var(--radius-lg);
-    background: var(--bg-input) !important;
-    border-color: var(--border) !important;
-    padding: 0 var(--space-3);
-  }
-  .yartu-top-search:focus-within input {
-    width: 100%;
-    opacity: 1;
-    position: relative;
-    pointer-events: auto;
-  }
+/* ══════ Mobile "More" drawer — search + notifications/avatar utility rows ══════ */
+.mm-search {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 16px 8px; padding: 0 12px; height: 40px;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-full);
 }
+.mm-search .search-icon { color: var(--text-muted); flex-shrink: 0; display: flex; }
+.mm-search input { background: transparent; border: none; width: 100%; color: var(--text-primary); font-size: 0.88rem; outline: none; }
+.mm-search-results { margin: 0 16px 8px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; max-height: 260px; overflow-y: auto; }
 
 /* ══════ Phase 3: Touch Target Sizing (H3 + M5) ══════ */
 @media (max-width: 768px) {
