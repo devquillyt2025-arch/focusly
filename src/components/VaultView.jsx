@@ -333,6 +333,14 @@ export default memo(function VaultView() {
   return (
     <div style={{ width: '100%', maxWidth: 900, margin: '0 auto', boxSizing: 'border-box', padding: '32px', display: 'flex', flexDirection: 'column', gap: 20, background: 'transparent' }}>
 
+      <div style={{
+        padding: '10px 14px', borderRadius: 8,
+        background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)',
+        fontSize: '0.8rem', color: '#ca8a04', display: 'flex', gap: 8, alignItems: 'center'
+      }}>
+        ⚠️ Passwords are stored unencrypted on this device. Do not use this for highly sensitive credentials.
+      </div>
+
       {/* ── Toolbar ── */}
       <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 340 }}>
