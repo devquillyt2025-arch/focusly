@@ -6,3 +6,14 @@ dist-ssr
 .env*
 .DS_Store
 supabase/.temp
+# Vite optimizer cache stamps (auto-generated, should never be committed)
+vite.config.js.timestamp-*.mjs
+# Dev scratch files committed accidentally
+temp*.css
+temp*.js
+temp_script.cjs
+scratch-*.css
+scratch-*.js
+# Next.js landing build output
+landing/.next
+landing/node_modules
