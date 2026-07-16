@@ -133,8 +133,7 @@ result (`unauthenticated` / `no_google_id` / `api_error` / `network_error`).
   not see prior sync state and can duplicate.
 - **Recurrence is local-only.** The Google Tasks REST API has no recurrence field;
   any RRULE is silently dropped. Nook creates the next occurrence itself.
-- `VITE_GOOGLE_CLIENT_SECRET` is read in the browser. That is inherent to this
-  client-only PKCE-plus-secret flow as written; see §7.
+- **Supabase auth requirement.** The Google OAuth token exchange and refresh are handled server-side by the `google-oauth` Edge Function (to keep the `GOOGLE_CLIENT_SECRET` out of the client bundle). This means Tasks and Calendar integrations require Supabase to be configured and the user to be signed in to perform sync operations.
 
 ---
 
@@ -155,7 +154,7 @@ Tab ids come from `App.jsx` (`allTabs`, ~line 1270). id → label is not 1:1 —
 | `countdowns` | Countdowns | Date countdowns, pinning | `CountdownsView` | `nook_countdowns`, `nook_countdown_pinned` |
 | `habits` | Habits | Standalone habit tracking (see §5) | `HabitsView`, `habitsStore.js` | `nook_habits`, `nook_habits_migrated` |
 | `timer` | Focus Timer | Pomodoro + focus companion | `Timer`, `FocusCompanion`, `utils/timerTickStore.js` | `nook-pomo-log` (falls back to legacy `nook-analytics`) |
-| `journal` | Journal | Per-day entries, week/month calendar | `JournalView` | `nook_journal_<YYYY-MM-DD>` (per-entry), `nook_journal_icons`, `nook_journal_calview` |
+| `journal` | Journal | Per-day entries, week/month calendar | `JournalView` | `nook_journal_<YYYY-MM-DD>` (per-entry), `nook_journal_icons`, `nook_journal_calview`, `nook_journal_calcollapsed` |
 | `reports` | Reports | Trackers + analytics + charts | `ReportsView`, `trackers/*`, `AnalyticsDashboard`, `TrackerCharts` | `nook-trackers` |
 | `activity` | Activity Log | Cross-module audit trail | `ActivityLogView`, `utils/activityLog.js` | `nook-activity-log` |
 | `settings` | Settings | Profile, theme, notifications, backup, integrations | `SettingsView`, `utils/backup.js`, `driveBackup.js` | `nook-settings`, `nook-profile-*`, `nook-notif-*`, `nook-theme` |
@@ -257,17 +256,6 @@ Match these; do not "improve" them.
 
 Recorded so future sessions don't re-flag them as new findings. None of these are
 dead code; each is a real decision or a real bug with a real cost to touching.
-
-**Latent bugs (real, not yet fixed):**
-
-- **`AnalyticsDashboard` depends on `TrackerCharts` for chart.js registration.**
-  It renders `<Doughnut>` but never calls `ChartJS.register`. The only
-  `ArcElement` registration is `TrackerCharts.jsx:23`, which `ReportsView` loads
-  *lazily* while importing `AnalyticsDashboard` *eagerly*. It works today only
-  because a TrackerCharts chunk executes first. Fixing it means adding a
-  registration — a behavior change, not a cleanup.
-- **`VITE_GOOGLE_CLIENT_SECRET` is bundled into client JS** (`googleTasksSync.js`).
-  A real fix is a token-exchange backend, not a refactor.
 
 **Dead-ish code deliberately kept:**
 

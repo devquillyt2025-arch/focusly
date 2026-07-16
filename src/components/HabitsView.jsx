@@ -639,7 +639,7 @@ function HabitModal({ onSave, onClose, editHabit = null }) {
             <button className="btn-cancel" onClick={onClose}>Cancel</button>
             <button
               className="btn-submit"
-              style={{ '--submit-c': '#818cf8' }}
+              style={{ '--submit-c': form.color }}
               disabled={!form.name.trim()}
               onClick={save}>
               {isEdit ? 'Save Changes' : 'Create Habit'}

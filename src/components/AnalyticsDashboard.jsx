@@ -1,7 +1,38 @@
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler,
+  ArcElement
+} from 'chart.js';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { computeGlobalStats, TRACKER_CATS } from '../trackers/trackerUtils';
 import { calculateDailyScore, getScoreHistory, getGlobalWeeklyHeatmap, getCategoryBreakdown } from '../trackers/analyticsUtils';
 import { todayStr as getTodayStr } from '../utils/date';
+
+// This component renders its own charts, so it registers its own chart.js
+// pieces. Previously it registered nothing and only worked because ReportsView
+// happens to load TrackerCharts (which registers ArcElement et al) into the
+// same shared ChartJS registry — correctness by import order, which would have
+// broken silently on any unrelated reorder.
+// register() is idempotent, so overlapping with TrackerCharts is safe.
+// ArcElement is for the two <Doughnut>s; the scales/PointElement/LineElement/
+// Filler are for the <Line> (which sets fill: true). No BarElement or Title —
+// this file renders no <Bar> and sets no title plugin.
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 export default function AnalyticsDashboard({ trackers, tasks, pomodoroLog }) {
   const global = computeGlobalStats(trackers);

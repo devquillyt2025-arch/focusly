@@ -230,7 +230,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   };
 
   const getCategoryColor = cat => {
-    const M = { learning: { bg: 'rgba(59,130,246,.15)', text: 'var(--color-blue)', border: 'var(--color-blue)' }, fitness: { bg: 'rgba(16,185,129,.15)', text: '#34d399', border: 'var(--color-green)' }, mental: { bg: 'rgba(168,85,247,.15)', text: 'var(--color-purple)', border: '#a855f7' }, work: { bg: 'rgba(120,105,252,.15)', text: '#9d93ff', border: '#7869fc' }, finance: { bg: 'rgba(245,158,11,.15)', text: '#fbbf24', border: 'var(--color-amber)' } };
+    const M = { learning: { bg: 'rgba(59,130,246,.15)', text: 'var(--color-blue)', border: 'var(--color-blue)' }, fitness: { bg: 'rgba(16,185,129,.15)', text: '#34d399', border: 'var(--color-green)' }, mental: { bg: 'rgba(168,85,247,.15)', text: 'var(--color-purple)', border: '#a855f7' }, work: { bg: 'var(--accent-glow)', text: 'var(--accent-light)', border: 'var(--accent)' }, finance: { bg: 'rgba(245,158,11,.15)', text: '#fbbf24', border: 'var(--color-amber)' } };
     return M[cat] || { bg: 'rgba(236,72,153,.15)', text: '#f472b6', border: '#ec4899' };
   };
   const getEventStyle = ev => ev.type === 'gcal' ? (c => ({ bg: `${c}1a`, text: c, border: c }))(gcalColor(ev.colorId)) : getCategoryColor(ev.category);
