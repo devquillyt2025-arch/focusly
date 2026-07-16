@@ -2909,10 +2909,10 @@ select.modal-input {
   box-sizing: border-box;
 }
 
-/* ── Split layout: ambient metadata (left) + canvas (right, hero) ──
-   Mobile-first base is a single stacked column (metadata above canvas, since
-   .jnx-meta is now first in DOM); the ≥768 / ≥1024 breakpoints below promote it
-   to a side-by-side grid, metadata in column 1, canvas in column 2. */
+/* ── Split layout: canvas (left, hero) + ambient metadata (right) ──
+   Mobile-first base is a single stacked column (canvas above metadata, since
+   .jnx-write-panel is now first in DOM); the ≥768 / ≥1024 breakpoints below
+   promote it to a side-by-side grid, canvas in column 1, metadata in column 2. */
 .jnx-split {
   display: grid;
   grid-template-columns: 1fr;
@@ -2958,14 +2958,19 @@ select.modal-input {
               margin 0.25s ease;
 }
 
-/* When sidebar open or right panel collapsed: collapse meta (now col 1) to 0,
-   keep write-panel (now col 2) at 1fr. Column order flipped when .jnx-meta
-   moved to the left — .jnx-meta's own zeroing rules below (width/opacity/etc.)
-   target it by class regardless of column, but this grid-template-columns
-   value hardcodes which physical column collapses, so it had to flip too. */
+/* When sidebar open or right panel collapsed: collapse meta (now col 2) to 0,
+   keep write-panel (now col 1) at 1fr. Column order flipped again when
+   .jnx-meta moved back to the right — .jnx-meta's own zeroing rules below
+   (width/opacity/etc.) target it by class regardless of column, but this
+   grid-template-columns value hardcodes which physical column collapses, so
+   it had to flip too. (Note: as of this pass neither .jnx-sidebar-open nor
+   .jnx-right-collapsed is applied anywhere in JSX — App.jsx uses a bare
+   .sidebar-open class instead — so this whole block is currently unreachable.
+   Kept accurate rather than deleted, since reconnecting it is a product
+   decision, not a cleanup.) */
 .jnx-sidebar-open .jnx-split,
 .jnx-right-collapsed .jnx-split {
-  grid-template-columns: 0px 1fr !important;
+  grid-template-columns: 1fr 0px !important;
   column-gap: 0 !important;
   gap: 0 !important;
 }
@@ -2976,7 +2981,7 @@ select.modal-input {
   max-width: 0 !important;
   opacity: 0 !important;
   visibility: hidden !important;
-  transform: translateX(-30px);
+  transform: translateX(30px);
   padding: 0 !important;
   margin: 0 !important;
   overflow: hidden !important;
@@ -3924,8 +3929,12 @@ select.modal-input {
 /* Collapse the calendar body when "Less" */
 .jnx-meta-cal.jnx-heatmap-collapsed .jnx-heatmap-body { grid-template-rows: 0fr; }
 
-/* ── On this day / Recent entries — fill the lower sidebar with useful content ── */
-.jnx-meta-section { display: flex; flex-direction: column; gap: 12px; max-width: 340px; }
+/* ── On this day / Recent entries — fill the lower sidebar with useful content.
+   width: 100% (not the original max-width: 340px) — every other row in this
+   panel is full-bleed against the card's own padding (see .jnx-kpi-grid etc.),
+   and a narrower capped width here would reopen the exact dead-space-inside-
+   the-card bug fixed for those rows two passes ago. */
+.jnx-meta-section { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .jnx-recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .jnx-recent-item {
   display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left;
@@ -4037,7 +4046,7 @@ select.modal-input {
    Mobile <768    : stacked — metadata first, canvas below (no separator; a
                    vertical rule between stacked blocks wouldn't read as one). */
 
-/* Desktop — metadata is a left-sized fixed column, canvas flexes on the right.
+/* Desktop — canvas flexes on the left, metadata is a right-sized fixed column.
    Both columns are sticky: meta scrolls its own (often-taller) content within
    itself while staying pinned, and the canvas stays pinned in view too rather
    than scrolling away as the user browses meta's content alongside it. */
@@ -4049,8 +4058,11 @@ select.modal-input {
        30% of the available space, the browser expands the track past its fr
        share to fit it — meta renders wider than 30% regardless of the ratio
        written here. minmax(0, Nfr) explicitly allows the track to shrink below
-       its content's minimum, so the fr ratio actually holds. */
-    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+       its content's minimum, so the fr ratio actually holds. Canvas is column 1
+       (7fr) and meta is column 2 (3fr) — matching .jnx-write-panel/.jnx-meta's
+       DOM order, since grid auto-placement fills columns in source order when
+       no explicit grid-column is set on either child. */
+    grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
     column-gap: 48px;
     /* Explicit row height, independent of either column's own content or cap.
        Grid's default "auto" row sizing takes the tallest column's (capped)
@@ -4078,13 +4090,17 @@ select.modal-input {
   .jnx-meta {
     position: sticky;
     top: 8px;
-    /* No max-height/overflow-y here on purpose — .jnx-meta (stats + calendar)
-       is a fixed reference panel, not scrolling content; only .jnx-write-panel
-       (the actual journal entry, genuinely long-form) is meant to scroll.
-       Its natural content height stays well under the viewport at any
-       realistic window size (verified down to 720px tall), so it doesn't need
-       its own overflow — giving it one just surfaced a second, unwanted
-       scrollbar alongside the write panel's real one. */
+    /* Used to skip max-height/overflow-y here — stats + calendar alone stayed
+       well under the viewport at any realistic window size. That stopped
+       being true once the Recent Entries section (below the calendar) was
+       added: at shorter viewports (verified at 700px tall) the card's natural
+       height now exceeds the viewport, and since it's sticky with no overflow
+       of its own, the extra content was simply clipped at the fold with no
+       way to scroll to it. Matching .jnx-write-panel's own scroll treatment
+       below fixes that; the themed scrollbar rules further down this file
+       cover .jnx-meta too so this doesn't reintroduce a stark default one. */
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
     padding-top: 6px;
     /* The base .jnx-meta rule now gives the panel its own full border on all
        sides (soft glass card), which already reads as the column boundary —
@@ -4099,11 +4115,12 @@ select.modal-input {
   }
 }
 
-/* Tablet — right-sized metadata column on the left, flexible canvas on the right */
+/* Tablet — flexible canvas on the left, right-sized metadata column on the right */
 @media (min-width: 768px) and (max-width: 1023px) {
   .jnx-split {
-    /* minmax(0, Nfr) — same reasoning as the desktop breakpoint above. */
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    /* minmax(0, Nfr) — same reasoning as the desktop breakpoint above. Canvas
+       is column 1 (3fr), meta is column 2 (2fr), matching DOM order. */
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
     column-gap: 32px;
     /* See the desktop breakpoint's comment above — explicit row height, +32px
        of real sticky slack (matching this breakpoint's own column-gap value),
@@ -4113,9 +4130,11 @@ select.modal-input {
   .jnx-meta {
     position: sticky;
     top: 8px;
-    /* See the desktop breakpoint's comment above — no internal scroll here,
-       and no extra right-edge border/padding: the base .jnx-meta card border
-       already marks the boundary. */
+    /* See the desktop breakpoint's comment above — now has its own scroll for
+       the same reason. No extra right-edge border/padding: the base .jnx-meta
+       card border already marks the boundary. */
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
   }
   .jnx-write-panel {
     position: sticky;
@@ -7669,28 +7688,46 @@ select.modal-input {
 .jnx-write-panel {
   min-width: 0;
   overflow-x: hidden;
+  /* The themed scrollbar below renders at this element's own border-box edge,
+     outside any padding — .jnx-canvas has padding: 0 !important (flat, no
+     chrome), so without this the title-nav pill sits flush against that same
+     edge and visually fuses with the scrollbar track/thumb whenever the entry
+     is long enough to scroll. This padding is the only thing separating them;
+     it doesn't move the scrollbar (browsers always paint it at the box edge),
+     it just insets the content so there's real space between the two.
+     !important: the earlier "no chrome, flat layout" .jnx-write-panel rule
+     sets padding: 0 !important — same fight as the .jnx-title font-weight
+     override above, same fix (equal specificity, !important, later in the
+     cascade wins). */
+  padding-right: 16px !important;
 }
-/* Themed scrollbar — .jnx-write-panel gets its own overflow-y:auto at the
-   ≥768px breakpoints below (it's not covered by the app-wide .tab-content
-   scrollbar rule further down this file), so left at its default it renders
-   the raw OS scrollbar: a stark white bar/arrows that breaks the glass
-   aesthetic every other surface in this tab uses. Built from the same
-   ink-faint/accent tokens as the rest of the journal rather than the app's
-   generic --border-strong, so it stays in this panel's own warm palette. */
-.jnx-write-panel {
+/* Themed scrollbar — .jnx-write-panel and .jnx-meta both get their own
+   overflow-y:auto at the ≥768px breakpoints below (neither is covered by the
+   app-wide .tab-content scrollbar rule further down this file), so left at
+   their default they'd render the raw OS scrollbar: a stark white bar/arrows
+   that breaks the glass aesthetic every other surface in this tab uses. Built
+   from the same ink-faint/accent tokens as the rest of the journal rather
+   than the app's generic --border-strong, so it stays in this panel's own
+   warm palette. */
+.jnx-write-panel,
+.jnx-meta {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--jnx-ink-faint) 55%, transparent) transparent;
 }
-.jnx-write-panel::-webkit-scrollbar { width: 8px; }
-.jnx-write-panel::-webkit-scrollbar-track { background: transparent; }
-.jnx-write-panel::-webkit-scrollbar-thumb {
+.jnx-write-panel::-webkit-scrollbar,
+.jnx-meta::-webkit-scrollbar { width: 8px; }
+.jnx-write-panel::-webkit-scrollbar-track,
+.jnx-meta::-webkit-scrollbar-track { background: transparent; }
+.jnx-write-panel::-webkit-scrollbar-thumb,
+.jnx-meta::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--jnx-ink-faint) 55%, transparent);
   border-radius: var(--radius-full);
   border: 2px solid transparent;
   background-clip: padding-box;
   transition: background 0.2s ease;
 }
-.jnx-write-panel::-webkit-scrollbar-thumb:hover {
+.jnx-write-panel::-webkit-scrollbar-thumb:hover,
+.jnx-meta::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--jnx-accent) 55%, transparent);
   background-clip: padding-box;
 }
@@ -7749,20 +7786,6 @@ select.modal-input {
   border-radius: var(--radius-full);
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
-}
-/* Live word count under the entry — faint, small, only shown once there's
-   something to count (an empty "0 words" caption on a blank day reads as
-   clutter, not information). Uses the same currentWc state the editor already
-   tracks on every input, so it updates live for free. */
-.jnx-write-panel .jnx-write-wc {
-  margin-top: 16px;
-  text-align: right;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--jnx-ink-faint);
 }
 /* FIX: The global "Unified gradient hero titles" rule targets .jnx-title with
    -webkit-text-fill-color: transparent !important — which overrides the local

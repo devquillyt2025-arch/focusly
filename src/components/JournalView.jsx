@@ -308,6 +308,12 @@ export default memo(function JournalView() {
     const ym = month.first.slice(0, 7); // 'YYYY-MM'
     return Object.keys(wcMap).filter(d => d.startsWith(ym)).length;
   }, [wcMap, month.first]);
+  // Last 3 other entries with content, newest first (history is already sorted
+  // that way) — excludes the day currently being viewed since that's already
+  // the whole right-hand canvas, not something worth also linking to itself.
+  const recentEntries = useMemo(() => (
+    history.filter(e => e.date !== viewingDate && hasContentHtml(e)).slice(0, 3)
+  ), [history, viewingDate]);
 
   // Persist the chosen calendar view
   useEffect(() => { try { localStorage.setItem('nook_journal_calview', viewMode); } catch {} }, [viewMode]);
@@ -521,8 +527,52 @@ export default memo(function JournalView() {
       <div className="jnx-split">
 
         {/* ══════════════════════════════════════════════════
-            LEFT COLUMN — Unified Control + Metadata Hub
-            (moved from the right — writing canvas is now on the right)
+            LEFT COLUMN — Pure Writing Sanctuary
+            Date heading + editable text area, plus a hairline divider between
+            them — no other chrome. Word count lives only in the right panel's
+            stats row now; a second live counter here was redundant. */}
+        <main className="jnx-write-panel">
+          {/* Ambient glow layer — must be a direct child of .jnx-write-panel: its
+              position:absolute is scoped by .jnx-write-panel's position:relative
+              (see index.css), and .jnx-write-panel > *:not(.jnx-aura) relies on this
+              exact nesting too. Living anywhere else (e.g. sibling of .jnx-split)
+              lets it escape to the nearest positioned ancestor up the tree instead,
+              ballooning it across the full page width/height. */}
+          <div className="jnx-aura" aria-hidden="true" />
+          <div className="jnx-canvas">
+            <div className="jnx-title-row">
+              <div className="jnx-title-group">
+                <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
+                <span className="jnx-title-weekday">{fmtWeekday(viewingDate)}</span>
+              </div>
+              <div className="jnx-title-nav">
+                <button className="jnx-nav-arrow" onClick={goPrev} title="Previous day" aria-label="Previous day">
+                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button className="jnx-nav-arrow" onClick={goNext} disabled={!canGoNext} title="Next day" aria-label="Next day">
+                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+            <div className="jnx-divider jnx-write-divider" aria-hidden="true" />
+            <div
+              ref={editorRef}
+              className="journal-rich-editor jnx-editor"
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              onBlur={handleEditorBlur}
+              data-placeholder={isToday
+                ? (streak > 0 ? `Keep your ${streak}-day streak alive — begin where you are…` : 'Begin where you are. Write your thoughts, reflections, or notes for today…')
+                : 'Write your reflections for this day…'}
+              data-empty="true"
+              spellCheck
+            />
+          </div>
+        </main>
+
+        {/* ══════════════════════════════════════════════════
+            RIGHT COLUMN — Unified Control + Metadata Hub
             ══════════════════════════════════════════════════ */}
         <motion.aside
           className="jnx-meta"
@@ -709,55 +759,29 @@ export default memo(function JournalView() {
             </div>
           </motion.div>
 
-        </motion.aside>
+          {/* ── Row 5: Recent Entries — gives the space below the calendar a job
+              instead of trailing into empty rows; hidden entirely rather than
+              showing an empty-state when there's nothing else to link to yet. ── */}
+          {recentEntries.length > 0 && (
+            <motion.div className="jnx-meta-section" variants={META_ITEM}>
+              <span className="jnx-meta-label">Recent Entries</span>
+              <ul className="jnx-recent-list">
+                {recentEntries.map(e => {
+                  const preview = htmlToText(toHtml(e.content ?? '')).trim();
+                  return (
+                    <li key={e.date}>
+                      <button className="jnx-recent-item" onClick={() => jumpTo(e.date)}>
+                        <span className="jnx-recent-date">{relLabel(e.date, todayDate)}</span>
+                        <span className="jnx-recent-prev">{preview || 'No preview'}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </motion.div>
+          )}
 
-        {/* ══════════════════════════════════════════════════
-            RIGHT COLUMN — Pure Writing Sanctuary
-            Date heading + editable text area, plus a hairline divider between
-            them and a faint live word count below — no other chrome.
-            ══════════════════════════════════════════════════ */}
-        <main className="jnx-write-panel">
-          {/* Ambient glow layer — must be a direct child of .jnx-write-panel: its
-              position:absolute is scoped by .jnx-write-panel's position:relative
-              (see index.css), and .jnx-write-panel > *:not(.jnx-aura) relies on this
-              exact nesting too. Living anywhere else (e.g. sibling of .jnx-split)
-              lets it escape to the nearest positioned ancestor up the tree instead,
-              ballooning it across the full page width/height. */}
-          <div className="jnx-aura" aria-hidden="true" />
-          <div className="jnx-canvas">
-            <div className="jnx-title-row">
-              <div className="jnx-title-group">
-                <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
-                <span className="jnx-title-weekday">{fmtWeekday(viewingDate)}</span>
-              </div>
-              <div className="jnx-title-nav">
-                <button className="jnx-nav-arrow" onClick={goPrev} title="Previous day" aria-label="Previous day">
-                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <button className="jnx-nav-arrow" onClick={goNext} disabled={!canGoNext} title="Next day" aria-label="Next day">
-                  <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
-            </div>
-            <div className="jnx-divider jnx-write-divider" aria-hidden="true" />
-            <div
-              ref={editorRef}
-              className="journal-rich-editor jnx-editor"
-              contentEditable
-              suppressContentEditableWarning
-              onInput={handleEditorInput}
-              onBlur={handleEditorBlur}
-              data-placeholder={isToday
-                ? (streak > 0 ? `Keep your ${streak}-day streak alive — begin where you are…` : 'Begin where you are. Write your thoughts, reflections, or notes for today…')
-                : 'Write your reflections for this day…'}
-              data-empty="true"
-              spellCheck
-            />
-            {currentWc > 0 && (
-              <div className="jnx-write-wc" aria-live="polite">{currentWc} {currentWc === 1 ? 'word' : 'words'}</div>
-            )}
-          </div>
-        </main>
+        </motion.aside>
 
       </div>{/* /jnx-split */}
 
