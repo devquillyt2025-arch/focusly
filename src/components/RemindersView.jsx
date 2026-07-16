@@ -1,5 +1,5 @@
 import { memo,  useState, useEffect, useCallback } from 'react';
-import { listReminders, groupReminders } from '../utils/reminders';
+import { listReminders, groupReminders, clearReminder } from '../utils/reminders';
 
 // Read-only aggregated view over the `reminders` companion table — this
 // page has no independent create/delete, it only surfaces and lets you
@@ -58,16 +58,16 @@ export default memo(function RemindersView({ onNavigateToSource }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <ReminderGroup label="Overdue" items={overdue} tone="red" onNavigateToSource={onNavigateToSource} />
-          <ReminderGroup label="Today" items={today} tone="accent" onNavigateToSource={onNavigateToSource} />
-          <ReminderGroup label="Upcoming" items={upcoming} tone="muted" onNavigateToSource={onNavigateToSource} />
+          <ReminderGroup label="Overdue" items={overdue} tone="red" onNavigateToSource={onNavigateToSource} onDismiss={() => load(true)} />
+          <ReminderGroup label="Today" items={today} tone="accent" onNavigateToSource={onNavigateToSource} onDismiss={() => load(true)} />
+          <ReminderGroup label="Upcoming" items={upcoming} tone="muted" onNavigateToSource={onNavigateToSource} onDismiss={() => load(true)} />
         </div>
       )}
     </div>
   );
 });
 
-function ReminderGroup({ label, items, tone, onNavigateToSource }) {
+function ReminderGroup({ label, items, tone, onNavigateToSource, onDismiss }) {
   if (items.length === 0) return null;
   const toneColor = tone === 'red' ? 'var(--color-red)' : tone === 'accent' ? 'var(--accent)' : 'var(--text-muted)';
   return (
@@ -77,15 +77,29 @@ function ReminderGroup({ label, items, tone, onNavigateToSource }) {
         <span style={{ background: 'var(--bg-input)', color: 'var(--text-muted)', padding: '1px 8px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 700 }}>{items.length}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map(r => <ReminderRow key={r.id} reminder={r} onNavigateToSource={onNavigateToSource} />)}
+        {items.map(r => <ReminderRow key={r.id} reminder={r} onNavigateToSource={onNavigateToSource} onDismiss={onDismiss} />)}
       </div>
     </section>
   );
 }
 
-function ReminderRow({ reminder, onNavigateToSource }) {
+function ReminderRow({ reminder, onNavigateToSource, onDismiss }) {
+  const [dismissing, setDismissing] = useState(false);
   const reminderTime = new Date(reminder.reminder_at);
   const targetTime = reminder.target_at ? new Date(reminder.target_at) : null;
+
+  const handleDismiss = async (e) => {
+    e.stopPropagation();
+    if (dismissing) return;
+    setDismissing(true);
+    try {
+      await clearReminder(reminder.source_type, reminder.source_id);
+      onDismiss?.();
+    } catch {
+      setDismissing(false);
+    }
+  };
+
   return (
     <div
       onClick={() => onNavigateToSource?.(reminder.source_type, reminder.source_id)}
@@ -107,6 +121,20 @@ function ReminderRow({ reminder, onNavigateToSource }) {
           {targetTime && ` · due ${targetTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
         </span>
       </div>
+      <button
+        onClick={handleDismiss}
+        disabled={dismissing}
+        aria-label="Dismiss reminder"
+        title="Dismiss reminder"
+        style={{
+          background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+          cursor: dismissing ? 'default' : 'pointer', color: 'var(--text-muted)',
+          padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, flexShrink: 0,
+          opacity: dismissing ? 0.5 : 1, transition: 'opacity 0.13s',
+        }}
+      >
+        {dismissing ? '…' : 'Dismiss'}
+      </button>
     </div>
   );
 }

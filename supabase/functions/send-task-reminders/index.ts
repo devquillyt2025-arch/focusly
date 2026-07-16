@@ -40,10 +40,22 @@ function reminderBody(reminder: { target_at: string | null }) {
   return isDateOnly ? `Due ${dateStr}` : `Due ${dateStr} at ${timeStr}`;
 }
 
+// Minimal HTML escaper — prevents a task title containing HTML/script tags from
+// being rendered as markup inside the email body (SEC-05).
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendReminderEmail(to: string, reminder: { title: string; source_type: string; source_id: string; target_at: string | null }) {
   if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
 
   const body = reminderBody(reminder);
+  const safeTitle = escapeHtml(reminder.title);
   const url = SITE_URL
     ? (reminder.source_type === 'task' ? `${SITE_URL}/?reminder=task:${reminder.source_id}` : SITE_URL)
     : null;
@@ -54,10 +66,10 @@ async function sendReminderEmail(to: string, reminder: { title: string; source_t
     body: JSON.stringify({
       from: RESEND_FROM,
       to,
-      subject: `Reminder: ${reminder.title}`,
+      subject: `Reminder: ${safeTitle}`,
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="margin-bottom: 4px;">${reminder.title}</h2>
+          <h2 style="margin-bottom: 4px;">${safeTitle}</h2>
           <p style="color: #666; margin-top: 0;">${body}</p>
           ${url ? `<p><a href="${url}" style="display:inline-block; background:#7869fc; color:#fff; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:600;">Open in Nook</a></p>` : ''}
         </div>
@@ -67,6 +79,7 @@ async function sendReminderEmail(to: string, reminder: { title: string; source_t
 
   if (!res.ok) throw new Error(`Resend API error: ${res.status} ${await res.text()}`);
 }
+
 
 Deno.serve(async (req) => {
   if (req.headers.get('X-Cron-Secret') !== CRON_SECRET) {
@@ -149,9 +162,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Batch mark all processed reminders as sent
-    const reminderIds = dueReminders.map(r => r.id);
-    await supabase.from('reminders').update({ reminder_sent: true }).in('id', reminderIds);
+    // ─── FLAG-3: Only mark reminders as sent when a delivery channel existed ────
+    // Previously ALL reminders in the batch were marked sent regardless of
+    // delivery outcome. A user with no push subscription AND email disabled
+    // would have their reminder silently tombstoned, never delivered, and
+    // never retried. Now we only mark those with at least one channel attempted.
+    const sentIds: string[] = [];
+    for (const reminder of dueReminders) {
+      const hasPush  = (subsByUserId[reminder.user_id]?.length ?? 0) > 0;
+      const hasEmail = prefsByUserId[reminder.user_id]?.email_reminders_enabled === true;
+      if (hasPush || hasEmail) sentIds.push(reminder.id);
+    }
+    if (sentIds.length > 0) {
+      await supabase.from('reminders').update({ reminder_sent: true }).in('id', sentIds);
+    }
   }
 
   return new Response(
