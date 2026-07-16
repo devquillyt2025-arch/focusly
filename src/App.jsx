@@ -1416,7 +1416,7 @@ export default function App() {
       </div>{/* end app-body */}
 
       {/* ── Toast ── */}
-      {toast && <div key={toast.key} className={`app-toast toast-${toast.type}`}>{toast.msg}</div>}
+      {toast && <div key={toast.key} role="status" aria-live="polite" aria-atomic="true" className={`app-toast toast-${toast.type}`}>{toast.msg}</div>}
 
       {/* ── Modals ── */}
       <AnimatePresence>

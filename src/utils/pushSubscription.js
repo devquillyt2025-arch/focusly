@@ -117,9 +117,13 @@ export async function unsubscribeFromPush() {
 // silently never delivering (see subscribeToPush's keyMatches check).
 export async function isCurrentlySubscribed() {
   if (!isPushSupported()) return false;
+  // Guard: keyMatches calls urlBase64ToUint8Array which throws on undefined —
+  // return false (correct degraded state) rather than letting it propagate.
+  if (!VAPID_PUBLIC_KEY) return false;
   const registration = await navigator.serviceWorker.getRegistration('/sw.js');
   if (!registration) return false;
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return false;
   return keyMatches(subscription, VAPID_PUBLIC_KEY);
 }
+
