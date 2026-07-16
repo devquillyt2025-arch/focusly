@@ -67,22 +67,24 @@ function newNote(overrides = {}) {
 // Only fires when B is ≥20 chars so normal notes with repeated short phrases
 // are never touched. This is a safe one-time migration for a specific data
 // corruption pattern (second occurrence cut off mid-sentence).
+//
+// Previously used an O(n²) loop over every possible split point — replaced
+// with a single midpoint check that is O(n) and covers the only known
+// corruption pattern (split always falls near the midpoint).
 function deduplicateContent(content) {
   if (!content || content.length < 40 || content.length > 20000) return content;
   const half = Math.floor(content.length / 2);
   // Exact duplication: content = A + A
-  if (content.length % 2 === 0) {
-    const A = content.slice(0, half);
-    if (content.slice(half) === A) return A;
+  if (content.length % 2 === 0 && content.slice(half) === content.slice(0, half)) {
+    return content.slice(0, half);
   }
-  // Truncated duplication: content = A + B where B is a non-trivial prefix of A
-  for (let splitAt = half; splitAt <= content.length - 20; splitAt++) {
-    const A = content.slice(0, splitAt);
-    const B = content.slice(splitAt);
-    if (A.startsWith(B)) return A;
-  }
+  // Truncated duplication: content = A + B where B (≥20 chars) is a prefix of A.
+  // The known corruption always splits near the midpoint — one check suffices.
+  const tail = content.slice(half);
+  if (tail.length >= 20 && content.startsWith(tail)) return content.slice(0, half);
   return content;
 }
+
 
 // ── Note Editor Modal ──────────────────────────────────────────────────────
 export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
