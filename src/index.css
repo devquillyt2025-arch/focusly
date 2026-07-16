@@ -2936,7 +2936,9 @@ select.modal-input {
   padding: 0 !important;
   margin: 0 !important;
 }
-/* Ambient metadata — borderless, no card, bleeds into the sanctuary */
+/* Ambient metadata — a soft glass card (see the boxed-card rules further down)
+   so it reads as a distinct panel against the pure-black tab background instead
+   of bleeding into it edge-to-edge. */
 .jnx-meta {
   min-width: 0;
   display: flex;
@@ -3570,6 +3572,11 @@ select.modal-input {
   font-size: 1.45rem; line-height: 1.8; font-weight: 400;
   letter-spacing: 0.003em; color: var(--jnx-ink);
   overflow-y: visible;
+  /* The caret itself is the only edit-mode indicator by design (see the
+     :focus rule below) — accent-colored rather than defaulting to the ink
+     text color so it actually reads as "you're writing" rather than just
+     blending into the letters around it. */
+  caret-color: var(--jnx-accent);
 }
 .jnx-editor.journal-editor-readonly { background: transparent !important; opacity: 0.92; }
 /* FIX: Added missing content: attr(data-placeholder) — the ::before rule existed
@@ -3657,7 +3664,7 @@ select.modal-input {
 .jnx-cont-editor[data-empty="true"]::before { font-size: 1.1rem; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   AMBIENT METADATA PANEL (right) — borderless, bleeds into the sanctuary
+   AMBIENT METADATA PANEL (left) — soft glass card
    ═══════════════════════════════════════════════════════════════════ */
 /* Compact, fit-content sidebar: ONE consistent 22px gap between every section
    (right-controls → context-header → kpi-grid → meta-cal) — no per-section
@@ -3666,7 +3673,18 @@ select.modal-input {
    elements each consuming a full gap on both sides; .jnx-right-controls's own
    border-bottom+margin-bottom was the same mistake reintroduced later and has
    since been removed.) */
-.jnx-meta { gap: 22px; padding: 8px 4px 40px; align-self: start; height: fit-content; max-width: 100%; }
+/* Soft glass edge — a low-opacity line + barely-there tint (both existing --jnx-line/
+   --jnx-grain tokens, already theme-aware; not new hardcoded colors) so the panel
+   reads as its own card against the tab's pure-black background instead of floating
+   borderless in it. --radius-lg matches .card's corner radius elsewhere in the app —
+   reused, not reinvented. Kept subtle enough to stay behind the purple accent and the
+   entry-dot heatmap, verified at low brightness. */
+.jnx-meta {
+  gap: 22px; padding: 20px 18px 32px; align-self: start; height: fit-content; max-width: 100%;
+  border: 1px solid var(--jnx-line);
+  border-radius: var(--radius-lg);
+  background: var(--jnx-grain);
+}
 .jnx-meta-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--jnx-ink-faint); }
 /* Thin fading rule between sections (1px, warm, low opacity) */
 .jnx-meta-rule { height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--jnx-accent) 22%, transparent), transparent 78%); max-width: 300px; }
@@ -3790,27 +3808,25 @@ select.modal-input {
    (the exact pitfall documented in the .jnx-meta comment above). border-top sits flush
    at the top of this box's existing gap-driven position, so spacing stays untouched. */
 .jnx-meta-cal-divided { border-top: 1px solid var(--jnx-line); padding-top: 12px; }
-/* Same width + margin-left: auto trick as .jnx-meta-cal-sub/.jnx-meta .jnx-month
-   below — without it this row spans the FULL panel width while the grid it
-   labels is capped to 328px and pushed right, so "Activity" sits at the panel's
-   left edge, stranded well left of where the calendar actually starts. Matching
-   the width keeps the label flush above the grid's left edge and the month-nav
-   arrows flush above its right edge. */
-.jnx-meta-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-left: auto; width: min(328px, 100%); }
+/* Every row in the panel now fills its full width (see .jnx-meta's own border/
+   padding further up) instead of being capped to a fixed 328px column and
+   pushed right with margin-left: auto — that old trick left a dead gap between
+   the panel's left border and where content actually started once the panel
+   became a bordered card. width: 100% keeps every row's left edge flush with
+   the card's own inner edge, so the label, the grid, and the nav arrows all
+   share one left-aligned line down the panel — and the grid's right edge lines
+   up with the card's right edge too, since both now span the same 100%. */
+.jnx-meta-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
 .jnx-meta-cal-head .jnx-meta-label { font-size: 0.6rem; }
-/* width (not max-width) gives this row a definite size — margin-left: auto only
-   pushes a definitely-sized box to the right; paired with max-width alone (no
-   width) it disables flex's default stretch and the box collapses to fit-content. */
-.jnx-meta-cal-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; margin-left: auto; width: min(328px, 100%); }
-.jnx-meta-period { font-size: 0.66rem; color: var(--jnx-ink-soft); }
+.jnx-meta-cal-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; width: 100%; }
+.jnx-meta-period { display: inline-block; font-size: 0.66rem; color: var(--jnx-ink-soft); animation: jnxMonthFade 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes jnxMonthFade { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Calendar fills the (now right-sized) sidebar column, in the writing serif.
-   Increased 20% from the 273px/35.6px-cell size at the user's request (273*1.2≈328).
-   width (not max-width) — see note above; min(…, 100%) still guarantees no overflow. */
-.jnx-meta .jnx-month { width: min(328px, 100%); margin-left: auto; gap: 6px; font-family: var(--jnx-serif); }
+/* Calendar fills the panel's full inner width, in the writing serif. */
+.jnx-meta .jnx-month { width: 100%; gap: 6px; font-family: var(--jnx-serif); }
 .jnx-meta .jnx-mcell-num { font-family: var(--jnx-serif); font-size: 0.96rem; }
 .jnx-meta .jnx-month-dow { font-family: var(--jnx-serif); }
-.jnx-meta .jnx-month-dow { font-size: 0.84rem; font-weight: 500; opacity: 0.65; }
+.jnx-meta .jnx-month-dow { font-size: 0.84rem; font-weight: 600; opacity: 0.85; }
 
 /* Premium day cells: glassy rings, glowing entry dots, purple (--jnx-accent) selected
    state. Three states stay visually distinct by TECHNIQUE, not just color, so they're
@@ -3824,12 +3840,17 @@ select.modal-input {
   transition: transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s ease, background 0.22s ease, border-color 0.18s ease;
 }
 .jnx-meta .jnx-mcell .jnx-mcell-num { color: var(--jnx-ink-soft); font-weight: 500; }
-/* entry indicator dot */
+/* Entry indicator dot — a mini heatmap. Size/opacity/glow all scale with the day's
+   word count (jnx-lvl-1..4, set from wcLevel() in JournalView.jsx) so a 40-word note
+   and a 400-word entry are visibly different at a glance, not just "wrote / didn't". */
 .jnx-meta .jnx-mcell.jnx-has-entry::after {
   content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-  width: 5px; height: 5px; border-radius: 50%; background: var(--jnx-accent);
-  box-shadow: 0 0 8px rgba(var(--jnx-glow), 0.75);
+  border-radius: 50%; background: var(--jnx-accent);
 }
+.jnx-meta .jnx-mcell.jnx-lvl-1::after { width: 4px;  height: 4px;  opacity: 0.45; box-shadow: none; }
+.jnx-meta .jnx-mcell.jnx-lvl-2::after { width: 5px;  height: 5px;  opacity: 0.7;  box-shadow: 0 0 5px rgba(var(--jnx-glow), 0.35); }
+.jnx-meta .jnx-mcell.jnx-lvl-3::after { width: 6px;  height: 6px;  opacity: 0.9;  box-shadow: 0 0 8px rgba(var(--jnx-glow), 0.55); }
+.jnx-meta .jnx-mcell.jnx-lvl-4::after { width: 7.5px; height: 7.5px; opacity: 1;   box-shadow: 0 0 12px rgba(var(--jnx-glow), 0.8); }
 .jnx-meta .jnx-mcell:not(:disabled):hover {
   transform: scale(1.1);
   background: rgba(255,255,255,0.06);
@@ -3842,12 +3863,19 @@ select.modal-input {
   border-width: 1.5px;
   box-shadow: 0 0 8px rgba(var(--jnx-glow), 0.18);
 }
-/* selected day — solid purple fill with depth */
-.jnx-meta .jnx-mcell.jnx-active {
+/* selected day — solid purple fill with depth. The :not(:disabled):hover variant
+   below exists only so this outranks the generic hover rule above: that rule's own
+   :not(:disabled):hover pair gives it higher specificity than .jnx-active alone, so
+   without this, hovering the selected day replaced its purple fill with the plain
+   white hover tint — the exact "selected state isn't unmistakable" bug this file
+   is fixing. */
+.jnx-meta .jnx-mcell.jnx-active,
+.jnx-meta .jnx-mcell.jnx-active:not(:disabled):hover {
   background: var(--jnx-accent);
   border-color: transparent;
   box-shadow: 0 0 20px rgba(var(--jnx-glow), 0.55), 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25);
 }
+.jnx-meta .jnx-mcell.jnx-active:not(:disabled):hover { transform: scale(1.06); }
 /* Number/dot color atop the filled circle needs to flip per theme: dark mode's
    --jnx-accent (var(--accent), #7869fc) is light enough for near-black text
    (~4.4:1); light mode's --jnx-accent (var(--accent-dark), #5d50e0) is darker and
@@ -3857,8 +3885,16 @@ select.modal-input {
 .jnx-meta .jnx-mcell.jnx-active.jnx-has-entry::after { background: #1a1510; box-shadow: none; }
 :root[data-theme="light"] .jnx-meta .jnx-mcell.jnx-active .jnx-mcell-num { color: #fff; }
 :root[data-theme="light"] .jnx-meta .jnx-mcell.jnx-active.jnx-has-entry::after { background: #fff; }
-.jnx-meta .jnx-mcell.jnx-out { opacity: 0.55; }
+.jnx-meta .jnx-mcell.jnx-out { opacity: 0.32; }
 .jnx-meta .jnx-mcell.jnx-out .jnx-mcell-num { color: var(--jnx-ink-faint); }
+/* No hover affordance on adjacent-month days — dimmer + inert reads as "not this
+   month" at a glance, and lifting/glowing on hover fought that signal. */
+.jnx-meta .jnx-mcell.jnx-out:not(:disabled):hover {
+  transform: none;
+  background: rgba(255,255,255,0.02);
+  border-color: rgba(255,255,255,0.07);
+  box-shadow: none;
+}
 
 /* ── Less / More segmented control (bottom right) ── */
 .jnx-seg-wrap { display: flex; justify-content: flex-end; max-width: 300px; }
@@ -4026,8 +4062,18 @@ select.modal-input {
        height happens to be even shorter, which is content-dependent and not
        something to rely on. The actual fix is decoupling the row's height from
        both columns entirely: +48px beyond the viewport guarantees real slack for
-       whichever side is taller, on any day, regardless of content length. */
-    grid-template-rows: calc(100dvh + 48px);
+       whichever side is taller, on any day, regardless of content length.
+       That +48px is relative to the viewport, but this row doesn't sit flush
+       against the viewport — .sunsama-tab-transition's 32+80px and .jnx-page's
+       8+40px vertical padding (160px total) sit outside it too, and 100dvh
+       already accounts for none of that. Without subtracting it back out, the
+       row (and everything wrapping it) ends up 160px taller than intended,
+       making .tab-content itself scroll ~200px on a normal-height entry —
+       verified via getBoundingClientRect: .jnx-meta visibly slid before
+       sticking, reading as "the panel is scrollable/draggable" even though
+       there's nothing to scroll to. Subtracting the 160px restores the
+       intended ~48px of real sticky slack without the page-level scroll. */
+    grid-template-rows: calc(100dvh - 112px);
   }
   .jnx-meta {
     position: sticky;
@@ -4040,13 +4086,10 @@ select.modal-input {
        its own overflow — giving it one just surfaced a second, unwanted
        scrollbar alongside the write panel's real one. */
     padding-top: 6px;
-    /* Thin separator between the two columns, requested back after the flat
-       shared background (.tab-content-journal) made them read as one
-       undivided surface — a low-opacity line reads as an intentional column
-       boundary without the "boxed card" look the earlier background fix
-       removed (that was a background/shadow/radius issue, not this 1px rule). */
-    border-right: 1px solid var(--jnx-line);
-    padding-right: 24px;
+    /* The base .jnx-meta rule now gives the panel its own full border on all
+       sides (soft glass card), which already reads as the column boundary —
+       the column-gap below provides the remaining breathing room from the
+       write panel, so no extra right-edge border/padding is needed here. */
   }
   .jnx-write-panel {
     position: sticky;
@@ -4063,15 +4106,16 @@ select.modal-input {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     column-gap: 32px;
     /* See the desktop breakpoint's comment above — explicit row height, +32px
-       slack this time (matching this breakpoint's own column-gap value). */
-    grid-template-rows: calc(100dvh + 32px);
+       of real sticky slack (matching this breakpoint's own column-gap value),
+       with the same 160px of surrounding tab-shell padding subtracted back out. */
+    grid-template-rows: calc(100dvh - 128px);
   }
   .jnx-meta {
     position: sticky;
     top: 8px;
-    /* See the desktop breakpoint's comment above — no internal scroll here. */
-    border-right: 1px solid var(--jnx-line);
-    padding-right: 20px;
+    /* See the desktop breakpoint's comment above — no internal scroll here,
+       and no extra right-edge border/padding: the base .jnx-meta card border
+       already marks the boundary. */
   }
   .jnx-write-panel {
     position: sticky;
@@ -7476,17 +7520,13 @@ select.modal-input {
 
 
 /* --- New Dashboard Styles for Meta Panel --- */
-/* Same width + margin-left: auto column as .jnx-meta-cal-head/.jnx-meta-cal-sub/
-   .jnx-meta .jnx-month — without it this header sits flush at the full panel's
-   left edge while the Activity block below is a narrower, right-shifted 328px
-   column, so "JUL 11 / Week of..." reads noticeably further left than
-   everything below it instead of lining up in the same column. */
+/* Full width, flush left — see .jnx-meta-cal-head's comment above; every row in
+   the panel shares this same left/right edge now. */
 .jnx-meta-context-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-left: auto;
-  width: min(328px, 100%);
+  width: 100%;
 }
 .jnx-meta-context-title {
   display: flex;
@@ -7513,15 +7553,12 @@ select.modal-input {
   text-transform: uppercase;
   color: var(--jnx-ink-faint);
 }
-/* Same width + margin-left: auto column as the eyebrow header/Activity block/
-   calendar — previously 100% (the full panel width), so WORDS/ENTRIES/STREAK
-   sat further left and ended further left than everything else in the panel. */
+/* Full width, flush left — see .jnx-meta-cal-head's comment above. */
 .jnx-kpi-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
-  margin-left: auto;
-  width: min(328px, 100%);
+  width: 100%;
 }
 /* No card behind the numbers — bare stats, matching the rest of this borderless
    panel (nothing else in .jnx-meta has a background either; the numbers and
@@ -7552,6 +7589,24 @@ select.modal-input {
   white-space: nowrap;
 }
 
+/* ── Streak reward — flame + color shift once streak > 0, distinct "at risk"
+   treatment once it's evening and today has no entry yet ── */
+.jnx-kpi-streak .jnx-kpi-num { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.jnx-streak-flame { flex-shrink: 0; color: var(--jnx-ink-faint); }
+.jnx-streak-lit .jnx-kpi-num,
+.jnx-streak-lit .jnx-streak-flame { color: #ff9d47; }
+.jnx-streak-lit .jnx-streak-flame { filter: drop-shadow(0 0 7px rgba(255, 157, 71, 0.55)); animation: jnxFlameGlow 2.4s ease-in-out infinite; }
+.jnx-streak-risk .jnx-kpi-num,
+.jnx-streak-risk .jnx-streak-flame { color: #ff6b5e; }
+.jnx-streak-risk .jnx-streak-flame { filter: drop-shadow(0 0 7px rgba(255, 107, 94, 0.55)); animation: jnxFlameFlicker 1.5s ease-in-out infinite; }
+.jnx-streak-risk-tag {
+  display: block; margin-top: 3px;
+  font-size: 0.54rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #ff6b5e;
+}
+@keyframes jnxFlameGlow { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+@keyframes jnxFlameFlicker { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.9); } }
+
 
 /* ── Right Column Controls — one row ────────────────────────────────────
    Export + Autosave moved to sit beside Today, inside .jnx-right-actions,
@@ -7565,21 +7620,16 @@ select.modal-input {
   display: flex;
   padding: 6px 0;
 }
-/* Same width + margin-left: auto + right-anchored content as the eyebrow header/
-   Activity block/calendar below — Search+Today+Export+Autosave was previously
-   flush at the panel's full-width left edge while everything else in the panel
-   sits in a narrower, right-shifted 328px column, so this row visually didn't
-   line up with anything below it. justify-content: flex-end hugs the (already
-   content-sized) actions cluster to that column's right edge, matching the
-   calendar's own right edge instead of just trailing off into empty space. */
+/* Full width — see .jnx-meta-cal-head's comment above; justify-content: flex-end
+   still hugs the (content-sized) actions cluster to the panel's right edge,
+   which now matches the calendar's own right edge since both span 100%. */
 .jnx-right-cluster {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
-  margin-left: auto;
-  width: min(328px, 100%);
+  width: 100%;
 }
 .jnx-right-actions {
   display: flex;
@@ -7620,6 +7670,30 @@ select.modal-input {
   min-width: 0;
   overflow-x: hidden;
 }
+/* Themed scrollbar — .jnx-write-panel gets its own overflow-y:auto at the
+   ≥768px breakpoints below (it's not covered by the app-wide .tab-content
+   scrollbar rule further down this file), so left at its default it renders
+   the raw OS scrollbar: a stark white bar/arrows that breaks the glass
+   aesthetic every other surface in this tab uses. Built from the same
+   ink-faint/accent tokens as the rest of the journal rather than the app's
+   generic --border-strong, so it stays in this panel's own warm palette. */
+.jnx-write-panel {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--jnx-ink-faint) 55%, transparent) transparent;
+}
+.jnx-write-panel::-webkit-scrollbar { width: 8px; }
+.jnx-write-panel::-webkit-scrollbar-track { background: transparent; }
+.jnx-write-panel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--jnx-ink-faint) 55%, transparent);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+.jnx-write-panel::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--jnx-accent) 55%, transparent);
+  background-clip: padding-box;
+}
 .jnx-write-panel .jnx-canvas {
   padding-top: 8px;
 }
@@ -7633,19 +7707,74 @@ select.modal-input {
   gap: 12px;
   margin: 0 0 16px 0;
 }
+/* Groups the date heading + weekday label as one cluster on the left, so
+   .jnx-title-row's justify-content: space-between still only splits two
+   things (this cluster vs. the nav pill) instead of spreading three items
+   across the row. */
+.jnx-write-panel .jnx-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.jnx-write-panel .jnx-title-weekday {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 500;
+  color: var(--jnx-ink);
+  white-space: nowrap;
+}
+/* Separates the date header (title + nav arrows) from the entry body below —
+   same border-top/var(--jnx-line) technique as .jnx-meta-cal-divided in the left
+   panel, for visual consistency between the two columns. .jnx-divider's base
+   rule zeroes all margins !important (it's meant to be a bare rule with spacing
+   supplied by context), and .jnx-canvas/.jnx-editor are both locked to
+   margin/padding: 0 !important too (see their own comments — flat layout, no
+   nested card chrome) — so the 16px gap below the line has to live here, on the
+   divider itself, matching .jnx-title-row's own 16px margin-bottom above it for
+   symmetric spacing. Full width of the content column only (.jnx-divider's own
+   width: 100% inherits .jnx-canvas's width, not the viewport). */
+.jnx-write-panel .jnx-write-divider {
+  margin-bottom: 16px !important;
+}
+/* Grouped into a pill (same background/border technique as .jnx-export-trigger
+   in the left panel) so the two arrows read as one "day navigation" control
+   instead of floating loose next to the title. */
 .jnx-write-panel .jnx-title-nav {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+/* Live word count under the entry — faint, small, only shown once there's
+   something to count (an empty "0 words" caption on a blank day reads as
+   clutter, not information). Uses the same currentWc state the editor already
+   tracks on every input, so it updates live for free. */
+.jnx-write-panel .jnx-write-wc {
+  margin-top: 16px;
+  text-align: right;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--jnx-ink-faint);
 }
 /* FIX: The global "Unified gradient hero titles" rule targets .jnx-title with
    -webkit-text-fill-color: transparent !important — which overrides the local
    color: var(--jnx-ink) set here. We must explicitly reset text-fill-color back
-   to the warm ink token so the journal date heading renders correctly. */
+   to the warm ink token so the journal date heading renders correctly. That same
+   global rule also forces font-weight: 850 !important, which fights the lighter
+   weight requested here — same fix, override with !important at higher
+   (2-class) specificity. */
 .jnx-write-panel .jnx-title {
+  font-family: 'Times New Roman', Times, serif;
   font-size: clamp(1.8rem, 3vw, 2.4rem);
-  font-weight: 700;
+  font-weight: 500 !important;
   color: var(--jnx-ink) !important;
   -webkit-text-fill-color: var(--jnx-ink) !important;
   background: none !important;

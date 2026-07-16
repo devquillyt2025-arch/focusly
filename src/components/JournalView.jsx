@@ -138,8 +138,8 @@ function scopeMeta(scope, ds, range) {
 // ─── Heatmap builder — single Monday-start week ─────────────────────
 function wcLevel(wc) {
   if (!wc) return 0;
-  if (wc < 50) return 1;
-  if (wc < 150) return 2;
+  if (wc < 100) return 1;
+  if (wc < 200) return 2;
   if (wc < 300) return 3;
   return 4;
 }
@@ -227,6 +227,10 @@ function timeMood(hour) {
 function fmtPremiumDate(ds) {
   return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
+// "Monday" — shown as a small companion label beside the date heading.
+function fmtWeekday(ds) {
+  return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+}
 
 // Last N days ending today, flagged by whether an entry exists — the streak "chain".
 function buildStreakDots(today, wcMap, n = 7) {
@@ -296,6 +300,8 @@ export default memo(function JournalView() {
 
   const week        = useMemo(() => buildWeek(todayDate, weekOffset, wcMap), [todayDate, weekOffset, wcMap]);
   const month       = useMemo(() => buildMonth(todayDate, monthOffset, wcMap), [todayDate, monthOffset, wcMap]);
+  const prevMonthLabel = useMemo(() => monthLabel(monthOffset - 1, firstOfMonth(todayDate, monthOffset - 1)), [todayDate, monthOffset]);
+  const nextMonthLabel = useMemo(() => monthLabel(monthOffset + 1, firstOfMonth(todayDate, monthOffset + 1)), [todayDate, monthOffset]);
   const streak      = useMemo(() => computeStreak(todayDate, wcMap), [todayDate, wcMap]);
   const totalEntries = useMemo(() => Object.keys(wcMap).length, [wcMap]);
   const monthEntries = useMemo(() => {
@@ -432,6 +438,10 @@ export default memo(function JournalView() {
   const mood       = useMemo(() => timeMood(new Date().getHours()), []);
   const nowTime    = useMemo(() => new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), []);
   const streakDots = useMemo(() => buildStreakDots(todayDate, wcMap, 7), [todayDate, wcMap]);
+  // Wall-clock check, not memoized — same "derive at render" pattern as FocusCompanion
+  // (see CLAUDE.md §Tab-specific quirks), so it stays fresh across re-renders without
+  // needing its own ticking store.
+  const streakAtRisk = streak > 0 && !wcMap[todayDate] && new Date().getHours() >= 17;
   // Ambient glow intensity — the canvas "breathes brighter" as the entry grows (full ~350 words).
   const auraIntensity = Math.min(1, currentWc / 350);
 
@@ -642,21 +652,27 @@ export default memo(function JournalView() {
               <span className="jnx-kpi-num">{totalEntries}</span>
               <span className="jnx-kpi-label">ENTRIES</span>
             </div>
-            <div className="jnx-kpi-card">
-              <span className="jnx-kpi-num">{streak}</span>
-              <span className="jnx-kpi-label">STREAK</span>
+            <div className={`jnx-kpi-card jnx-kpi-streak${streak > 0 ? ' jnx-streak-lit' : ''}${streakAtRisk ? ' jnx-streak-risk' : ''}`}>
+              <span className="jnx-kpi-num">
+                {streak}
+                {streak > 0 && <JIcoFlame className="jnx-streak-flame" />}
+              </span>
+              <span className="jnx-kpi-label">
+                STREAK
+                {streakAtRisk && <span className="jnx-streak-risk-tag" title="Write today to keep your streak alive">at risk</span>}
+              </span>
             </div>
           </motion.div>
 
           {/* ── Row 4: Activity Calendar ── */}
-          <motion.div className="jnx-meta-cal" variants={META_ITEM}>
+          <motion.div className="jnx-meta-cal jnx-meta-cal-divided" variants={META_ITEM}>
             <div className="jnx-meta-cal-head">
               <span className="jnx-meta-label">Activity</span>
               <div className="jnx-week-nav">
-                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o - 1)} title="Previous month" aria-label="Previous month">
+                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o - 1)} title={`Previous month — ${prevMonthLabel}`} aria-label={`Previous month — ${prevMonthLabel}`}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o + 1)} title="Next month" aria-label="Next month">
+                <button className="jnx-nav-arrow jnx-nav-arrow-sm" onClick={() => setMonthOffset(o => o + 1)} title={`Next month — ${nextMonthLabel}`} aria-label={`Next month — ${nextMonthLabel}`}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
               </div>
@@ -665,7 +681,8 @@ export default memo(function JournalView() {
             <div className="jnx-heatmap-body">
               <div className="jnx-heatmap-body-inner">
                 <div className="jnx-meta-cal-sub">
-                  <span className="jnx-meta-period">{monthLabel(monthOffset, month.first)} · {monthEntries} entr{monthEntries === 1 ? "y" : "ies"}</span>
+                  {/* key forces remount on month change so the fade-in animation restarts */}
+                  <span className="jnx-meta-period" key={monthOffset}>{monthLabel(monthOffset, month.first)} · {monthEntries} entr{monthEntries === 1 ? "y" : "ies"}</span>
                 </div>
 
                 <div className="jnx-month">
@@ -678,7 +695,7 @@ export default memo(function JournalView() {
                     {month.days.map(d => (
                       <button
                         key={d.date}
-                        className={`jnx-mcell${d.wc ? " jnx-has-entry" : ""}${d.isToday ? " jnx-today" : ""}${d.date === viewingDate ? " jnx-active" : ""}${!d.inMonth ? " jnx-out" : ""}`}
+                        className={`jnx-mcell${d.wc ? ` jnx-has-entry jnx-lvl-${d.level}` : ""}${d.isToday ? " jnx-today" : ""}${d.date === viewingDate ? " jnx-active" : ""}${!d.inMonth ? " jnx-out" : ""}`}
                         onClick={() => setViewingDate(d.date)}
                         title={`${fmtDate(d.date)} — ${d.wc ? `${d.wc} words` : "no entry"}`}
                         aria-label={`${fmtDate(d.date)}, ${d.wc ? `${d.wc} words` : "no entry"}`}
@@ -696,7 +713,8 @@ export default memo(function JournalView() {
 
         {/* ══════════════════════════════════════════════════
             RIGHT COLUMN — Pure Writing Sanctuary
-            Contains ONLY: date heading + editable text area
+            Date heading + editable text area, plus a hairline divider between
+            them and a faint live word count below — no other chrome.
             ══════════════════════════════════════════════════ */}
         <main className="jnx-write-panel">
           {/* Ambient glow layer — must be a direct child of .jnx-write-panel: its
@@ -708,7 +726,10 @@ export default memo(function JournalView() {
           <div className="jnx-aura" aria-hidden="true" />
           <div className="jnx-canvas">
             <div className="jnx-title-row">
-              <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
+              <div className="jnx-title-group">
+                <h1 className="jnx-title">{fmtPremiumDate(viewingDate)}</h1>
+                <span className="jnx-title-weekday">{fmtWeekday(viewingDate)}</span>
+              </div>
               <div className="jnx-title-nav">
                 <button className="jnx-nav-arrow" onClick={goPrev} title="Previous day" aria-label="Previous day">
                   <svg width="16" height="16" viewBox="0 0 24 24" {...S}><polyline points="15 18 9 12 15 6"/></svg>
@@ -718,6 +739,7 @@ export default memo(function JournalView() {
                 </button>
               </div>
             </div>
+            <div className="jnx-divider jnx-write-divider" aria-hidden="true" />
             <div
               ref={editorRef}
               className="journal-rich-editor jnx-editor"
@@ -731,6 +753,9 @@ export default memo(function JournalView() {
               data-empty="true"
               spellCheck
             />
+            {currentWc > 0 && (
+              <div className="jnx-write-wc" aria-live="polite">{currentWc} {currentWc === 1 ? 'word' : 'words'}</div>
+            )}
           </div>
         </main>
 
@@ -898,5 +923,12 @@ function JIcoLock() {
 }
 function JIcoCheck() {
   return <svg width="12" height="12" viewBox="0 0 24 24" {...S} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>;
+}
+function JIcoFlame({ className }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path fill="currentColor" d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-.5-2 2 1 3.5 3.5 3.5 6a7 7 0 1 1-14 0c0-5 3-7 4-8 1-.8 2-1.6 3-3z" />
+    </svg>
+  );
 }
 
