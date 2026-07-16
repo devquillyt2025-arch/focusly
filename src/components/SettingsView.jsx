@@ -189,16 +189,25 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
+
+    const doImport = async () => {
       try {
-        const data = JSON.parse(event.target.result);
+        let data;
+        if (file.name.endsWith('.zip')) {
+          const JSZip = (await import('jszip')).default;
+          const zip = await JSZip.loadAsync(file);
+          const jsonFile = zip.file('backup.json');
+          if (!jsonFile) throw new Error('backup.json not found inside ZIP.');
+          data = JSON.parse(await jsonFile.async('string'));
+        } else {
+          data = JSON.parse(await file.text());
+        }
         onImportData(data);
       } catch (err) {
-        alert('Invalid JSON file.');
+        alert(`Import failed: ${err.message}`);
       }
     };
-    reader.readAsText(file);
+    doImport();
   };
 
   const handleAvatarUpload = (e) => {

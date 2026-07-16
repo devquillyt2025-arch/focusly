@@ -303,12 +303,33 @@ export default function App() {
 
 
   const handleImportData = useCallback((data) => {
-    if (confirm("This will replace your current data. Are you sure?")) {
-      for (const key in data) {
-        localStorage.setItem(key, data[key]);
+    // Support schema-v1 ZIP exports (the current exportBackup format)
+    // as well as legacy flat {key: string} imports.
+    const isSchemaV1 = data?.schemaVersion === 1 && data?.data?.local;
+    const localMap = isSchemaV1 ? data.data.local : data;
+
+    const ALLOWED_PREFIX = /^nook[-_]/;
+    const BLOCKED_KEYS = new Set(['nook_google_tokens','nook_pkce_verifier','nook_sync_queue','nook_deleted_tasks']);
+
+    const keyCount = Object.keys(localMap).filter(k => ALLOWED_PREFIX.test(k) && !BLOCKED_KEYS.has(k)).length;
+    if (!confirm(`This will replace ${keyCount} data set(s) with the backup. Continue?`)) return;
+
+    for (const [key, value] of Object.entries(localMap)) {
+      if (!ALLOWED_PREFIX.test(key)) continue;      // reject non-nook keys
+      if (BLOCKED_KEYS.has(key)) continue;           // never restore tokens/queues
+      try {
+        // value is already parsed; re-stringify for localStorage
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      } catch (err) {
+        console.error(`[Import] failed to write ${key}:`, err);
       }
-      window.location.reload();
     }
+    
+    if (data?.data?.reminders?.length > 0) {
+        alert("Backup imported successfully.\n\nNote: Reminders are device-specific and were not restored. You may need to re-enable them for your tasks.");
+    }
+
+    window.location.reload();
   }, []);
 
   const handleClearData = useCallback(() => {
@@ -1082,31 +1103,12 @@ export default function App() {
   });
   const [profileAvatar, setProfileAvatar] = useState(() => localStorage.getItem('nook-profile-avatar') || '😎');
 
-  // Push notification helper
-  const triggerDesktopNotification = (title, body) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/nook-favicon.png' });
-    } else if ('Notification' in window && Notification.permission !== 'denied') {
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') new Notification(title, { body, icon: '/nook-favicon.png' });
-      });
-    }
-  };
-
+  // Nav badge counts (derived — no effect needed, no notification side-effect).
+  // Previously this block contained a per-edit "Daily Summary" notification that
+  // fired 5 s after every task count change — removed (BUG-08) because it spammed
+  // on every add/complete and bypassed the proper morning-briefing system.
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
   const activeHabitsCount = habits.filter(h => !h.archived).length;
-
-  // Automated trigger for notifications when enabled
-  useEffect(() => {
-    if (localStorage.getItem('nook-notif-master') !== 'false') {
-      const timer = setTimeout(() => {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          triggerDesktopNotification('Nook Daily Summary', `🎯 ${pendingTasksCount} pending tasks | ⚡ ${activeHabitsCount} active habits`);
-        }
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [pendingTasksCount, activeHabitsCount]);
 
   return (
     <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
