@@ -260,15 +260,18 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Window Focus Sync Trigger ──
+  // Uses tasksRef (not tasks) so the listener is never re-registered on each
+  // task mutation, and always reads the live list — not a stale closure snapshot
+  // that would let pullTasksFromGoogle clobber concurrent local edits.
   useEffect(() => {
     const handleFocus = () => {
       if (localStorage.getItem('nook_sync_enabled') === 'true') {
-        syncTasks(tasks, setTasks, setSyncStatus, true);
+        syncTasks(tasksRef.current, setTasks, setSyncStatus, true);
       }
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [tasks]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [timerMode,       setTimerMode]       = useState('focus');
   const [activeTimerMode, setActiveTimerMode] = useState('focus'); // mode actually running
@@ -364,6 +367,9 @@ export default function App() {
   const pomoLogRef         = useRef(pomodoroLog);
   const switchModeRef      = useRef(null);
   const onCompleteRef      = useRef(null);
+  // Stable ref so focus/sync callbacks always see the current tasks list without
+  // closing over a stale snapshot or depending on `tasks` in their effect deps.
+  const tasksRef           = useRef(tasks);
 
   useEffect(() => { activeTaskRef.current      = activeTaskId;    }, [activeTaskId]);
   useEffect(() => { timerModeRef.current       = timerMode;       }, [timerMode]);
@@ -372,6 +378,7 @@ export default function App() {
   useEffect(() => { timerSecsRef.current       = timerSeconds;    }, [timerSeconds]);
   useEffect(() => { settingsRef.current        = settings;        }, [settings]);
   useEffect(() => { pomoLogRef.current         = pomodoroLog;     }, [pomodoroLog]);
+  useEffect(() => { tasksRef.current           = tasks;           }, [tasks]);
 
   // ── Persistence ──
   useEffect(() => { persist(SK.tasks,      tasks);      }, [tasks]);
@@ -745,7 +752,8 @@ export default function App() {
   // Stable handlers passed to the memoized TaskList (keep its props referentially stable)
   const openAddTaskModal = useCallback(() => setOpenModal('add'), []);
   const openEditTask     = useCallback((task) => setEditingTask(task), []);
-  const handleSyncNow    = useCallback(() => syncTasks(tasks, setTasks, setSyncStatus), [tasks]);
+  // tasksRef keeps this callback stable while still syncing the live list.
+  const handleSyncNow    = useCallback(() => syncTasks(tasksRef.current, setTasks, setSyncStatus), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reminders tab → jump to the task that owns a reminder, opened straight to its Scheduling tab.
   const navigateToReminderSource = useCallback((sourceType, sourceId) => {
@@ -853,11 +861,15 @@ export default function App() {
         const applyDone = t => t.id === id
           ? { ...t, completed: done, status: done ? 'completed' : 'needsAction', completedAt: done ? completedIso : null, updatedAt: completedIso }
           : t;
+        // Flush any partial focus-time accumulation so the sync carries the
+        // correct timeLogged — without this, up to FLUSH_EVERY_N_SECS of timer
+        // work could be overwritten by pullTasksFromGoogle's setTasks.
+        flushFocusTime();
         // Track the freshly-built list so the sync below runs on an array that
         // INCLUDES both the completion and any new occurrence — passing the stale
         // `tasks` closure dropped them (pull rebuilds state from whatever array
         // it's given, erasing just-applied local changes).
-        let nextTasks = tasks.map(applyDone);
+        let nextTasks = tasksRef.current.map(applyDone);
         setTasks(prev => prev.map(applyDone));
 
         if (done && currentTask.recurrence) {

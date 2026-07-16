@@ -645,8 +645,39 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
   }
 
   localStorage.setItem('nook_last_pull_sync', nowIso);
+
+  // ── FLAG-4: Tombstone pruning ─────────────────────────────────────────────
+  // Remote IDs seen in this (complete, un-paginated) pull. Any tombstoned Google
+  // Task ID that is NOT in the remote list will never be resurrected — safe to
+  // evict so nook_deleted_tasks doesn't grow without bound and exhaust quota.
+  const remoteIdSet = new Set(gTasks.map(t => t.id));
+  try {
+    const rawTomb = localStorage.getItem('nook_deleted_tasks');
+    const tombstones = rawTomb ? JSON.parse(rawTomb) : [];
+    const pruned = tombstones.filter(gId => remoteIdSet.has(gId));
+    if (pruned.length < tombstones.length) {
+      localStorage.setItem('nook_deleted_tasks', JSON.stringify(pruned));
+    }
+  } catch { /* non-fatal */ }
+
   if (taskStateChanged) {
-    setTasks(updatedTasks);
+    // ── FLAG-1: Functional updater ────────────────────────────────────────────
+    // Pull can take multiple API round-trips. Using a functional updater means
+    // the merge runs against React's *current* state rather than the snapshot
+    // captured at pull-start, so concurrent local edits (checkbox, rename, etc.)
+    // that arrived during the pull are preserved rather than overwritten.
+    //
+    // Merge strategy: Google's pulled value wins for every allowlisted field
+    // (consistent with the existing last-write-wins intent), but local-only
+    // fields (timeLogged, pomodorosCompleted, notes, subtasks…) kept on prev
+    // are never clobbered by a pull that doesn't know about them.
+    setTasks(prev => {
+      const byId = Object.fromEntries(updatedTasks.map(t => [t.id, t]));
+      const merged = prev
+        .map(t => byId[t.id] ? { ...t, ...byId[t.id] } : t)
+        .concat(updatedTasks.filter(t => !prev.find(p => p.id === t.id)));
+      return merged;
+    });
   }
 }
 
