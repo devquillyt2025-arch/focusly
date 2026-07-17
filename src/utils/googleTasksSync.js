@@ -328,6 +328,39 @@ export function pushSyncQueue(action) {
 let syncInProgress = false;
 let lastSyncTimestamp = 0; // For debouncing window focus triggers
 
+// ─── Retry/backoff for queued push ops ──────────────────────────────────────
+// 429 (rate limit) was always retried; 401 (token expired/invalid — a fresh
+// token comes from getValidAccessToken() on the *next* sync cycle, so this is
+// genuinely retryable, not permanent) and 5xx (transient server errors) were
+// previously silently dropped after one attempt. 4xx other than 401/429
+// (400 bad payload, 403 permission/config, 404 already handled as a
+// conflict) are NOT retryable — retrying those forever would just spin.
+function isRetryableStatus(status) {
+  return status === 429 || status === 401 || status >= 500;
+}
+
+const MAX_RETRY_ATTEMPTS = 8;
+// Exponential, capped at 5 min — bounded mostly by the natural sync cadence
+// (focus-triggered syncs are themselves 30s-debounced) rather than by a tight
+// retry loop, so this mainly prevents hammering on the rare back-to-back
+// manual "Sync Now" case.
+function backoffMs(attempts) {
+  return Math.min(2 ** attempts * 1000, 5 * 60 * 1000);
+}
+
+// Requeues op with an incremented attempt count and backoff window, or drops
+// it (with a console warning — this is the last point before the op is gone
+// for good) once MAX_RETRY_ATTEMPTS is exceeded, so a permanently-broken op
+// can't sit in the queue retrying forever.
+function requeueWithBackoff(remainingQ, op) {
+  const attempts = (op.attempts || 0) + 1;
+  if (attempts > MAX_RETRY_ATTEMPTS) {
+    console.warn(`[Google Tasks Sync] Dropping ${op.type} for task ${op.taskId} after ${MAX_RETRY_ATTEMPTS} failed attempts.`);
+    return;
+  }
+  remainingQ.push({ ...op, attempts, nextRetryAt: Date.now() + backoffMs(attempts) });
+}
+
 export async function pushLocalChangesToGoogle(tasks, token) {
   const qStr = localStorage.getItem('nook_sync_queue');
   let q = [];
@@ -352,6 +385,13 @@ export async function pushLocalChangesToGoogle(tasks, token) {
   try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
 
   for (const op of q) {
+    // Still cooling down from a previous retryable failure — skip the network
+    // call (and the rate-limit delay below) entirely this cycle.
+    if (op.nextRetryAt && Date.now() < op.nextRetryAt) {
+      remainingQ.push(op);
+      continue;
+    }
+
     // Small delay between requests to respect Google Tasks API usage limits
     await new Promise(r => setTimeout(r, 100));
 
@@ -375,8 +415,8 @@ export async function pushLocalChangesToGoogle(tasks, token) {
           parentGoogleTaskId = data.id;
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, googleTaskId: data.id, lastSyncedAt: nowIso } : t);
           localTask = updatedTasks.find(t => t.id === op.taskId);
-        } else if (res.status === 429) {
-          remainingQ.push(op); // Rate limited, keep in queue
+        } else if (isRetryableStatus(res.status)) {
+          requeueWithBackoff(remainingQ, op); // rate limited / expired token / transient server error
           continue;
         } else {
           const errText = await res.text();
@@ -398,12 +438,12 @@ export async function pushLocalChangesToGoogle(tasks, token) {
           const nowIso = new Date().toISOString();
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, lastSyncedAt: nowIso } : t);
           localTask = updatedTasks.find(t => t.id === op.taskId);
-        } else if (res.status === 429) {
-          remainingQ.push(op);
-          continue;
         } else if (res.status === 404) {
           console.warn('[Google Tasks Sync] Conflict: Task deleted on Google Tasks but updated locally.');
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, syncConflict: 'Deleted on Google Tasks, edited locally', googleTaskId: null } : t);
+          continue;
+        } else if (isRetryableStatus(res.status)) {
+          requeueWithBackoff(remainingQ, op);
           continue;
         } else {
           const errText = await res.text();
@@ -487,8 +527,8 @@ export async function pushLocalChangesToGoogle(tasks, token) {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok && res.status === 429) {
-        remainingQ.push(op);
+      if (!res.ok && isRetryableStatus(res.status)) {
+        requeueWithBackoff(remainingQ, op);
       } else if (!res.ok) {
         console.error('[Google Tasks Sync] DELETE task failed:', await res.text());
       }
@@ -500,17 +540,27 @@ export async function pushLocalChangesToGoogle(tasks, token) {
   // network requests. Another tab (or a same-tab pushSyncQueue call) may have
   // queued something new in the meantime; blindly setting the queue to
   // remainingQ would silently drop it. Instead, under the same lock
-  // pushSyncQueue uses, remove exactly the ops this run finished processing
-  // (matched by qid — falling back to type+taskId for anything queued before
-  // qid existed) from whatever the queue currently holds.
-  const processedKeys = new Set(
-    q.filter(op => !remainingQ.includes(op)).map(op => op.qid || `${op.type}:${op.taskId}`)
-  );
+  // pushSyncQueue uses, merge by key (qid — falling back to type+taskId for
+  // anything queued before qid existed) against whatever the queue currently
+  // holds: remove ops this run fully resolved, update ops it's still
+  // retrying with their fresh attempts/nextRetryAt, and leave anything else
+  // (added concurrently) untouched.
+  //
+  // Matched by key, not object identity — requeueWithBackoff() pushes a new
+  // {...op, attempts, nextRetryAt} object into remainingQ rather than the
+  // original op reference, so a reference-equality check here would
+  // wrongly treat every retried op as "processed" and drop it instead of
+  // persisting its backoff state.
+  const keyOf = op => op.qid || `${op.type}:${op.taskId}`;
+  const remainingByKey = new Map(remainingQ.map(op => [keyOf(op), op]));
+  const processedKeys = new Set(q.map(keyOf).filter(key => !remainingByKey.has(key)));
   await withSyncQueueLock(() => {
     const curStr = localStorage.getItem('nook_sync_queue');
     let current = [];
     try { current = curStr ? JSON.parse(curStr) : []; } catch {}
-    const next = current.filter(item => !processedKeys.has(item.qid || `${item.type}:${item.taskId}`));
+    const next = current
+      .filter(item => !processedKeys.has(keyOf(item)))
+      .map(item => remainingByKey.get(keyOf(item)) || item);
     localStorage.setItem('nook_sync_queue', JSON.stringify(next));
   });
   return updatedTasks;
