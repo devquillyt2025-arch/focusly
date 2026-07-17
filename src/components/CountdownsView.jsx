@@ -437,6 +437,7 @@ function CountdownModal({ onSave, onClose, editCd = null, onDelete }) {
   const startRef = useRef(null);
   const endRef = useRef(null);
   const msDateRefs = useRef({});
+  const submittingRef = useRef(false); // guards a same-frame double-submit (double-Enter/double-click)
 
   const [form, setForm] = useState(() => isEdit ? {
     name: editCd.name,
@@ -467,9 +468,11 @@ function CountdownModal({ onSave, onClose, editCd = null, onDelete }) {
   };
 
   const save = () => {
+    if (submittingRef.current) return;
     if (!form.name.trim()) { setError('Name is required'); return; }
     if (!form.startDate || !form.endDate) { setError('Start and end dates are required'); return; }
     if (form.endDate < form.startDate) { setError('End date must be after start date'); return; }
+    submittingRef.current = true;
 
     const milestones = form.milestones.filter(m => m.name.trim() && m.targetDate);
 
