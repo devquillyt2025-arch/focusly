@@ -134,20 +134,25 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     }
   };
 
-  // Save effects
+  // Save effects — try/catch matches the app-wide persist() convention: a
+  // QuotaExceededError here would otherwise throw during React's commit phase
+  // and propagate to the nearest error boundary, which used to mean the whole
+  // app (there was none above Settings), not just this toggle.
   useEffect(() => {
-    localStorage.setItem('nook-profile-name', profileName);
-    localStorage.setItem('nook-profile-email', profileEmail);
-    localStorage.setItem('nook-profile-avatar', avatar);
+    try {
+      localStorage.setItem('nook-profile-name', profileName);
+      localStorage.setItem('nook-profile-email', profileEmail);
+      localStorage.setItem('nook-profile-avatar', avatar);
+    } catch {}
     if (onUpdateProfileRef.current) onUpdateProfileRef.current(profileName, profileEmail, avatar);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileName, profileEmail, avatar]);
-  useEffect(() => { localStorage.setItem('nook-notif-master', notifMaster); }, [notifMaster]);
-  useEffect(() => { localStorage.setItem('nook-notif-morning', notifMorning); }, [notifMorning]);
-  useEffect(() => { localStorage.setItem('nook-notif-morning-time', morningTime); }, [morningTime]);
-  useEffect(() => { localStorage.setItem('nook-notif-streak', notifStreak); }, [notifStreak]);
-  useEffect(() => { localStorage.setItem('nook-notif-pomo', notifPomo); }, [notifPomo]);
-  useEffect(() => { localStorage.setItem('nook-week-start', weekStart); }, [weekStart]);
+  useEffect(() => { try { localStorage.setItem('nook-notif-master', notifMaster); } catch {} }, [notifMaster]);
+  useEffect(() => { try { localStorage.setItem('nook-notif-morning', notifMorning); } catch {} }, [notifMorning]);
+  useEffect(() => { try { localStorage.setItem('nook-notif-morning-time', morningTime); } catch {} }, [morningTime]);
+  useEffect(() => { try { localStorage.setItem('nook-notif-streak', notifStreak); } catch {} }, [notifStreak]);
+  useEffect(() => { try { localStorage.setItem('nook-notif-pomo', notifPomo); } catch {} }, [notifPomo]);
+  useEffect(() => { try { localStorage.setItem('nook-week-start', weekStart); } catch {} }, [weekStart]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const applyPreset = preset => setForm(f => ({ ...f, ...preset.vals }));
