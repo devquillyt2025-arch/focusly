@@ -518,7 +518,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
 
   const persist = (updated) => {
     setNotes(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
   };
 
   // Bug 3 fix: one-time migration that removes content duplicated at the data
@@ -541,7 +541,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
       const exists = prev.find(n => n.id === note.id);
       logActivity({ module: 'notes', entity_type: 'note', entity_id: note.id, action: exists ? 'updated' : 'created', title: note.title || '(untitled)' });
       const updated = exists ? prev.map(n => n.id === note.id ? note : n) : [note, ...prev];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -549,7 +549,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
   const updateNoteColor = (id, newColor) => {
     setNotes(prev => {
       const updated = prev.map(n => n.id === id ? { ...n, color: newColor, updatedAt: new Date().toISOString() } : n);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -560,7 +560,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
       const note = prev.find(n => n.id === id);
       if (note) logActivity({ module: 'notes', entity_type: 'note', entity_id: id, action: 'deleted', title: note.title || '(untitled)' });
       const updated = prev.filter(n => n.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -572,7 +572,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
       const target = prev.find(n => n.id === id);
       if (target) logActivity({ module: 'notes', entity_type: 'note', entity_id: id, action: 'updated', title: `${target.pinned ? 'Unpinned' : 'Pinned'}: ${target.title || '(untitled)'}` });
       const updated = prev.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() } : n);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
