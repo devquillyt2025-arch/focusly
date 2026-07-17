@@ -46,7 +46,7 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
   const [pushBusy, setPushBusy] = useState(false);
   useEffect(() => {
     let active = true;
-    isCurrentlySubscribed().then(v => { if (active) setPushEnabled(v); });
+    isCurrentlySubscribed().then(v => { if (active) setPushEnabled(v); }).catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -176,12 +176,16 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     setBackupBusy(true);
     try {
       const counts = await exportBackup();
+      // "Download started", not "downloaded ✓" — a browser can silently block,
+      // cancel, or redirect a triggered download with no JS-visible signal
+      // either way, so we can only confirm the file was built, not saved.
+      // Also: this backup includes your saved-login passwords in plaintext.
       alert(
-        `Backup downloaded ✓\n\n` +
+        `Backup download started\n\n` +
         `• ${counts.local} local data set${counts.local === 1 ? '' : 's'} (tasks, notes, journal, etc.)\n` +
         `• ${counts.reminders} reminder${counts.reminders === 1 ? '' : 's'}\n` +
         `• ${counts.notification_prefs} preference row${counts.notification_prefs === 1 ? '' : 's'}\n\n` +
-        `Keep this .zip somewhere safe.`
+        `Includes your Saved Logins in plaintext — keep this .zip somewhere safe.`
       );
     } catch (err) {
       console.error('[Backup] export failed:', err);
@@ -230,12 +234,16 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
       alert("This browser does not support desktop notification");
       return;
     }
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      alert('Enable notifications in browser settings to get reminders');
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Enable notifications in browser settings to get reminders');
+        setNotifMaster(false);
+      } else {
+        setNotifMaster(true);
+      }
+    } catch {
       setNotifMaster(false);
-    } else {
-      setNotifMaster(true);
     }
   };
 
@@ -597,7 +605,9 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
         <h3 className="settings-card-title">Data Management</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: 14 }}>
           Your content is stored locally in your browser ({calculateStorage()} KB used).
-          A full backup also bundles your reminders and notification preferences.
+          A full backup also bundles your reminders, notification preferences, and
+          your Saved Logins (passwords included, unencrypted) — store the file
+          somewhere you'd store a password export.
         </p>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -609,7 +619,7 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
           <label className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import
-            <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+            <input type="file" accept=".json,.zip" style={{ display: 'none' }} onChange={handleImport} />
           </label>
 
           <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.06)', color: 'var(--color-red)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={onClearData}>
