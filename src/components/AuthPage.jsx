@@ -1,16 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, friendlyAuthError } from '../utils/authClient';
 
 // ─── Liquid Glass Full-screen login + signup ────────────────────────
-export default function AuthPage() {
+// ssoError: set by AuthGate when the cross-origin SSO handoff from the
+// landing app failed (expired/already-consumed link, network error) —
+// pre-fills the error banner so "handoff failed" doesn't look identical to
+// "never signed in."
+export default function AuthPage({ ssoError = '' }) {
   const [mode,     setMode]     = useState('signin'); // 'signin' | 'signup'
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [error,    setError]    = useState(ssoError);
   const [notice,   setNotice]   = useState('');
+
+  // AuthGate's onAuthStateChange listener can flip AuthGate's session state
+  // to null (mounting this component with ssoError='') *before* AuthGate's
+  // own setSsoError(...) call lands from the same async handoff flow —
+  // useState(ssoError) only seeds the initial value, so that later prop
+  // update was silently dropped. Verified against a real revoked-session
+  // handoff (Phase 5 sandbox test) before landing this fix: the error copy
+  // never appeared despite setSession() genuinely returning an error.
+  useEffect(() => { if (ssoError) setError(ssoError); }, [ssoError]);
 
   const switchMode = (m) => { setMode(m); setError(''); setNotice(''); };
 

@@ -28,6 +28,14 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const RESEND_FROM = Deno.env.get('RESEND_FROM') || 'Nook <onboarding@resend.dev>';
 const SITE_URL = Deno.env.get('SITE_URL') ?? '';
 
+// A subscription that keeps failing without ever returning one of the
+// standard revoked/expired codes (404/410/401/403, cleaned up immediately
+// below) would otherwise retry every single cron run forever with no way to
+// stop — no schema field existed to count consecutive failures at all until
+// migration 0007. This bounds it: 5xx/timeouts/etc. get a handful of retries
+// (transient errors do happen), a hard-dead endpoint eventually gets pruned.
+const PUSH_MAX_CONSECUTIVE_FAILURES = 5;
+
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 function reminderBody(reminder: { target_at: string | null }) {
@@ -100,11 +108,15 @@ Deno.serve(async (req) => {
   }
 
   let sent = 0, failed = 0, cleaned = 0, emailSent = 0, emailFailed = 0;
+  // Reminders with at least one *confirmed* successful delivery this run —
+  // see the reminder_sent write-back below for why this replaced the
+  // previous "a channel existed" check.
+  const deliveredReminderIds = new Set<string>();
 
   if (dueReminders && dueReminders.length > 0) {
     const userIds = [...new Set(dueReminders.map(r => r.user_id))];
     const [{ data: allSubs }, { data: allPrefs }] = await Promise.all([
-      supabase.from('push_subscriptions').select('id, user_id, endpoint, p256dh_key, auth_key').in('user_id', userIds),
+      supabase.from('push_subscriptions').select('id, user_id, endpoint, p256dh_key, auth_key, consecutive_failures').in('user_id', userIds),
       supabase.from('notification_prefs').select('user_id, email_reminders_enabled').in('user_id', userIds),
     ]);
 
@@ -130,6 +142,7 @@ Deno.serve(async (req) => {
           if (email) {
             await sendReminderEmail(email, reminder);
             emailSent++;
+            deliveredReminderIds.add(reminder.id);
           }
         } catch {
           emailFailed++;
@@ -151,28 +164,52 @@ Deno.serve(async (req) => {
             payload,
           );
           sent++;
+          deliveredReminderIds.add(reminder.id);
+          if (sub.consecutive_failures > 0) {
+            await supabase.from('push_subscriptions').update({ consecutive_failures: 0 }).eq('id', sub.id);
+          }
         } catch (err) {
           failed++;
           const statusCode = (err as { statusCode?: number }).statusCode;
           if (statusCode === 404 || statusCode === 410 || statusCode === 401 || statusCode === 403) {
+            // Google/browser itself says this endpoint is gone — no point counting failures first.
             await supabase.from('push_subscriptions').delete().eq('id', sub.id);
             cleaned++;
+          } else {
+            const nextCount = (sub.consecutive_failures ?? 0) + 1;
+            if (nextCount >= PUSH_MAX_CONSECUTIVE_FAILURES) {
+              await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+              cleaned++;
+            } else {
+              await supabase.from('push_subscriptions').update({ consecutive_failures: nextCount }).eq('id', sub.id);
+            }
           }
         }
       }
     }
 
-    // ─── FLAG-3: Only mark reminders as sent when a delivery channel existed ────
-    // Previously ALL reminders in the batch were marked sent regardless of
-    // delivery outcome. A user with no push subscription AND email disabled
-    // would have their reminder silently tombstoned, never delivered, and
-    // never retried. Now we only mark those with at least one channel attempted.
-    const sentIds: string[] = [];
-    for (const reminder of dueReminders) {
-      const hasPush  = (subsByUserId[reminder.user_id]?.length ?? 0) > 0;
-      const hasEmail = prefsByUserId[reminder.user_id]?.email_reminders_enabled === true;
-      if (hasPush || hasEmail) sentIds.push(reminder.id);
-    }
+    // ─── FLAG-3 (revised): only mark sent on CONFIRMED delivery, not just a
+    // channel existing ────────────────────────────────────────────────────
+    // FLAG-3 originally stopped marking a reminder sent when the user had no
+    // channel configured at all (push sub + email both absent) — that fixed
+    // the "silently tombstoned, never delivered" case. But it checked
+    // whether a channel *existed*, not whether the send through it actually
+    // *succeeded*: a user whose only push subscription is stale (returning
+    // some non-cleanup error, so it isn't pruned) or whose Resend send throws
+    // still had `hasPush`/`hasEmail` true, so the reminder was marked sent
+    // anyway — delivered to no one, and never retried.
+    //
+    // deliveredReminderIds only gains an entry when webpush.sendNotification
+    // or sendReminderEmail actually resolved without throwing (see above).
+    // A reminder with a configured channel that failed every attempt this
+    // run stays reminder_sent: false, so the next cron run's query
+    // (reminder_sent = false) naturally retries it — this *is* the retry
+    // mechanism, no separate queue needed. A reminder with no channel at all
+    // behaves the same as before: nothing to attempt, stays unmarked until
+    // the user configures one.
+    const sentIds = dueReminders
+      .filter((reminder: any) => deliveredReminderIds.has(reminder.id))
+      .map((reminder: any) => reminder.id);
     if (sentIds.length > 0) {
       await supabase.from('reminders').update({ reminder_sent: true }).in('id', sentIds);
     }

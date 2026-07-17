@@ -8,6 +8,7 @@ import AuthPage from './AuthPage';
 export default function AuthGate({ children }) {
   // undefined = still checking the session; null = signed out; object = signed in
   const [session, setSession] = useState(isAuthConfigured ? undefined : null);
+  const [ssoError, setSsoError] = useState('');
 
   useEffect(() => {
     if (!isAuthConfigured) return;
@@ -29,7 +30,29 @@ export default function AuthGate({ children }) {
         const refresh_token = params.get('sb_refresh_token');
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
+          // The handoff tokens are single-shot — once consumed (by this call,
+          // successful or not) they're gone from the URL, so a failure here
+          // must be surfaced now or it's lost. Previously the return value
+          // was discarded entirely, so a failed handoff fell straight through
+          // to getSession() below and landed on a plain "signed out" screen —
+          // indistinguishable from having never signed in at all.
+          //
+          // Deliberately NOT gated on `active`, unlike the setSession call
+          // below. Verified (Phase 5 sandbox, real revoked-session handoff)
+          // that gating this on `active` silently swallowed a genuine error:
+          // React StrictMode double-invokes this effect in dev, and the
+          // *first* instance — the one that actually owns the hash, since
+          // replaceState already stripped it by the time the second runs —
+          // can have its `active` flipped false by the second mount's
+          // cleanup before this await resolves. The hash is consumed exactly
+          // once, ever; whichever effect instance processes it is the only
+          // chance to ever report the result, so there's no "staler, about
+          // to be superseded" run to guard against here the way there is for
+          // the session-setting call below.
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (error) {
+            setSsoError('Your sign-in link expired or was already used. Please sign in again below.');
+          }
         }
       }
       const { data } = await supabase.auth.getSession();
@@ -50,7 +73,7 @@ export default function AuthGate({ children }) {
     );
   }
 
-  if (!session) return <AuthPage />;
+  if (!session) return <AuthPage ssoError={ssoError} />;
 
   return children;
 }
