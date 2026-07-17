@@ -234,3 +234,53 @@ export function disconnectGoogleCalendar() {
 export function isGCalConnected() {
   return localStorage.getItem(GCAL_ENABLED_KEY) === 'true';
 }
+
+// ─── Offline push queue ──────────────────────────────────────────────────
+// Unlike Tasks, Calendar only ever pushes on CREATE (there's no edit/delete
+// mirroring back to Google) — createGCalEvent() was previously called inside
+// a bare try/catch in CalendarView's submit handler, so a failed push (the
+// user was offline, a transient API error) was silently dropped: the event
+// stayed local-only forever with no record it needed retrying, no offline
+// queue equivalent to nook_sync_queue. This gives it one, scoped to just
+// that one operation.
+const GCAL_PUSH_QUEUE_KEY = 'nook_gcal_push_queue';
+const GCAL_PUSH_MAX_ATTEMPTS = 5;
+
+export function queueGCalPush(payload) {
+  let q = [];
+  try { q = JSON.parse(localStorage.getItem(GCAL_PUSH_QUEUE_KEY) || '[]'); } catch {}
+  q.push({ ...payload, qid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, attempts: 0 });
+  try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(q)); } catch {}
+}
+
+// Attempts every queued push once (no backoff timer — the natural trigger
+// cadence this is called from, mount + window focus, already spaces retries
+// out in normal use). Returns true if anything in the queue was successfully
+// pushed, so the caller knows to refresh its Google event list.
+export async function flushGCalPushQueue() {
+  let q = [];
+  try { q = JSON.parse(localStorage.getItem(GCAL_PUSH_QUEUE_KEY) || '[]'); } catch {}
+  if (!q.length) return false;
+
+  const token = await getCalendarToken();
+  if (!token) return false; // not connected / couldn't refresh — try again next trigger
+
+  let anySucceeded = false;
+  const remaining = [];
+  for (const item of q) {
+    try {
+      const { qid, attempts, ...payload } = item;
+      await createGCalEvent(token, payload);
+      anySucceeded = true;
+    } catch (err) {
+      const attempts = (item.attempts || 0) + 1;
+      if (attempts >= GCAL_PUSH_MAX_ATTEMPTS) {
+        console.warn(`[Google Calendar Sync] Dropping queued event "${item.title}" after ${attempts} failed push attempts:`, err);
+      } else {
+        remaining.push({ ...item, attempts });
+      }
+    }
+  }
+  try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(remaining)); } catch {}
+  return anySucceeded;
+}

@@ -4,6 +4,7 @@ import { logActivity } from '../utils/activityLog';
 import {
   isGCalConnected,
   getCalendarToken, fetchGCalEvents, createGCalEvent, gcalColor,
+  queueGCalPush, flushGCalPushQueue,
 } from '../utils/googleCalendarSync';
 import Select from './Select';
 import { localDateStr as toISO } from '../utils/date';
@@ -135,6 +136,18 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
 
   useEffect(() => { if (gcalConnected) fetchGCalRange(); }, [gcalConnected, fetchGCalRange]);
 
+  // Retry any event pushes that failed (offline, transient API error) —
+  // mirrors Tasks' focus-triggered sync, minus the debounce/queue-mutex
+  // machinery Tasks needs (Calendar only ever pushes on create, one op at a
+  // time, so there's no cross-tab read-modify-write race to guard here).
+  useEffect(() => {
+    if (!gcalConnected) return;
+    const flush = () => { flushGCalPushQueue().then(succeeded => { if (succeeded) fetchGCalRange(); }); };
+    flush();
+    window.addEventListener('focus', flush);
+    return () => window.removeEventListener('focus', flush);
+  }, [gcalConnected, fetchGCalRange]);
+
   const eventsByDate = useMemo(() => {
     const map = {};
     const add = (ds, item) => { if (!ds) return; (map[ds] = map[ds] || []).push(item); };
@@ -232,7 +245,14 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     saveCustomEvent(ev);
     logActivity({ module: 'calendar', entity_type: 'calendar_event', entity_id: ev.id, action: 'created', title: ev.title });
     if (gcalConnected && pushToGCal) {
-      try { const tok = await getCalendarToken(); if (tok) { await createGCalEvent(tok, { title: ev.title, date: ev.date, time: ev.time, endTime: ev.endTime }); await fetchGCalRange(); } } catch {}
+      const payload = { title: ev.title, date: ev.date, time: ev.time, endTime: ev.endTime };
+      try {
+        const tok = await getCalendarToken();
+        if (tok) { await createGCalEvent(tok, payload); await fetchGCalRange(); }
+        else queueGCalPush(payload); // couldn't get a token right now — retry on next focus/mount
+      } catch {
+        queueGCalPush(payload); // offline / transient API error — was previously dropped silently
+      }
     }
     setModalSubmitting(false);
     setModalTitle(''); setModalNotes(''); setShowAddModal(false);
