@@ -21,12 +21,19 @@ data lives in `localStorage`, is loaded synchronously into React state in
 round-trip for normal reads/writes, and the app is fully functional with no
 network and no account.
 
-Two consequences that drive most of the design:
+Three consequences that drive most of the design:
 
 - **State lives in `App.jsx`** (~2050 lines) and flows down as props. Views are
   code-split with `lazy()` per tab, but they are not independently stateful stores.
 - **Anything cloud-backed is an *addition* to localStorage, never a replacement.**
   If the cloud is unconfigured or offline, the app must still work.
+- **No cross-tab merge.** Two tabs open at once is last-write-wins on whatever
+  localStorage key either one touches — there is no reconciliation. `App.jsx`
+  listens for the `storage` event (fires only in *other* tabs of the same origin)
+  and shows a persistent top banner ("data changed in another tab") on any
+  `nook-`/`nook_`-prefixed key except sync-internal plumbing
+  (`CROSS_TAB_IGNORE_KEYS`). This is detect-and-warn, not a fix — see §8 for why
+  the banner has no dismiss.
 
 ### Supabase scope — and why it is this narrow
 
@@ -122,7 +129,31 @@ Google but edited locally is kept and tagged `syncConflict` rather than removed.
 `syncTasks()` = push queue → pull, in that order, guarded by a `syncInProgress`
 flag and a 30s debounce on window-focus triggers. `pushSyncQueue()` collapses
 repeat ops per task; deleted Google IDs are tombstoned in `nook_deleted_tasks` so
-a pull can't resurrect them. 429s are re-queued; 100ms is slept between requests.
+a pull can't resurrect them. 429/401/5xx are re-queued with exponential backoff
+(`requeueWithBackoff`, capped at 5 min, dropped after 8 attempts); 100ms is slept
+between requests.
+
+### Cross-tab mutex on the sync queue
+`nook_sync_queue`/`nook_deleted_tasks` are read-modified-written from two places
+that can race across tabs — `pushSyncQueue()` (fast, on every edit) and
+`pushLocalChangesToGoogle()`'s write-back (slow, after a batch of network calls).
+Both go through `withSyncQueueLock()` (`navigator.locks.request('nook-sync-queue', ...)`),
+and the write-back merges by `qid` against whatever the queue *currently* holds
+rather than blindly overwriting with a start-of-batch snapshot — otherwise a
+concurrent tab's write during the batch would be silently dropped. **Verified
+fail-open**: a tab holding the lock via a callback that never resolves, then
+closed outright, releases the lock and the other tab's pending call resolves in
+under a second rather than deadlocking (tested via Playwright closing one of two
+real tabs mid-lock — a managed close, not a literal process kill, but the Locks
+spec doesn't distinguish the two for release semantics).
+
+`utils/googleCalendarSync.js`'s `nook_gcal_push_queue` has the identical lock
+(`nook-gcal-push-queue`) for the identical reason — it was added without one
+initially on the (wrong) reasoning that "only pushes on create, one op at a
+time" meant no race; that describes the entity model, not tab concurrency. Any
+unlocked shared-key read-modify-write has this race regardless of how simple
+the data model is — check for a lock, don't assume simplicity implies safety,
+if you add another queue like this.
 
 `syncTaskField()` is a separate immediate single-field PATCH used by the
 Scheduling tab for instant feedback, bypassing the queue. It returns a tagged
@@ -283,3 +314,11 @@ dead code; each is a real decision or a real bug with a real cost to touching.
   re-render and pin it to yesterday's pomodoro count until an unrelated prop
   changed. The `useSyncExternalStore` tick hides this while a timer runs, which is
   why it looks safe and isn't.
+- **The cross-tab banner (§1) has no dismiss button — Reload is the only exit.**
+  This is intentional, not an oversight; do not "helpfully" re-add a dismiss/×.
+  Verified with two real tabs: dismissing without reloading leaves that tab's
+  in-memory state stale, and its *next save* silently overwrites whatever the
+  other tab wrote, with no further warning — worse than no banner, since it
+  teaches the user the banner is safe to wave away. If a dismiss is ever
+  reintroduced, it needs to solve that staleness (re-sync the tab's in-memory
+  state from disk, at minimum for the key that changed), not just hide the UI.
