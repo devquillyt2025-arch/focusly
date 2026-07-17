@@ -3,17 +3,28 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Shared by Search/Notifications/Avatar to pick which trigger markup to render
-// (full labeled row vs 64px icon-only) and which SidebarFlyout placement to use.
-// Scoped to these three leaf components only — not a general viewport-detection
-// system, so it doesn't reintroduce the sidebarOpen/matchMedia gap noted in the audit.
+// (full labeled row vs icon-only) and which SidebarFlyout placement to use.
+// Watches for .main-nav--rail class on the sidebar (set by JS toggle) rather than
+// a media query, so the search collapses in sync with the sidebar collapse state.
 export function useIsRail() {
-  const [isRail, setIsRail] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches);
+  const [isRail, setIsRail] = useState(() => {
+    if (typeof document === 'undefined') return false;
+    return !!document.querySelector('.main-nav--rail');
+  });
+
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1024px)');
-    const handler = () => setIsRail(mq.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    const nav = document.querySelector('.main-nav');
+    if (!nav) return;
+
+    const observer = new MutationObserver(() => {
+      setIsRail(nav.classList.contains('main-nav--rail'));
+    });
+    observer.observe(nav, { attributes: true, attributeFilter: ['class'] });
+    // Also re-check on mount in case the class was already set
+    setIsRail(nav.classList.contains('main-nav--rail'));
+    return () => observer.disconnect();
   }, []);
+
   return isRail;
 }
 

@@ -1128,7 +1128,13 @@ export default function App() {
   const scheduledToday = trackers.filter(t=>isScheduledToday(t));
   const unloggedToday  = scheduledToday.filter(t=>!isLoggedToday(t));
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => localStorage.getItem('nook-sidebar-open') !== 'false'
+  );
+  // Persist collapse state so it survives reloads (matches app's local-first convention)
+  useEffect(() => {
+    localStorage.setItem('nook-sidebar-open', sidebarOpen ? 'true' : 'false');
+  }, [sidebarOpen]);
   // Mirrors whichever SidebarSearch/MobileMoreModal instance is currently live —
   // NotesView falls back to this as `globalSearchQuery` to live-filter its own
   // list when the sidebar search box is used while on the Notes tab.
@@ -1150,88 +1156,95 @@ export default function App() {
   const activeHabitsCount = habits.filter(h => !h.archived).length;
 
   return (
-    <div className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
+    <div className={`app${sidebarOpen ? ' sidebar-open' : ' sidebar-rail'}`}>
       {/* ── Body: sidebar nav + content ── */}
       <div className="app-body">
 
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.nav
-            className="main-nav desktop-only"
-            role="navigation"
-            aria-label="Main navigation"
-            initial={{ x: -240, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -240, opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-          >
-          <div className="sidebar-brand">
-            <img src={nookLogo} className="sidebar-brand-logo" alt="Nook Logo" />
-            <span className="sidebar-brand-name">Nook</span>
-            <button className="hdr-btn sidebar-close-btn" onClick={() => setSidebarOpen(false)} title="Close Sidebar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            </button>
-          </div>
-          <SidebarSearch tasks={tasks} habits={habits} setActiveTab={setActiveTab} onQueryChange={setSearchQuery} />
-          {/* ── Section: Main ── */}
-          <span className="nav-section-label">Main</span>
-          {[
-            { id:'daily',    label:'Today',    Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
-            { id:'tasks',    label:'Tasks',    Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
-            { id:'notes',    label:'Notes',    Icon: NavIcoNotes },
-            { id:'calendar', label:'Calendar', Icon: NavIcoCalendar },
-            { id:'reminders', label:'Reminders', Icon: NavIcoBell },
-            { id:'links',    label:'Links',    Icon: NavIcoLinks },
-            { id:'countdowns', label:'Countdowns', Icon: NavIcoHourglass },
-          ].map(tab => (
-            <button key={tab.id}
-              className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="nav-icon"><tab.Icon /></span>
-              <span className="nav-label">{tab.label}</span>
-              {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
-            </button>
-          ))}
-
-          {/* ── Section: More ── */}
-          <div className="nav-divider" />
-          <span className="nav-section-label">More</span>
-          {[
-            { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
-            { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
-            { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
-            { id:'vault',    label:'Saved Logins', Icon: NavIcoVault },
-            { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
-            { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
-          ].map(tab => (
-            <button key={tab.id}
-              className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="nav-icon"><tab.Icon /></span>
-              <span className="nav-label">{tab.label}</span>
-            </button>
-          ))}
-
-          <div className="nav-spacer" />
-          <div className="nav-settings-separator" />
+      {/* Sidebar — always mounted; collapses to icon rail rather than hiding.
+          desktop-only hides it on mobile where the bottom nav takes over. */}
+      <nav
+        className={`main-nav desktop-only${sidebarOpen ? '' : ' main-nav--rail'}`}
+        role="navigation"
+        aria-label="Main navigation"
+      >
+        {/* Brand row — logo + name + toggle button */}
+        <div className="sidebar-brand">
+          <img src={nookLogo} className="sidebar-brand-logo" alt="Nook Logo" />
+          <span className="sidebar-brand-name">Nook</span>
           <button
-            className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
-            onClick={() => setActiveTab('settings')}
+            className="hdr-btn sidebar-close-btn"
+            onClick={() => setSidebarOpen(v => !v)}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            <span className="nav-icon"><NavIcoSettings /></span>
-            <span className="nav-label">Settings</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
-          </motion.nav>
-        )}
-      </AnimatePresence>
+        </div>
 
-      {!sidebarOpen && (
-        <button className="hdr-btn sidebar-reopen-btn sidebar-reopen-floating desktop-only" onClick={() => setSidebarOpen(true)} title="Open Sidebar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        {/* Search — full widget when expanded, icon-only trigger when railed */}
+        <SidebarSearch tasks={tasks} habits={habits} setActiveTab={setActiveTab} onQueryChange={setSearchQuery} />
+
+        {/* ── Section: Main ── */}
+        <span className="nav-section-label">Main</span>
+        {[
+          { id:'daily',      label:'Today',       Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
+          { id:'tasks',      label:'Tasks',        Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
+          { id:'notes',      label:'Notes',        Icon: NavIcoNotes },
+          { id:'calendar',   label:'Calendar',     Icon: NavIcoCalendar },
+          { id:'reminders',  label:'Reminders',    Icon: NavIcoBell },
+          { id:'links',      label:'Links',        Icon: NavIcoLinks },
+          { id:'countdowns', label:'Countdowns',   Icon: NavIcoHourglass },
+        ].map(tab => (
+          <button key={tab.id}
+            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+            onClick={() => setActiveTab(tab.id)}
+            data-tooltip={tab.label}
+          >
+            <span className="nav-icon-wrap">
+              <span className="nav-icon"><tab.Icon /></span>
+              {tab.badge > 0 && <span className="nav-badge-rail">{tab.badge > 99 ? '99+' : tab.badge}</span>}
+            </span>
+            <span className="nav-label">{tab.label}</span>
+            {tab.badge > 0 && <span className="nav-badge">{tab.badge}</span>}
+          </button>
+        ))}
+
+        {/* ── Section: More — shown flat in rail, labelled when expanded ── */}
+        <div className="nav-divider" />
+        <span className="nav-section-label">More</span>
+        {[
+          { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
+          { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
+          { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
+          { id:'vault',    label:'Saved Logins',  Icon: NavIcoVault },
+          { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
+          { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
+        ].map(tab => (
+          <button key={tab.id}
+            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+            onClick={() => setActiveTab(tab.id)}
+            data-tooltip={tab.label}
+          >
+            <span className="nav-icon-wrap">
+              <span className="nav-icon"><tab.Icon /></span>
+            </span>
+            <span className="nav-label">{tab.label}</span>
+          </button>
+        ))}
+
+        <div className="nav-spacer" />
+        <div className="nav-settings-separator" />
+        <button
+          className={`main-nav-btn${activeTab==='settings'?' nav-active':''}`}
+          onClick={() => setActiveTab('settings')}
+          data-tooltip="Settings"
+        >
+          <span className="nav-icon-wrap">
+            <span className="nav-icon"><NavIcoSettings /></span>
+          </span>
+          <span className="nav-label">Settings</span>
         </button>
-      )}
+      </nav>
 
       {/* ── Mobile Bottom Nav ── */}
       <nav className="mobile-bottom-nav">

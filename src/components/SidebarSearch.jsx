@@ -244,21 +244,26 @@ function SearchOverlay({ searchQuery, setSearchQuery, searchResults, searchInput
       <div className="sbsrch-panel" role="dialog" aria-modal="true" aria-label="Search Nook" onMouseDown={e => e.stopPropagation()}>
         <div className="sbsrch-input-row">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
-            ref={searchInputRef}
-            type="text"
-            role="searchbox"
-            aria-label="Search Nook"
-            placeholder="Search for anything..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button type="button" className="search-clear-btn" onClick={() => setSearchQuery('')} title="Clear">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          )}
-          <button type="button" className="modal-close sbsrch-close" onClick={onClose} aria-label="Close search">✕</button>
+          {/* Clear (×) lives INSIDE the field so it reads as "clear this input",
+              distinct from the panel-close (✕) at the row's edge — otherwise the
+              two adjacent X glyphs looked like two close buttons. */}
+          <div className="sbsrch-field">
+            <input
+              ref={searchInputRef}
+              type="text"
+              role="searchbox"
+              aria-label="Search Nook"
+              placeholder="Search for anything..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button type="button" className="search-clear-btn" onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }} title="Clear search" aria-label="Clear search">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </div>
+
         </div>
         {searchQuery.length >= 2 && <ResultsList searchQuery={searchQuery} searchResults={searchResults} onSelect={onSelect} />}
       </div>

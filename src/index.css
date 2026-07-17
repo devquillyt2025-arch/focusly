@@ -136,10 +136,11 @@ a { color: inherit; text-decoration: none; }
 input, textarea, select { font-family: inherit; }
 
 /* ─── App shell ─────────────────────────────────────────────────── */
-:root { --sidebar-width: 240px; }
+:root { --sidebar-width: 240px; --sidebar-rail-width: 60px; }
 .app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
-.app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; transition: margin-left 0.22s ease; }
+.app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; transition: margin-left 0.25s ease; }
 .sidebar-open .app-body { margin-left: var(--sidebar-width); }
+.sidebar-rail .app-body { margin-left: var(--sidebar-rail-width); }
 
 .status-dot {
   width: 7px;
@@ -323,6 +324,159 @@ input, textarea, select { font-family: inherit; }
 }
 
 .main-nav::-webkit-scrollbar { width: 0; }
+
+/* ─── Icon-rail collapse ─────────────────────────────────────────── */
+/* Smooth width transition on the sidebar itself */
+.main-nav {
+  transition: width 0.25s ease, min-width 0.25s ease;
+}
+
+/* Rail state — shrink to 60px icon strip */
+.main-nav--rail {
+  width: var(--sidebar-rail-width) !important;
+  min-width: var(--sidebar-rail-width) !important;
+  padding: 16px 6px 14px;
+  overflow: visible !important; /* let tooltips escape */
+}
+
+/* In rail mode: hide everything that isn't an icon */
+.main-nav--rail .nav-label,
+.main-nav--rail .nav-section-label,
+.main-nav--rail .nav-settings-separator,
+.main-nav--rail .nav-divider,
+.main-nav--rail .sidebar-brand-name,
+.main-nav--rail .sidebar-close-btn,
+.main-nav--rail .nav-badge { /* expanded-mode absolute badge */
+  display: none !important;
+}
+
+/* Rail buttons: centered, narrower */
+.main-nav--rail .main-nav-btn {
+  justify-content: center;
+  padding: 10px 0;
+  width: 100%;
+  /* Active bar: left border still works */
+}
+
+/* Rail brand: just the logo + toggle */
+.main-nav--rail .sidebar-brand {
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 10px;
+}
+
+/* Show toggle button in rail mode (it was hidden by sidebar-close-btn rule) */
+.main-nav--rail .sidebar-close-btn {
+  display: flex !important;
+  margin-left: 0;
+}
+
+/* Icon wrapper — relative so the corner badge can position over it */
+.nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Corner badge — only visible in rail mode */
+.nav-badge-rail {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: 800;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: none; /* hidden in expanded mode */
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  border: 1.5px solid var(--bg-sidebar);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+/* Show corner badge only when rail is active */
+.main-nav--rail .nav-badge-rail { display: flex; }
+
+/* Hide the expanded-mode absolute badge in rail mode (already done above) */
+
+/* ─── Tooltip (CSS-only, data-tooltip attr) ──────────────────────── */
+/* Tooltip appears to the right of each button with a short delay */
+.main-nav--rail .main-nav-btn {
+  position: relative;
+  overflow: visible;
+}
+.main-nav--rail .main-nav-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-6px);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 200;
+  letter-spacing: -0.01em;
+}
+/* Arrow pointing left */
+.main-nav--rail .main-nav-btn::before {
+  content: '';
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--border-strong);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 200;
+}
+
+/* Reveal on hover with ~300ms delay */
+.main-nav--rail .main-nav-btn:hover::after,
+.main-nav--rail .main-nav-btn:hover::before {
+  opacity: 1;
+  transition-delay: 0.3s;
+}
+.main-nav--rail .main-nav-btn:hover::after {
+  transform: translateY(-50%) translateX(0);
+}
+
+/* Search widget in rail: hide the full button, show only icon trigger */
+.main-nav--rail .sb-search-full-wrap { width: 100%; }
+.main-nav--rail .sb-search-full {
+  width: 100%;
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+.main-nav--rail .sb-search-full-placeholder,
+.main-nav--rail .search-shortcut-badge { display: none; }
+.main-nav--rail .sb-search-full { margin-bottom: 4px; }
+
+/* Rail trigger (already icon-only) needs centering */
+.main-nav--rail .sb-search-rail { width: 100%; display: flex; justify-content: center; }
+
+/* Suppress search tooltip from the ::after trick for search buttons */
+.main-nav--rail .sb-search-full-wrap::after,
+.main-nav--rail .sb-search-full::after { display: none; }
 
 /* Section label */
 .nav-section-label {
@@ -4816,13 +4970,12 @@ select.modal-input {
 .hv-ghost-row:hover { background: var(--accent-glow2); color: var(--accent-light); border-color: var(--border-accent); }
 
 @media (max-width: 1024px) {
-  :root { --sidebar-width: 64px; }
-  .main-nav { padding: 16px 8px; }
-  .nav-label, .nav-badge, .nav-section-label, .sidebar-brand-name { display: none; }
-  .main-nav-btn { justify-content: center; padding: 12px 0; }
-  .nav-icon { margin: 0; font-size: 1.2rem; }
-  .sidebar-close-btn { display: none; }
-  .sidebar-brand { justify-content: center; padding: 2px 0 0; gap: 0; }
+  /* On mid-size viewports, auto-collapse the sidebar to icon rail.
+     The JS class .main-nav--rail handles visual hiding of labels, but
+     we also adjust the sidebar-width variable so the page layout margin is correct
+     when the page first loads in a non-collapsed state on these widths.
+     Users can still manually expand via the toggle. */
+  :root { --sidebar-width: 240px; } /* keep full width — user controls collapse */
 }
 
 @media (max-width: 768px) {
@@ -4958,7 +5111,8 @@ select.modal-input {
     margin: 0; border-radius: 0;
   }
 
-  .sidebar-open .app-body { margin-left: 0; }
+  .sidebar-open .app-body,
+  .sidebar-rail .app-body { margin-left: 0; }
   .sidebar-reopen-floating { display: none; }
   .sidebar-brand { display: none; }
   .nav-section-label, .nav-divider, .nav-spacer { display: none; }
@@ -6214,6 +6368,33 @@ select.modal-input {
   font-family: inherit;
 }
 .sbsrch-input-row input::placeholder { color: var(--text-muted); }
+
+/* The field wraps the input + its in-field clear button. The clear is a
+   small FILLED circular chip sitting inside the field (the universal
+   "clear this input" affordance) — visually unlike the bare panel-close
+   ✕, and a divider separates the field zone from the close so the two are
+   never mistaken for a pair of close buttons. */
+.sbsrch-field { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.sbsrch-field input { flex: 1; min-width: 0; padding-right: 28px; }
+.sbsrch-field .search-clear-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.sbsrch-field .search-clear-btn:hover {
+  background: var(--border-strong);
+  color: var(--text-primary);
+}
+/* Separates the input field zone from the panel-close control. */
+.sbsrch-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 .sbsrch-close { flex-shrink: 0; }
 
 .sbsrch-panel .search-results-list { position: relative; z-index: 1; }
