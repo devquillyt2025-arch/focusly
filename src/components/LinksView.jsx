@@ -286,6 +286,7 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
   const [newCat,   setNewCat]   = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const firstRef = useRef(null);
+  const submittingRef = useRef(false); // guards a same-frame double-submit (double-Enter)
   useEffect(() => { firstRef.current?.focus(); }, []);
 
   const allCats = useMemo(() => {
@@ -297,7 +298,8 @@ function LinksModal({ entry, existingCats, onSave, onClose }) {
 
   const submit = (e) => {
     e.preventDefault();
-    if (!name.trim() || !url.trim()) return;
+    if (!name.trim() || !url.trim() || submittingRef.current) return;
+    submittingRef.current = true;
     let finalUrl = url.trim();
     if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
     onSave({
