@@ -17,6 +17,25 @@
 
 import { invokeGoogleOAuth } from './googleOAuthClient';
 
+// ─── Cross-tab sync-queue mutex ─────────────────────────────────────────────
+// nook_sync_queue / nook_deleted_tasks are read-modified-written from two
+// places that can race across tabs: pushSyncQueue() (fast, local, called on
+// every task edit) and pushLocalChangesToGoogle()'s final write-back (slow —
+// happens after a whole batch of network requests). Without this, two tabs
+// queuing/flushing concurrently can silently clobber each other's write.
+//
+// Scoped deliberately narrow: only the actual queue read-modify-write goes
+// under the lock, never the network calls in between (see
+// pushLocalChangesToGoogle) — holding a lock across a Google API round-trip
+// would make one tab's slow sync block another tab's fast local edit queuing
+// for no reason. navigator.locks is unavailable in older Safari; withSyncQueueLock
+// falls back to just running the function when it's missing, which reverts
+// to pre-existing (unlocked) behavior rather than breaking outright.
+function withSyncQueueLock(fn) {
+  if (!navigator.locks?.request) return Promise.resolve(fn());
+  return navigator.locks.request('nook-sync-queue', fn);
+}
+
 // ─── PKCE OAuth Helper Functions ────────────────────────────────────────────────────────
 function generateRandomString(length) {
   const array = new Uint8Array(length);
@@ -277,26 +296,32 @@ export async function syncTaskField(task) {
 // ─── Offline Queue & Rate Limiting ───────────────────────────────────────────────────────
 export function pushSyncQueue(action) {
   if (localStorage.getItem('nook_sync_enabled') !== 'true') return;
-  const qStr = localStorage.getItem('nook_sync_queue');
-  let q = [];
-  try { q = qStr ? JSON.parse(qStr) : []; } catch {}
-  
-  // Deduplicate or replace existing operations on the same task
-  if (action.type === 'UPDATE' || action.type === 'CREATE') {
-    q = q.filter(item => item.taskId !== action.taskId);
-  } else if (action.type === 'DELETE') {
-    q = q.filter(item => item.taskId !== action.taskId);
-    const delStr = localStorage.getItem('nook_deleted_tasks');
-    let deletedIds = [];
-    try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
-    if (action.googleTaskId && !deletedIds.includes(action.googleTaskId)) {
-      deletedIds.push(action.googleTaskId);
-      localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
-    }
-  }
+  return withSyncQueueLock(() => {
+    const qStr = localStorage.getItem('nook_sync_queue');
+    let q = [];
+    try { q = qStr ? JSON.parse(qStr) : []; } catch {}
 
-  q.push(action);
-  localStorage.setItem('nook_sync_queue', JSON.stringify(q));
+    // Deduplicate or replace existing operations on the same task
+    if (action.type === 'UPDATE' || action.type === 'CREATE') {
+      q = q.filter(item => item.taskId !== action.taskId);
+    } else if (action.type === 'DELETE') {
+      q = q.filter(item => item.taskId !== action.taskId);
+      const delStr = localStorage.getItem('nook_deleted_tasks');
+      let deletedIds = [];
+      try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
+      if (action.googleTaskId && !deletedIds.includes(action.googleTaskId)) {
+        deletedIds.push(action.googleTaskId);
+        localStorage.setItem('nook_deleted_tasks', JSON.stringify(deletedIds));
+      }
+    }
+
+    // qid identifies this specific queued op instance (not just its task) so
+    // pushLocalChangesToGoogle's write-back can remove exactly the ops it
+    // processed without clobbering anything a concurrent tab queued in the
+    // meantime — see the lock comment above.
+    q.push({ ...action, qid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}` });
+    localStorage.setItem('nook_sync_queue', JSON.stringify(q));
+  });
 }
 
 // ─── Two-Way Sync Engine ────────────────────────────────────────────────────────────────
@@ -470,7 +495,24 @@ export async function pushLocalChangesToGoogle(tasks, token) {
     }
   }
 
-  localStorage.setItem('nook_sync_queue', JSON.stringify(remainingQ));
+  // Don't blindly overwrite the queue with remainingQ — q was a snapshot from
+  // when this function started, and this loop just spent many seconds making
+  // network requests. Another tab (or a same-tab pushSyncQueue call) may have
+  // queued something new in the meantime; blindly setting the queue to
+  // remainingQ would silently drop it. Instead, under the same lock
+  // pushSyncQueue uses, remove exactly the ops this run finished processing
+  // (matched by qid — falling back to type+taskId for anything queued before
+  // qid existed) from whatever the queue currently holds.
+  const processedKeys = new Set(
+    q.filter(op => !remainingQ.includes(op)).map(op => op.qid || `${op.type}:${op.taskId}`)
+  );
+  await withSyncQueueLock(() => {
+    const curStr = localStorage.getItem('nook_sync_queue');
+    let current = [];
+    try { current = curStr ? JSON.parse(curStr) : []; } catch {}
+    const next = current.filter(item => !processedKeys.has(item.qid || `${item.type}:${item.taskId}`));
+    localStorage.setItem('nook_sync_queue', JSON.stringify(next));
+  });
   return updatedTasks;
 }
 
