@@ -246,11 +246,30 @@ export function isGCalConnected() {
 const GCAL_PUSH_QUEUE_KEY = 'nook_gcal_push_queue';
 const GCAL_PUSH_MAX_ATTEMPTS = 5;
 
+// Same cross-tab mutex as googleTasksSync.js's sync queue, and for the exact
+// same reason — found by grepping for the same read-modify-write shape after
+// the Tasks queue needed it. Original reasoning here ("Calendar only ever
+// pushes on create, one op at a time, so there's no cross-tab read-modify-
+// write race to guard") was wrong: "one op at a time" describes the entity
+// model (no per-task ongoing sync state to conflict), not concurrency — it
+// says nothing about two *tabs* racing on the same shared queue key, which
+// is a risk any unlocked localStorage read-modify-write has regardless of
+// how simple the data model is. Verified this queue had it: two tabs each
+// queuing a failed push around the same time, or one tab flushing while
+// another queues, can each blindly overwrite the other's write, same as
+// nook_sync_queue could before it got this same lock.
+function withGCalQueueLock(fn) {
+  if (!navigator.locks?.request) return Promise.resolve(fn());
+  return navigator.locks.request('nook-gcal-push-queue', fn);
+}
+
 export function queueGCalPush(payload) {
-  let q = [];
-  try { q = JSON.parse(localStorage.getItem(GCAL_PUSH_QUEUE_KEY) || '[]'); } catch {}
-  q.push({ ...payload, qid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, attempts: 0 });
-  try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(q)); } catch {}
+  return withGCalQueueLock(() => {
+    let q = [];
+    try { q = JSON.parse(localStorage.getItem(GCAL_PUSH_QUEUE_KEY) || '[]'); } catch {}
+    q.push({ ...payload, qid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, attempts: 0 });
+    try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(q)); } catch {}
+  });
 }
 
 // Attempts every queued push once (no backoff timer — the natural trigger
@@ -281,6 +300,24 @@ export async function flushGCalPushQueue() {
       }
     }
   }
-  try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(remaining)); } catch {}
+
+  // Don't blindly overwrite with `remaining` — q was a snapshot from before
+  // the network calls above, which took real time. Merge by qid against
+  // whatever the queue currently holds, same pattern as the Tasks sync
+  // queue's write-back: remove what this run resolved (succeeded or
+  // permanently dropped), update anything still retrying, leave anything
+  // queued by another tab in the meantime untouched.
+  await withGCalQueueLock(() => {
+    const keyOf = item => item.qid || item.title;
+    const resolvedKeys = new Set(q.map(keyOf).filter(k => !remaining.some(r => keyOf(r) === k)));
+    const remainingByKey = new Map(remaining.map(item => [keyOf(item), item]));
+    const curStr = localStorage.getItem(GCAL_PUSH_QUEUE_KEY);
+    let current = [];
+    try { current = curStr ? JSON.parse(curStr) : []; } catch {}
+    const next = current
+      .filter(item => !resolvedKeys.has(keyOf(item)))
+      .map(item => remainingByKey.get(keyOf(item)) || item);
+    try { localStorage.setItem(GCAL_PUSH_QUEUE_KEY, JSON.stringify(next)); } catch {}
+  });
   return anySucceeded;
 }
