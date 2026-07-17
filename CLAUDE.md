@@ -172,9 +172,11 @@ Tab ids come from `App.jsx` (`allTabs`, ~line 1270). id → label is not 1:1 —
   mirror. Empty when `isAuthConfigured` is false.
 - **Journal:** one localStorage key *per day* (`nook_journal_<date>` prefix), not
   one array. Anything enumerating entries must scan keys by prefix.
-- **Reports:** `AnalyticsDashboard` renders `<Doughnut>` but registers no chart.js
-  elements. The only `ChartJS.register(...ArcElement...)` lives in
-  `TrackerCharts.jsx`. See §7 — do not remove that registration.
+- **Reports:** `AnalyticsDashboard` and `TrackerCharts.jsx` each call
+  `ChartJS.register(...)` independently (fixed in `9fe9afa` — previously only
+  `TrackerCharts.jsx` registered, and `AnalyticsDashboard` worked only by import-order
+  luck). `register()` is idempotent, so the overlap between the two files' element
+  sets is harmless; don't re-introduce a single shared registration point.
 
 ---
 
