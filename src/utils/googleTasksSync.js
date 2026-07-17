@@ -395,13 +395,28 @@ export async function pushLocalChangesToGoogle(tasks, token) {
     // Small delay between requests to respect Google Tasks API usage limits
     await new Promise(r => setTimeout(r, 100));
 
+    // Wraps this op's entire processing (including subtask sync below) so an
+    // unexpected failure partway through — a network drop mid-request, a
+    // malformed response body — can't abort the whole batch and discard
+    // every earlier op this run already completed. updatedTasks only reaches
+    // the caller (and the queue write-back only runs) once, after this loop
+    // finishes; without this, one bad op would silently undo everything
+    // before it too, not just itself.
+    try {
     if (op.type === 'CREATE' || op.type === 'UPDATE') {
       let localTask = updatedTasks.find(t => t.id === op.taskId);
       if (!localTask) continue; // task was deleted before sync
 
       let parentGoogleTaskId = localTask.googleTaskId;
 
-      if (op.type === 'CREATE' || !parentGoogleTaskId) {
+      // Decide POST-vs-PATCH from whether a googleTaskId already exists, not
+      // from the queued op's `type` label — the label reflects intent at
+      // queue time, which can go stale (e.g. an earlier attempt this same
+      // batch already created the task, then a *later* op threw before the
+      // batch finished; see the per-op try/catch below). Branching on
+      // `op.type === 'CREATE'` here would re-POST and duplicate the task on
+      // Google every time a since-completed CREATE op gets reprocessed.
+      if (!parentGoogleTaskId) {
         const payload = nookToGoogleTask(localTask);
         const res = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks', {
           method: 'POST',
@@ -532,6 +547,14 @@ export async function pushLocalChangesToGoogle(tasks, token) {
       } else if (!res.ok) {
         console.error('[Google Tasks Sync] DELETE task failed:', await res.text());
       }
+    }
+    } catch (err) {
+      // Safe to requeue regardless of op.type now — the POST-vs-PATCH branch
+      // above checks parentGoogleTaskId, not op.type, so a requeued CREATE
+      // that actually already succeeded before this throw will correctly
+      // PATCH (or no-op) instead of re-POSTing on retry.
+      console.error(`[Google Tasks Sync] Unexpected error processing ${op.type} for task ${op.taskId}:`, err);
+      requeueWithBackoff(remainingQ, op);
     }
   }
 
