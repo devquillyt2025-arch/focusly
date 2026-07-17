@@ -1,5 +1,6 @@
 import { memo,  useState, useEffect, useCallback } from 'react';
 import { listReminders, groupReminders, clearReminder } from '../utils/reminders';
+import { isAuthConfigured } from '../utils/authClient';
 
 // Read-only aggregated view over the `reminders` companion table — this
 // page has no independent create/delete, it only surfaces and lets you
@@ -49,6 +50,12 @@ export default memo(function RemindersView({ onNavigateToSource }) {
       {loading ? (
         <div className="cdp-empty">
           <span className="tab-fallback-spinner" aria-label="Loading" />
+        </div>
+      ) : !isAuthConfigured ? (
+        <div className="cdp-empty">
+          <IcoBell size={30} />
+          <p className="cdp-empty-title">Reminders aren't set up</p>
+          <p className="cdp-empty-sub">This Nook instance doesn't have Supabase configured, so reminders — which need a server to fire while the tab is closed — aren't available here.</p>
         </div>
       ) : total === 0 ? (
         <div className="cdp-empty">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { getReminder, saveReminder, clearReminder } from '../utils/reminders';
+import { isAuthConfigured } from '../utils/authClient';
 import { localDateStr } from '../utils/date';
 import CalendarDatePicker from './CalendarDatePicker';
 import TimePicker from './TimePicker';
@@ -150,6 +151,17 @@ export default function ReminderField({ sourceType, sourceId, title, targetAt, o
 
   // Cleanup debounce on unmount.
   useEffect(() => () => clearTimeout(saveTimerRef.current), []);
+
+  if (!isAuthConfigured) {
+    return (
+      <div className="tdp-field">
+        <label className="tdp-label">Reminder date and time</label>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Reminders need Supabase configured on this instance — unavailable here.
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
