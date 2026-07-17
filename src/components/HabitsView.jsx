@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, memo, useRef } from 'react';
 import {
   HABIT_CATS, ACCENT_COLORS, localDateStr,
   isScheduledToday, isScheduledOn, isCompletedToday, isCompletedOn,
@@ -491,13 +491,16 @@ function HabitModal({ onSave, onClose, editHabit = null }) {
     reminderEnabled: false, reminderTime: '',
   });
   const [nameError, setNameError] = useState('');
+  const submittingRef = useRef(false); // guards a same-frame double-submit (double-Enter/double-click)
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const isCustom = Array.isArray(form.frequency);
 
   const save = () => {
+    if (submittingRef.current) return;
     if (!form.name.trim()) { setNameError('Name is required'); return; }
+    submittingRef.current = true;
     onSave({ ...form, name: form.name.trim() });
   };
 
