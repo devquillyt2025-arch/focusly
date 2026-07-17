@@ -29,17 +29,24 @@ function VaultModal({ entry, defaultService, services, onSave, onClose }) {
   const [url,      setUrl]      = useState(entry?.url      || '');
   const [showPw,   setShowPw]   = useState(false);
   const firstRef = useRef(null);
+  const submittingRef = useRef(false); // guards a same-frame double-submit (double-Enter)
   useEffect(() => { firstRef.current?.focus(); }, []);
 
   const submit = (e) => {
     e.preventDefault();
-    if (!service.trim()) return;
+    if (!service.trim() || submittingRef.current) return;
+    submittingRef.current = true;
+    // Reject non-http(s) schemes (e.g. javascript:) the same way LinksView does —
+    // prefixing https:// neuters anything that isn't already http(s) into a
+    // harmless malformed URL instead of a live javascript: URI.
+    let finalUrl = url.trim();
+    if (finalUrl && !/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
     onSave({
       id:        entry?.id || genId(),
       title:     service.trim(),
       username:  username.trim(),
       password,
-      url:       url.trim(),
+      url:       finalUrl,
       createdAt: entry?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
