@@ -6038,7 +6038,10 @@ select.modal-input {
   border-color: var(--accent);
 }
 
-/* Sidebar search — full 240px rail: always-visible inline pill under the brand row */
+/* Sidebar search — full 240px rail: always-visible inline pill trigger under
+   the brand row. It's a <button> now, not an input — typing happens in the
+   overlay (SearchOverlay) that it opens; this is purely a trigger. */
+.sb-search-full-wrap { display: contents; }
 .sb-search-full {
   display: flex;
   align-items: center;
@@ -6051,9 +6054,11 @@ select.modal-input {
   border-radius: var(--radius-full);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
   margin-bottom: 10px;
   flex-shrink: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .sb-search-full .search-icon {
@@ -6063,19 +6068,14 @@ select.modal-input {
   align-items: center;
 }
 
-.sb-search-full input {
-  background: transparent;
-  border: none;
-  width: 100%;
+.sb-search-full-placeholder {
+  flex: 1;
   min-width: 0;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  outline: none;
-  height: 100%;
-}
-
-.sb-search-full input::placeholder {
   color: var(--text-secondary);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sb-search-full:hover {
@@ -6083,30 +6083,15 @@ select.modal-input {
   background: var(--bg-hover);
 }
 
-.sb-search-full:focus-within {
-  border-color: var(--accent) !important;
-  background: var(--bg-input) !important;
-  box-shadow: 0 0 0 3px var(--accent-glow) !important;
-}
-
-/* Sidebar search — 64px rail: icon-only trigger, flyout hosts the real input */
-.sb-search-rail { position: relative; margin-bottom: 6px; }
-.sb-search-flyout-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.sb-search-flyout-input input {
-  background: transparent;
-  border: none;
-  width: 100%;
-  color: var(--text-primary);
-  font-size: 0.85rem;
+.sb-search-full:focus-visible {
+  border-color: var(--accent);
+  background: var(--bg-input);
+  box-shadow: 0 0 0 3px var(--accent-glow);
   outline: none;
 }
-.sb-search-flyout-input .search-icon { color: var(--text-muted); flex-shrink: 0; display: flex; }
+
+/* Sidebar search — 64px rail: icon-only trigger, same overlay as the full pill */
+.sb-search-rail { position: relative; margin-bottom: 6px; }
 
 .search-results-list { display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; }
 
@@ -6148,19 +6133,93 @@ select.modal-input {
   box-shadow: var(--shadow-xs);
 }
 
-.search-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  box-shadow: var(--shadow-lg);
-  z-index: 200;
-  overflow: hidden;
+/* ══════ Sidebar search overlay (liquid glass) ══════════════════════
+   Fixed, centered-near-top, backdropped — portaled to <body>, sits above all
+   app content. Mirrors JournalView's jnx-palette-overlay pattern (the app's
+   existing command-palette convention) rather than the old anchored dropdown.
+   The panel's surface is a translucent tint of --surface-nested (the same
+   color --bg-elevated resolves to) rather than --bg-elevated itself, since
+   that token is opaque everywhere else it's used — alpha is what makes the
+   glass effect possible. Kept fairly opaque (0.82) on purpose: a lower alpha
+   let a bright blurred backdrop wash out --text-secondary's contrast against
+   the panel in quick manual checks, so this trades a little "glassiness" for
+   guaranteed AA contrast regardless of what's behind it. */
+.sbsrch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 20px 20px;
+  animation: fadeOverlay 0.12s ease;
+}
+
+.sbsrch-panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 66vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-strong);
+  background: rgba(28, 28, 31, 0.82);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  animation: modalIn 0.16s var(--ease-spring);
+}
+/* Static top-left highlight sheen suggesting depth — no shimmer animation,
+   this sits behind live search results so constant motion would be noisy. */
+.sbsrch-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 42%);
+}
+:root[data-theme="light"] .sbsrch-panel {
+  background: rgba(243, 244, 246, 0.86);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-theme="light"] .sbsrch-panel::before {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 42%);
+}
+
+.sbsrch-input-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px 14px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.sbsrch-input-row input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+.sbsrch-input-row input::placeholder { color: var(--text-muted); }
+.sbsrch-close { flex-shrink: 0; }
+
+.sbsrch-panel .search-results-list { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sbsrch-overlay, .sbsrch-panel { animation: none !important; }
 }
 
 .search-empty {
@@ -6232,7 +6291,10 @@ select.modal-input {
   flex-shrink: 0;
 }
 
-/* ══════ Shared flyout panel (currently just Search's 64px-rail flyout) ══════
+/* ══════ Shared flyout panel (SidebarFlyout.jsx — not currently used by any
+   mounted component; Search moved to sbsrch-overlay above. Left in place
+   per this repo's convention of not deleting a module as a drive-by cleanup
+   — see CLAUDE.md §8) ══════
    Portalled to <body> by SidebarFlyout so it escapes .main-nav's overflow
    clipping; position:fixed left/top|bottom set inline per anchor rect. */
 .sb-flyout {
@@ -6246,7 +6308,6 @@ select.modal-input {
   overflow-y: auto;
   cursor: default;
 }
-.sb-flyout-search { width: 320px; max-width: calc(100vw - 24px); padding: 0; }
 
 /* Preferences (avatar) dropdown — tighter vertical rhythm so it doesn't waste
    space. Scoped so the shared notifications dropdown keeps its own spacing. */

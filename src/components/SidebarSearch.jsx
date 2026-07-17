@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import SidebarFlyout, { useIsRail } from './SidebarFlyout';
+import { createPortal } from 'react-dom';
+import { useIsRail } from './SidebarFlyout';
 
 const isMac = typeof window !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
 
@@ -133,9 +134,9 @@ function ResultIcon({ type }) {
   }
 }
 
-// Unpositioned — the caller decides how to place it (absolute .search-dropdown
-// wrapper for the desktop inline input, or nothing when it's already sitting
-// inside an already-positioned SidebarFlyout / the mobile More sheet).
+// Unpositioned — the caller decides how to place it (inside SearchOverlay's
+// already-positioned .sbsrch-panel here, or nothing when it's already sitting
+// inside the mobile More sheet).
 export function ResultsList({ searchQuery, searchResults, onSelect }) {
   return (
     <div className="search-results-list" onMouseDown={e => e.stopPropagation()}>
@@ -157,77 +158,111 @@ export function ResultsList({ searchQuery, searchResults, onSelect }) {
   );
 }
 
-// Renders inline (full 240px sidebar) or as a 40px icon that opens a
-// SidebarFlyout("right") on the 64px rail — same query/results state either way.
+// Renders inline (full 240px sidebar) or as a 40px icon on the 64px rail —
+// both are just triggers now. Typing/results live in a single portaled
+// overlay (SearchOverlay) shared by both, closing on Escape/backdrop/✕.
 export default function SidebarSearch({ tasks, habits, setActiveTab, onQueryChange }) {
   const isRail = useIsRail();
   const { searchQuery, setSearchQuery, searchResults, searchInputRef } = useNookSearch(tasks, habits);
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef(null);
-  const railBtnRef = useRef(null);
+  const triggerRef = useRef(null);
 
   // Notes' own list view falls back to this as `globalSearchQuery` — see App.jsx.
   useEffect(() => { onQueryChange?.(searchQuery); }, [searchQuery, onQueryChange]);
 
+  // Global Ctrl/Cmd+K opens the overlay outright (previously it only focused
+  // an input that, on the rail, wasn't even mounted unless already open).
+  // Guarded by offsetParent so it's a no-op while this trigger sits under the
+  // <768px `.desktop-only` rule — MobileMoreModal owns search on mobile, and
+  // this component stays mounted-but-hidden there (CSS display:none, not
+  // unmounted), so an unguarded listener would pop this overlay over it.
   useEffect(() => {
-    const handler = e => { if (wrapRef.current && !wrapRef.current.contains(e.target) && !railBtnRef.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handler = e => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      if (!triggerRef.current || triggerRef.current.offsetParent === null) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  const close = () => setOpen(false);
   const select = (tab) => { setActiveTab(tab); setOpen(false); setSearchQuery(''); };
 
-  if (isRail) {
-    return (
-      <div className="sb-search-rail" ref={wrapRef}>
-        <button ref={railBtnRef} className="hdr-btn sb-rail-trigger" title="Search (Ctrl K)" onClick={() => { setOpen(o => !o); setTimeout(() => searchInputRef.current?.focus(), 0); }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <SidebarFlyout open={open} anchorRef={railBtnRef} placement="right" className="sb-flyout-search">
-          <div className="sb-search-flyout-input">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              role="searchbox"
-              aria-label="Search Nook"
-              placeholder="Search for anything..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setSearchQuery(''); e.target.blur(); } }}
-            />
-          </div>
-          {searchQuery.length >= 2 && <ResultsList searchQuery={searchQuery} searchResults={searchResults} onSelect={select} />}
-        </SidebarFlyout>
-      </div>
-    );
-  }
+  const trigger = isRail ? (
+    <button ref={triggerRef} type="button" className="hdr-btn sb-rail-trigger" title="Search (Ctrl K)" onClick={() => setOpen(true)}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+  ) : (
+    <button ref={triggerRef} type="button" className="sb-search-full" aria-label="Search Nook" onClick={() => setOpen(true)}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span className="sb-search-full-placeholder">Search for anything...</span>
+      <span className="search-shortcut-badge">{isMac ? '⌘K' : 'Ctrl K'}</span>
+    </button>
+  );
 
   return (
-    <div className="sb-search-full" role="search" aria-label="Search Nook" ref={wrapRef} onClick={() => searchInputRef.current?.focus()}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input
-        ref={searchInputRef}
-        type="text"
-        aria-label="Search Nook"
-        placeholder="Search for anything..."
-        value={searchQuery}
-        onChange={e => { setSearchQuery(e.target.value); setOpen(true); }}
-        onFocus={() => { if (searchQuery.length >= 2) setOpen(true); }}
-        onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setSearchQuery(''); e.target.blur(); } }}
-      />
-      {searchQuery ? (
-        <button className="search-clear-btn" onClick={() => { setSearchQuery(''); setOpen(false); }} title="Clear">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      ) : (
-        <span className="search-shortcut-badge">{isMac ? '⌘K' : 'Ctrl K'}</span>
-      )}
-      {open && searchQuery.length >= 2 && (
-        <div className="search-dropdown">
-          <ResultsList searchQuery={searchQuery} searchResults={searchResults} onSelect={select} />
-        </div>
+    <div className={isRail ? 'sb-search-rail' : 'sb-search-full-wrap'}>
+      {trigger}
+      {open && (
+        <SearchOverlay
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchResults={searchResults}
+          searchInputRef={searchInputRef}
+          onClose={close}
+          onSelect={select}
+        />
       )}
     </div>
+  );
+}
+
+// Fixed, centered, backdropped overlay — portaled to <body> so it escapes
+// .main-nav's overflow clipping (same reason SidebarFlyout portals) and sits
+// above all app content. Mirrors the app's existing command-palette pattern
+// (JournalView's jnx-palette-overlay) rather than inventing a new one.
+function SearchOverlay({ searchQuery, setSearchQuery, searchResults, searchInputRef, onClose, onSelect }) {
+  // Focus the input once the overlay (and portal) has actually mounted.
+  // Timeout is cleared on close/unmount so a stray focus() can never fire
+  // after the panel is gone (no setState involved here — nothing async to
+  // race — but the ref access itself is guarded the same way).
+  useEffect(() => {
+    const id = setTimeout(() => searchInputRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [searchInputRef]);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="sbsrch-overlay" onMouseDown={onClose}>
+      <div className="sbsrch-panel" role="dialog" aria-modal="true" aria-label="Search Nook" onMouseDown={e => e.stopPropagation()}>
+        <div className="sbsrch-input-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            ref={searchInputRef}
+            type="text"
+            role="searchbox"
+            aria-label="Search Nook"
+            placeholder="Search for anything..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button type="button" className="search-clear-btn" onClick={() => setSearchQuery('')} title="Clear">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+          <button type="button" className="modal-close sbsrch-close" onClick={onClose} aria-label="Close search">✕</button>
+        </div>
+        {searchQuery.length >= 2 && <ResultsList searchQuery={searchQuery} searchResults={searchResults} onSelect={onSelect} />}
+      </div>
+    </div>,
+    document.body
   );
 }
