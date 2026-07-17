@@ -1457,7 +1457,12 @@ export default function App() {
       {/* ── Cross-tab change banner ── */}
       {/* Detect-and-warn, not a merge: tells the user their data may have
           changed in another tab and lets them choose to reload, rather than
-          silently doing anything on their behalf. */}
+          silently doing anything on their behalf.
+          No dismiss-without-reload — verified (two real tabs, Playwright)
+          that dismissing left this tab's in-memory state stale, and its next
+          save silently overwrote the other tab's write with no further
+          warning. A banner you can wave away into a worse state than the one
+          it warned about is worse than no banner, so Reload is the only exit. */}
       {crossTabChanged && (
         <div role="status" aria-live="polite" style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 500,
@@ -1470,10 +1475,6 @@ export default function App() {
             background: '#1a1200', color: '#fff', border: 'none', borderRadius: 7,
             padding: '5px 14px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', flexShrink: 0,
           }}>Reload</button>
-          <button onClick={() => setCrossTabChanged(false)} aria-label="Dismiss" style={{
-            background: 'none', border: 'none', color: '#1a1200', fontSize: '1.1rem',
-            lineHeight: 1, cursor: 'pointer', padding: '0 4px', flexShrink: 0, opacity: 0.7,
-          }}>×</button>
         </div>
       )}
 
