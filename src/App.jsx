@@ -99,6 +99,17 @@ const SK = {
 
 function persist(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 
+// Sync-engine-internal keys that shouldn't trigger the cross-tab reload banner —
+// these are plumbing (tokens, queue, tombstones, one-time migration flags), not
+// content the user actually authored, so a change here isn't "your data changed
+// in another tab" in any way a reload would help with.
+const CROSS_TAB_IGNORE_KEYS = new Set([
+  'nook_google_tokens', 'nook_pkce_verifier', 'nook_sync_queue', 'nook_deleted_tasks',
+  'nook_last_pull_sync', 'nook_sync_enabled',
+  'nook-notif-state', 'nook-visits', 'nook-install-dismissed', 'nook-analytics',
+  'nook_cleaned_w_duplicates', 'nook_habits_migrated',
+]);
+
 // ─── Helpers ─────────────────────────────────────────────────────
 function makeItems() { return ['1','2','3'].map(id => ({ id, text: '', done: false })); }
 
@@ -291,6 +302,7 @@ export default function App() {
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [openModal,    setOpenModal]    = useState(null);
   const [toast,        setToast]        = useState(null);
+  const [crossTabChanged, setCrossTabChanged] = useState(false);
 
   // ── New state ──
   const [activeTab,      setActiveTab]      = useState('daily');
@@ -577,6 +589,24 @@ export default function App() {
     window.addEventListener('app-toast', handleAppToast);
     return () => window.removeEventListener('app-toast', handleAppToast);
   }, [showToast]);
+
+  // ── Cross-tab change detection ──
+  // Redesign decision (robustness audit, cross-tab item): Nook has no merge
+  // logic for concurrent tabs — this is deliberately just detect-and-warn,
+  // not an attempt at a real merge. The `storage` event only fires in OTHER
+  // tabs of the same origin (never the tab that made the write), which is
+  // exactly the signal needed here. Excludes sync-engine-internal keys
+  // (tokens, queue, tombstones, migration/bookkeeping flags) since those
+  // changing doesn't mean the user's own content changed elsewhere — only
+  // user-facing data keys should prompt a reload.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e.key || !/^nook[-_]/.test(e.key) || CROSS_TAB_IGNORE_KEYS.has(e.key)) return;
+      setCrossTabChanged(true);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // ── Timer ──
   // Batched focus-time accrual: the ticking interval no longer calls setTasks (and
@@ -1423,6 +1453,29 @@ export default function App() {
         )}
       </div>
       </div>{/* end app-body */}
+
+      {/* ── Cross-tab change banner ── */}
+      {/* Detect-and-warn, not a merge: tells the user their data may have
+          changed in another tab and lets them choose to reload, rather than
+          silently doing anything on their behalf. */}
+      {crossTabChanged && (
+        <div role="status" aria-live="polite" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 500,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14,
+          padding: '10px 16px', background: 'var(--color-amber, #f59e0b)', color: '#1a1200',
+          fontSize: '0.85rem', fontWeight: 600, boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
+        }}>
+          <span>Your data changed in another tab. Reload to see the latest and avoid overwriting it.</span>
+          <button onClick={() => window.location.reload()} style={{
+            background: '#1a1200', color: '#fff', border: 'none', borderRadius: 7,
+            padding: '5px 14px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', flexShrink: 0,
+          }}>Reload</button>
+          <button onClick={() => setCrossTabChanged(false)} aria-label="Dismiss" style={{
+            background: 'none', border: 'none', color: '#1a1200', fontSize: '1.1rem',
+            lineHeight: 1, cursor: 'pointer', padding: '0 4px', flexShrink: 0, opacity: 0.7,
+          }}>×</button>
+        </div>
+      )}
 
       {/* ── Toast ── */}
       {toast && <div key={toast.key} role="status" aria-live="polite" aria-atomic="true" className={`app-toast toast-${toast.type}`}>{toast.msg}</div>}
