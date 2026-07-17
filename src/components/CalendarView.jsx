@@ -7,6 +7,7 @@ import {
 } from '../utils/googleCalendarSync';
 import Select from './Select';
 import { localDateStr as toISO } from '../utils/date';
+import { genId } from '../utils/id';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -68,6 +69,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
   const [currentDate,   setCurrentDate]   = useState(() => new Date());
   const [viewMode,      setViewMode]      = useState('day');
   const [showAddModal,  setShowAddModal]  = useState(false);
+  const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalDate,     setModalDate]     = useState(toISO(new Date()));
   const [modalTitle,    setModalTitle]    = useState('');
   const [modalCategory, setModalCategory] = useState('work');
@@ -214,9 +216,15 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
 
   const handleModalSubmit = async e => {
     e.preventDefault();
-    if (!modalTitle.trim()) return;
+    if (!modalTitle.trim() || modalSubmitting) return;
+    setModalSubmitting(true);
+    // genId() (timestamp+random), not Date.now().toString() — the modal stays
+    // mounted through the GCal await below, so a fast double-submit during that
+    // window used to be able to fire twice within the same millisecond and
+    // create two events sharing one id, corrupting every future id-keyed
+    // edit/delete for either of them.
     const endTime = modalEndTime || addHour(modalTime);
-    const ev = { id: Date.now().toString(), title: modalTitle.trim(), date: modalDate, time: modalTime, endTime, isAllDay: !modalTime, category: modalCategory, notes: modalNotes };
+    const ev = { id: genId(), title: modalTitle.trim(), date: modalDate, time: modalTime, endTime, isAllDay: !modalTime, category: modalCategory, notes: modalNotes };
     // Store as a calendar event ONLY. Previously this also called onAddTask with the
     // same id, so the item was persisted twice (customEvents + tasks) and rendered
     // twice in eventsByDate. Google sync for events goes through the Calendar API
@@ -226,6 +234,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
     if (gcalConnected && pushToGCal) {
       try { const tok = await getCalendarToken(); if (tok) { await createGCalEvent(tok, { title: ev.title, date: ev.date, time: ev.time, endTime: ev.endTime }); await fetchGCalRange(); } } catch {}
     }
+    setModalSubmitting(false);
     setModalTitle(''); setModalNotes(''); setShowAddModal(false);
   };
 
@@ -729,8 +738,8 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                   </label>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
-                  <button type="button" onClick={() => setShowAddModal(false)} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" style={{ flex: 2, padding: 12, background: 'var(--accent)', border: 'none', borderRadius: 13, color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(120,105,252,.35)' }}>Save Event</button>
+                  <button type="button" onClick={() => setShowAddModal(false)} disabled={modalSubmitting} style={{ flex: 1, padding: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--text-secondary)', fontWeight: 600, cursor: modalSubmitting ? 'default' : 'pointer', opacity: modalSubmitting ? 0.6 : 1 }}>Cancel</button>
+                  <button type="submit" disabled={modalSubmitting} style={{ flex: 2, padding: 12, background: 'var(--accent)', border: 'none', borderRadius: 13, color: '#fff', fontWeight: 700, cursor: modalSubmitting ? 'default' : 'pointer', opacity: modalSubmitting ? 0.6 : 1, boxShadow: '0 4px 14px rgba(120,105,252,.35)' }}>{modalSubmitting ? 'Saving…' : 'Save Event'}</button>
                 </div>
               </form>
             </motion.div>
