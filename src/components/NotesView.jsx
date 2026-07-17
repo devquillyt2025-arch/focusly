@@ -510,6 +510,7 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
   const [viewMode,    setViewMode]    = useState('grid'); // 'grid' | 'list'
   const [quickTitle,  setQuickTitle]  = useState('');
   const quickRef = useRef(null);
+  const quickSubmittingRef = useRef(false); // guards a same-frame double-submit (held-Enter)
   
   const [dateRange, setDateRange] = useState({ start: null, end: null });
   const [hoverColor, setHoverColor] = useState(null);
@@ -583,7 +584,9 @@ export default memo(function NotesView({ onOpenNoteEditor, globalSearchQuery = '
   // Quick create from the top bar input
   const handleQuickCreate = (e) => {
     e.preventDefault();
-    if (!quickTitle.trim()) return;
+    if (!quickTitle.trim() || quickSubmittingRef.current) return;
+    quickSubmittingRef.current = true;
+    requestAnimationFrame(() => { quickSubmittingRef.current = false; });
     const note = newNote({ title: quickTitle.trim() });
     saveNote(note);
     setQuickTitle('');
