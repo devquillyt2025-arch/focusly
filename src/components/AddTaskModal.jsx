@@ -32,6 +32,11 @@ export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existin
   } : DEFAULT);
   const [nameError, setNameError] = useState('');
   const nameRef = useRef(null);
+  // Guards against a same-frame double-submit (double-Enter, a double-fired
+  // submit event) slipping past the dupe-name check below, which only catches
+  // it once `existingTasks` has re-rendered with the just-added task — a
+  // separate discrete click does, but two submits in the same tick don't.
+  const submittingRef = useRef(false);
 
   useEffect(() => { nameRef.current?.focus(); }, []);
 
@@ -42,12 +47,15 @@ export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existin
 
   const submit = e => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!form.name.trim()) return;
     if (!isEditing) {
       const key = form.name.trim().toLowerCase();
       const dupe = existingTasks.some(t => t.name.trim().toLowerCase() === key);
       if (dupe) { setNameError('A task with this name already exists'); return; }
     }
+    submittingRef.current = true;
+    requestAnimationFrame(() => { submittingRef.current = false; });
     if (isEditing) onEdit({ ...editTask, ...form, timeEstimate: Math.max(1, Math.min(480, Number(form.timeEstimate) || 25)) });
     else onAdd(form);
   };

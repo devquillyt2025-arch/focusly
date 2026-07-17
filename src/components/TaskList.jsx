@@ -817,8 +817,14 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local, onQuickUpdate, onUpdate, showSaved]);
 
-  // Cleanup sync timer on unmount
-  useEffect(() => () => clearTimeout(dueSyncTimerRef.current), []);
+  // Cleanup sync timer on unmount. saveDueTimeDebounceRef needs the same
+  // treatment as dueSyncTimerRef — without it, a due-time edit made just
+  // before navigating away can still fire post-unmount and silently revert
+  // to whatever the debounced closure captured.
+  useEffect(() => () => {
+    clearTimeout(dueSyncTimerRef.current);
+    clearTimeout(saveDueTimeDebounceRef.current);
+  }, []);
 
   const openDetail = (task, initialTab = 'details') => {
     setDetailTask(task);
