@@ -108,31 +108,40 @@ Deno.serve(async (req) => {
     });
     if (!up.ok) throw new Error(`upload_failed: ${await up.text()}`);
 
-    // 4. Retention: keep the newest KEEP files, delete the rest.
-    //    drive.file scope only sees app-created files, i.e. exactly our backups.
-    const q = `'${folderId}' in parents and trashed=false`;
-    const list = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}` +
-      `&orderBy=createdTime desc&fields=files(id,name,createdTime)&spaces=drive`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (list.ok) {
-      const files = (await list.json()).files ?? [];
-      for (const f of files.slice(KEEP)) {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
-    }
-
-    // 5. Record success.
+    // 4. Record success now, before retention runs — the backup itself is what
+    //    this status means. Retention (below) is a separate best-effort cleanup
+    //    step; a network hiccup pruning old files must not retroactively mark
+    //    an upload that already succeeded as a failed run.
     await admin.from('drive_backup').update({
       last_backup_at: new Date().toISOString(), last_status: 'success', last_error: null,
     }).eq('user_id', user.id);
     await admin.from('backup_runs').insert({
       user_id: user.id, status: 'success', file_name: fileName, counts: backup.counts,
     });
+
+    // 5. Retention: keep the newest KEEP files, delete the rest. Best-effort —
+    //    caught and swallowed on its own so a failure here can't flip the run
+    //    recorded above into an error; next run's list will just include one
+    //    extra stale file and try again.
+    try {
+      const q = `'${folderId}' in parents and trashed=false`;
+      const list = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}` +
+        `&orderBy=createdTime desc&fields=files(id,name,createdTime)&spaces=drive`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (list.ok) {
+        const files = (await list.json()).files ?? [];
+        for (const f of files.slice(KEEP)) {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
+    } catch (pruneErr) {
+      console.error('[drive-backup] retention prune failed (non-fatal):', (pruneErr as Error).message);
+    }
 
     return json({ ok: true, file: fileName, counts: backup.counts });
   } catch (err) {
