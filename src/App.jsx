@@ -108,6 +108,9 @@ const CROSS_TAB_IGNORE_KEYS = new Set([
   'nook_last_pull_sync', 'nook_sync_enabled',
   'nook-notif-state', 'nook-visits', 'nook-install-dismissed', 'nook-analytics',
   'nook_cleaned_w_duplicates', 'nook_habits_migrated',
+  // UI-only preferences — not user content, so changing these in another tab
+  // should not trigger the "data changed" reload banner:
+  'nook-sidebar-open',
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -796,11 +799,17 @@ export default function App() {
     showToast(`"${updated.name.trim()}" updated ✓`, 'success');
   }, [showToast]);
 
-  // Silent update for detail-panel auto-saves (no toast, no modal side-effects)
+  // Silent update for detail-panel auto-saves (no toast, no modal side-effects).
+  // Still logs to the Activity Log so edits via the detail panel appear in the
+  // audit trail — they just don't interrupt the user with a toast or close a modal.
   const quickUpdateTask = useCallback((updated) => {
     const nextUpdated = { ...updated, name: (updated.name||'').trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
     setTasks(prev => {
       const old = prev.find(t => t.id === updated.id);
+      const changes = old ? diffObjects(old, nextUpdated, ['name', 'notes', 'priority', 'category', 'dueDate', 'timeEstimate']) : null;
+      if (changes) {
+        logActivity({ module: 'tasks', entity_type: 'task', entity_id: updated.id, action: 'updated', title: nextUpdated.name, field_changes: changes });
+      }
       if (nextUpdated.completed && !old?.completed) clearReminder('task', updated.id).catch(() => {});
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
@@ -845,8 +854,16 @@ export default function App() {
     setHabits(prev => [h, ...prev]);
   }, []);
   const updateHabit = useCallback((h) => {
-    logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action: 'updated', title: h.name });
-    setHabits(prev => prev.map(x => x.id === h.id ? h : x));
+    setHabits(prev => {
+      const old = prev.find(x => x.id === h.id);
+      const changes = old ? diffObjects(old, h, ['name', 'frequency', 'category', 'color', 'reminderEnabled', 'reminderTime', 'archived']) : null;
+      // Distinguish archive/restore from a plain edit
+      const action = old?.archived === false && h.archived === true ? 'archived'
+                   : old?.archived === true  && h.archived === false ? 'restored'
+                   : 'updated';
+      logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action, title: h.name, field_changes: changes });
+      return prev.map(x => x.id === h.id ? h : x);
+    });
   }, []);
   const deleteHabit = useCallback((id) => {
     setHabits(prev => {
@@ -1050,9 +1067,16 @@ export default function App() {
         const oldLog = (oldTracker.logs || []).find(l => l.date === today);
         const newLog = (newTracker.logs || []).find(l => l.date === today);
         
-        // General update
-        if (oldTracker.name !== newTracker.name || oldTracker.target !== newTracker.target) {
-           logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: newTracker.id, action: 'updated', title: newTracker.name });
+        // Log any structural edit (name, target, category, config).
+        // Log-only mutations (newLog !== oldLog) are caught by the 'completed'
+        // branch below, so we only fire 'updated' when something else changed.
+        const isStructuralEdit = oldTracker.name !== newTracker.name
+          || oldTracker.target !== newTracker.target
+          || oldTracker.category !== newTracker.category
+          || JSON.stringify(oldTracker.config) !== JSON.stringify(newTracker.config);
+        const isLogOnlyMutation = !oldLog && newLog; // caught separately below
+        if (isStructuralEdit && !isLogOnlyMutation) {
+          logActivity({ module: 'trackers', entity_type: 'tracker', entity_id: newTracker.id, action: 'updated', title: newTracker.name });
         }
 
         // Habit logged or Target/Average updated

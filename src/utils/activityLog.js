@@ -31,6 +31,9 @@ export function logActivity({
     log.unshift(entry);
     if (log.length > MAX_ENTRIES) log.length = MAX_ENTRIES;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    // Notify ActivityLogView (if mounted) so it can refresh without polling.
+    // Fire-and-forget; never throws.
+    try { window.dispatchEvent(new Event('nook-activity-updated')); } catch {}
     return entry;
   } catch (err) {
     console.warn('[ActivityLog] write failed:', err);

@@ -132,6 +132,27 @@ export default memo(function ActivityLogView({ setActiveTab }) {
   const reload = useCallback(() => { setLog(loadActivityLog()); setPage(1); }, []);
   useEffect(() => { reload(); }, [reload]);
 
+  // Keep the view live: reload whenever the log is written to.
+  // - Same tab: App.jsx fires 'nook-activity-updated' after each logActivity call.
+  //   (Throttled to avoid cascade on rapid bursts.)
+  // - Cross tab: storage event fires when another tab writes to the key.
+  useEffect(() => {
+    let lastReload = 0;
+    const throttledReload = () => {
+      const now = Date.now();
+      if (now - lastReload > 1500) { lastReload = now; setLog(loadActivityLog()); }
+    };
+    const onStorage = (e) => { if (e.key === 'nook-activity-log') throttledReload(); };
+    const onCustom   = () => throttledReload();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('nook-activity-updated', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('nook-activity-updated', onCustom);
+    };
+  }, []);
+
+
   useEffect(() => {
     const h = (e) => {
       if (gearRef.current && !gearRef.current.contains(e.target)) setGearOpen(false);

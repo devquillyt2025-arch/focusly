@@ -322,3 +322,57 @@ dead code; each is a real decision or a real bug with a real cost to touching.
   teaches the user the banner is safe to wave away. If a dismiss is ever
   reintroduced, it needs to solve that staleness (re-sync the tab's in-memory
   state from disk, at minimum for the key that changed), not just hide the UI.
+
+---
+
+## 9. Sidebar collapse (added version5, 2026-07)
+
+The sidebar is now an **always-mounted icon rail**, not a mount/unmount toggle.
+
+- `sidebarOpen` (App.jsx state) is persisted to `localStorage('nook-sidebar-open')`.
+- `true` → full 240px sidebar; `false` → 60px icon-only rail (`.main-nav--rail` class).
+- The `.app` root gets either `.sidebar-open` or `.sidebar-rail` — both drive
+  `margin-left` on `.app-body` via CSS variables (`--sidebar-width` / `--sidebar-rail-width`).
+- `'nook-sidebar-open'` is in `CROSS_TAB_IGNORE_KEYS` — it is a UI preference, not
+  user content, so toggling it in one tab must not fire the cross-tab data-changed banner.
+- `useIsRail()` in `SidebarFlyout.jsx` uses a `MutationObserver` on `.main-nav`'s
+  class list (not a media query) so the search trigger collapses in sync with the JS toggle.
+- CSS-only tooltips use `data-tooltip` + `::after` pseudo-element with `transition-delay: 0.3s`.
+- Mobile (≤768px): `.main-nav` is `display: none` regardless of state. The mobile bottom
+  nav handles navigation there. Do not change this behaviour.
+
+---
+
+## 10. Activity Log live-reload (added 2026-07)
+
+`utils/activityLog.js → logActivity()` fires a custom `window` event
+`'nook-activity-updated'` after every successful write. `ActivityLogView` listens
+for this event (and for the `storage` event on the log key from other tabs) and
+throttle-reloads at most once per 1.5 s. This keeps the Activity Log live while
+the user is on that tab — without polling, and without routing the log through
+React state in App.jsx.
+
+**Do not route the activity log through App state.** It is write-only from the app's
+perspective; reads live entirely inside `ActivityLogView`.
+
+---
+
+## 11. Audit findings fixed (2026-07-18)
+
+Recorded so future sessions don't re-open them.
+
+- **`updateHabit` now diffs field changes.** Before this fix, habit-updated log entries
+  had no `field_changes`. Now uses `diffObjects` on name/frequency/category/color/
+  reminderEnabled/reminderTime/archived, and uses `'archived'`/`'restored'` action
+  strings when the `archived` field flips.
+
+- **`quickUpdateTask` now logs to the Activity Log.** Detail-panel auto-saves were
+  previously silent (no `logActivity` call). Now logs `'updated'` with `diffObjects`
+  when at least one tracked field changes. Toast-free by design — do not add a toast.
+
+- **`updateTracker` now logs config/milestone edits.** Previously only fired on
+  name/target changes. Now detects any structural edit (name, target, category, config)
+  and excludes log-only mutations (those are caught by the existing `'completed'` branch).
+
+- **`'nook-sidebar-open'` added to `CROSS_TAB_IGNORE_KEYS`.** Without this, toggling
+  the sidebar in one tab fired a false "data changed in another tab" banner in the other.
