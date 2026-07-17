@@ -66,6 +66,17 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem('nook-week-start') || 'monday');
   const [backupBusy, setBackupBusy] = useState(false);
 
+  // Origin storage quota (Chrome/Edge/Firefox support the Storage API; Safari
+  // and older browsers don't — quotaPct stays null there and the KB-only
+  // figure below is all we show, same as before this existed).
+  const [quotaPct, setQuotaPct] = useState(null);
+  useEffect(() => {
+    if (!navigator.storage?.estimate) return;
+    navigator.storage.estimate().then(({ usage, quota }) => {
+      if (quota > 0) setQuotaPct(Math.round((usage / quota) * 100));
+    }).catch(() => {});
+  }, []);
+
   // ── Auto backup to Google Drive ──
   const [driveConfig, setDriveConfig] = useState(null);
   const [driveFreq, setDriveFreq] = useState('off');
@@ -604,11 +615,18 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
       <section className="settings-card">
         <h3 className="settings-card-title">Data Management</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: 14 }}>
-          Your content is stored locally in your browser ({calculateStorage()} KB used).
+          Your content is stored locally in your browser ({calculateStorage()} KB used
+          {quotaPct !== null && <span style={{ color: quotaPct >= 80 ? 'var(--color-red)' : 'inherit', fontWeight: quotaPct >= 80 ? 700 : 400 }}> — {quotaPct}% of your browser's storage limit for this site</span>}).
           A full backup also bundles your reminders, notification preferences, and
           your Saved Logins (passwords included, unencrypted) — store the file
           somewhere you'd store a password export.
         </p>
+        {quotaPct !== null && quotaPct >= 80 && (
+          <p style={{ color: 'var(--color-red)', fontSize: '0.78rem', lineHeight: 1.5, marginTop: -6, marginBottom: 14 }}>
+            You're close to this browser's storage limit for Nook. Export a backup soon —
+            writes can start silently failing once the limit is reached.
+          </p>
+        )}
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.84rem', cursor: backupBusy ? 'default' : 'pointer', opacity: backupBusy ? 0.65 : 1, display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={handleFullBackup} disabled={backupBusy}>

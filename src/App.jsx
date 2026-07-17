@@ -59,6 +59,12 @@ const RemindersView   = lazy(() => import('./components/RemindersView'));
 
 // ─── Constants ───────────────────────────────────────────────────
 const LONG_BREAK_AFTER = 4;
+// Same retention pattern as utils/activityLog.js's MAX_ENTRIES — pomodoroLog
+// grows one entry per completed focus session forever with no cap otherwise.
+// Every consumer (Stats, DailyGoalsView, AnalyticsDashboard) only ever looks
+// at the last 7/30 days, so 2000 entries is a large multiple of what's ever
+// actually read, not a lookback window being narrowed.
+const MAX_POMO_LOG = 2000;
 const DEFAULT_SETTINGS = {
   focusDuration: 25, shortDuration: 5, longDuration: 15, customDuration: 25,
   autoSwitch: false, sound: true,
@@ -632,7 +638,10 @@ export default function App() {
 
     if (mode==='focus') {
       logActivity({ module: 'focus', entity_type: 'focus_session', entity_id: new Date().getTime().toString(), action: 'completed', title: 'Focus Session Completed' });
-      setPomodoroLog(prev=>[...prev, new Date().toISOString()]);
+      setPomodoroLog(prev=>{
+        const next=[...prev, new Date().toISOString()];
+        return next.length>MAX_POMO_LOG ? next.slice(-MAX_POMO_LOG) : next;
+      });
       flushFocusTime();
       if (activeTaskRef.current) {
         setTasks(ts=>ts.map(t=>t.id===activeTaskRef.current?{...t,pomodorosCompleted:(t.pomodorosCompleted||0)+1}:t));
