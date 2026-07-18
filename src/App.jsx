@@ -1373,7 +1373,6 @@ export default function App() {
               onDeleteTracker={deleteTracker}
               onEditTracker={openEditTracker}
               onAddTracker={openAddTracker}
-              onQuickAdd={addTracker}
             />
           )}
 

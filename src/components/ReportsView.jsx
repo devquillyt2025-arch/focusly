@@ -3,9 +3,8 @@ import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from 
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
-  getLogForDate, todayStr, dateStrOf, isScheduledOn, isScheduledToday, isLoggedToday,
+  getLogForDate, todayStr, dateStrOf, isScheduledOn,
   computeGlobalStats, getSparklineData, upsertLog, toggleMilestone, getConfig,
-  genId, defaultConfig,
 } from '../trackers/trackerUtils';
 const HabitStreakChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitStreakChart })));
 const HabitDayOfWeekChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitDayOfWeekChart })));
@@ -18,7 +17,7 @@ import AnalyticsDashboard from './AnalyticsDashboard';
 import html2canvas from 'html2canvas';
 
 // ─── Reports view ──────────────────────────────────────────────────
-export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker, onQuickAdd }) {
+export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker }) {
   const [catFilter,  setCatFilter]  = useState('all');
   const [viewMode,   setViewMode]   = useState('trackers'); // 'trackers' | 'analytics'
   const [detail,     setDetail]     = useState(null); // tracker shown in detail
@@ -26,10 +25,9 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
   const [heatRange,  setHeatRange]  = useState('30'); // '30' (pattern) | '7' (this week)
   const reduceMotion = useReducedMotion();
 
-  // Refs to each rendered card + the Today's Focus strip, so the Best Streak /
-  // Perfect Days stat cards can scroll to the responsible habit and flash it.
-  const cardRefs  = useRef({});
-  const focusRef  = useRef(null);
+  // Refs to each rendered card so the Best Streak stat card can scroll to the
+  // responsible habit and flash it (read-only navigation, no write).
+  const cardRefs = useRef({});
 
   const jumpToCard = useCallback((id) => {
     const el = cardRefs.current[id];
@@ -38,10 +36,6 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
     setHighlightId(id);
     // Clear so the same card can be re-flashed on a later click.
     setTimeout(() => setHighlightId(cur => (cur === id ? null : cur)), 1600);
-  }, []);
-
-  const jumpToFocus = useCallback(() => {
-    focusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   const global = computeGlobalStats(trackers);
@@ -78,23 +72,6 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
     return bestId;
   }, [trackers]);
 
-  // Today's Focus: everything scheduled today that isn't logged yet, ordered by
-  // "streak at risk" — the pending habit with the biggest current streak is the
-  // most urgent, since that's what tonight's miss would break. Projects are
-  // excluded (they have no daily log). timeTag is a soft secondary sort.
-  const TIME_ORDER = { morning: 0, afternoon: 1, evening: 2, night: 3 };
-  const todaysFocus = useMemo(() => {
-    return trackers
-      // Only daily-cadence types belong here — targets/projects are long-horizon.
-      .filter(t => (t.type === 'habit' || t.type === 'average') && isScheduledToday(t) && !isLoggedToday(t))
-      .map(t => {
-        const streak = t.type === 'habit' ? computeHabitStreaks(t).current : 0;
-        const tag = getConfig(t).timeTag;
-        return { tracker: t, streak, tagOrder: TIME_ORDER[tag] ?? 99 };
-      })
-      .sort((a, b) => a.tagOrder - b.tagOrder || b.streak - a.streak);
-  }, [trackers]);
-
   let filtered = catFilter === 'all'
     ? trackersWithTrends
     : trackersWithTrends.filter(t => t.category === catFilter);
@@ -104,24 +81,6 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
 
   // The heatmap range toggle only affects habit cards — hide it if none exist.
   const hasHabits = trackers.some(t => t.type === 'habit');
-
-  // Quick-start seeds for the first-run empty state — pre-filled so a new user
-  // isn't staring at a blank input. Each becomes a real habit-type tracker.
-  const QUICK_STARTS = [
-    { name: 'Drink Water',           category: 'health',   icon: '💧' },
-    { name: 'Read 10 mins',          category: 'personal', icon: '📖' },
-    { name: 'No Screens After 10pm', category: 'health',   icon: '🌙' },
-  ];
-  const handleQuickStart = (seed) => {
-    if (!onQuickAdd) { onAddTracker?.(); return; }
-    const exists = trackers.some(t => t.name.trim().toLowerCase() === seed.name.toLowerCase());
-    if (exists) return;
-    onQuickAdd({
-      id: genId(), type: 'habit', logs: [], createdAt: new Date().toISOString(),
-      name: seed.name, category: seed.category, description: '',
-      config: defaultConfig('habit'),
-    });
-  };
 
   const openDetail = (tracker) => setDetail(tracker);
   const closeDetail = () => setDetail(null);
@@ -136,13 +95,16 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
 
   return (
     <div className="reports-view">
-      {/* Minimal action row — replaces the removed page header; keeps the success-rate stat and Add Tracker action */}
+      {/* Read-only summary row. Creation is intentionally demoted to a small,
+          low-emphasis link (Reports is analytics; tracker CRUD lives in the
+          detail drill-in) — kept only so creating a target/average/project
+          isn't orphaned with no entry point anywhere in the app. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
           {global.activeTrackers} tracker{global.activeTrackers === 1 ? '' : 's'} · {successRate}% success rate
         </span>
         {onAddTracker && (
-          <button className="add-task-btn" onClick={onAddTracker}>＋ Add Tracker</button>
+          <button className="reports-new-link" onClick={onAddTracker}>+ New tracker</button>
         )}
       </div>
 
@@ -155,32 +117,17 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
         <AnalyticsDashboard trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog} />
       ) : (
         <>
-          {/* Today's Focus — what's still pending today, most urgent first */}
-          {todaysFocus.length > 0 && (
-            <TodaysFocusStrip
-              ref={focusRef}
-              items={todaysFocus}
-              onLog={(t, v) => onUpdateTracker(upsertLog(t, v))}
-              onOpen={openDetail}
-            />
-          )}
-
-          {/* Global stats — Best Streak & Perfect Days jump to the habit responsible */}
+          {/* Global stats — Best Streak jumps to the habit responsible (read-only nav) */}
           <div className="reports-global-stats">
             <div className="rgs-card">
               <div className="rgs-val">{global.activeTrackers}</div>
               <div className="rgs-lbl">Trackers</div>
             </div>
-            <button
-              className={`rgs-card${todaysFocus.length ? ' rgs-card-link' : ''}`}
-              onClick={todaysFocus.length ? jumpToFocus : undefined}
-              disabled={!todaysFocus.length}
-              title={todaysFocus.length ? 'Jump to what’s left today' : undefined}
-            >
+            <div className="rgs-card">
               <div className="rgs-val">{global.perfectDaysMonth}</div>
               <div className="rgs-lbl">Perfect Days</div>
               <div className="rgs-sub">{global.perfectDaysMonth} of {daysInMonthSoFar} days</div>
-            </button>
+            </div>
             <button
               className={`rgs-card${bestStreakOwnerId ? ' rgs-card-link' : ''}`}
               onClick={bestStreakOwnerId ? () => jumpToCard(bestStreakOwnerId) : undefined}
@@ -227,16 +174,15 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
             )}
           </div>
 
-          {/* Tracker grid */}
+          {/* Tracker grid — read-only cards; click opens the detail drill-in */}
           {filtered.length === 0 ? (
-            trackers.length === 0 ? (
-              <QuickStartEmpty seeds={QUICK_STARTS} onPick={handleQuickStart} onAddTracker={onAddTracker} />
-            ) : (
-              <div className="empty-state">
-                <span>📊</span>
-                <p>No trackers in this category.</p>
-              </div>
-            )
+            <div className="empty-state">
+              <span>📊</span>
+              <p>{trackers.length === 0 ? 'No trackers yet.' : 'No trackers in this category.'}</p>
+              {trackers.length === 0 && onAddTracker && (
+                <button className="reports-new-link" onClick={onAddTracker}>+ New tracker</button>
+              )}
+            </div>
           ) : (
             <motion.div className="tracker-grid" layout={!reduceMotion}>
               <AnimatePresence mode="popLayout" initial={false}>
@@ -249,16 +195,9 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
                     cardRef={el => { if (el) cardRefs.current[t.id] = el; else delete cardRefs.current[t.id]; }}
                     highlighted={highlightId === t.id}
                     onOpen={() => openDetail(t)}
-                    onUpdate={onUpdateTracker}
                   />
                 ))}
               </AnimatePresence>
-              {trackers.length < 3 && onAddTracker && (
-                <button className="tracker-add-cta tracker-add-cta-grid" onClick={onAddTracker}>
-                  <IconPlusCircle />
-                  <span>Track a new habit</span>
-                </button>
-              )}
             </motion.div>
           )}
         </>
@@ -278,45 +217,10 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
   );
 });
 
-// ─── Today's Focus strip ───────────────────────────────────────────
-const TodaysFocusStrip = forwardRef(function TodaysFocusStrip({ items, onLog, onOpen }, ref) {
-  return (
-    <div className="focus-strip" ref={ref}>
-      <div className="focus-strip-hdr">
-        <span className="focus-strip-title">Today’s Focus</span>
-        <span className="focus-strip-count">{items.length} left</span>
-      </div>
-      <div className="focus-strip-scroll">
-        {items.map(({ tracker, streak }) => {
-          const cat = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
-          const isHabit = tracker.type === 'habit';
-          return (
-            <div key={tracker.id} className="focus-pill" style={{ borderColor: cat.color + '55' }}>
-              <button className="focus-pill-main" onClick={() => onOpen(tracker)}>
-                <span className="focus-pill-dot" style={{ background: cat.color }} />
-                <span className="focus-pill-name">{tracker.name}</span>
-                {isHabit && streak > 0 && <span className="focus-pill-streak">🔥{streak}</span>}
-              </button>
-              <button
-                className="focus-pill-check"
-                style={{ '--pill-accent': cat.color }}
-                onClick={() => (isHabit ? onLog(tracker, true) : onOpen(tracker))}
-                aria-label={isHabit ? `Mark ${tracker.name} done` : `Log ${tracker.name}`}
-              >
-                {isHabit ? <CheckIcon /> : <PlusIcon />}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
 // ─── Tracker card (unified chassis, 3 hero variants) ───────────────
 // forwardRef so AnimatePresence (popLayout) can attach its measurement ref;
 // merged with cardRef, our own scroll-to-card handle for the stat-card jumps.
-const TrackerCard = memo(forwardRef(function TrackerCard({ tracker, cardRef, highlighted, heatRange, reduceMotion, onOpen, onUpdate }, ref) {
+const TrackerCard = memo(forwardRef(function TrackerCard({ tracker, cardRef, highlighted, heatRange, reduceMotion, onOpen }, ref) {
   const cat      = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
 
@@ -370,22 +274,18 @@ const TrackerCard = memo(forwardRef(function TrackerCard({ tracker, cardRef, hig
         </span>
       </div>
 
-      {tracker.type === 'habit'   && <HabitCardBody   tracker={tracker} color={cat.color} heatRange={heatRange} reduceMotion={reduceMotion} onUpdate={onUpdate} />}
-      {tracker.type === 'target'  && <TargetCardBody  tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+      {tracker.type === 'habit'   && <HabitCardBody   tracker={tracker} heatRange={heatRange} reduceMotion={reduceMotion} />}
+      {tracker.type === 'target'  && <TargetCardBody  tracker={tracker} color={cat.color} />}
       {tracker.type === 'project' && <ProjectCardBody tracker={tracker} color={cat.color} />}
-      {tracker.type === 'average' && <AverageCardBody tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+      {tracker.type === 'average' && <AverageCardBody tracker={tracker} color={cat.color} />}
     </motion.div>
   );
 }));
 
-function HabitCardBody({ tracker, color, heatRange, reduceMotion, onUpdate }) {
+// All card bodies are read-only summaries. Logging happens in the detail
+// drill-in (opened by clicking the card) — never on the card itself.
+function HabitCardBody({ tracker, heatRange, reduceMotion }) {
   const { current, longest, successRate } = computeHabitStreaks(tracker);
-  const today    = todayStr();
-  const todayLog = getLogForDate(tracker, today);
-  const stop  = e => e.stopPropagation();
-  const log   = (v) => onUpdate(upsertLog(tracker, v));
-  const unlog = () => onUpdate({ ...tracker, logs: (tracker.logs || []).filter(l => l.date !== today) });
-
   return (
     <>
       <div className="tc-habit-hero">
@@ -396,53 +296,22 @@ function HabitCardBody({ tracker, color, heatRange, reduceMotion, onUpdate }) {
         </div>
       </div>
       <CardHeatmap tracker={tracker} range={heatRange} reduceMotion={reduceMotion} />
-      <div className="tc-actions" onClick={stop}>
-        {todayLog?.value === true ? (
-          <button className="tc-btn tc-btn-done tc-btn-active" style={{ '--card-cat': color }} onClick={unlog}>
-            <CheckIcon /> Done today
-          </button>
-        ) : todayLog?.value === false ? (
-          <button className="tc-btn tc-btn-skip tc-btn-active" onClick={unlog}>→ Skipped</button>
-        ) : (
-          <>
-            <button className="tc-btn tc-btn-done" style={{ '--card-cat': color }} onClick={() => log(true)}>
-              <CheckIcon /> Done
-            </button>
-            <button className="tc-btn tc-btn-skip" onClick={() => log(false)}>Skip</button>
-          </>
-        )}
-      </div>
     </>
   );
 }
 
-function TargetCardBody({ tracker, color, onUpdate }) {
+function TargetCardBody({ tracker, color }) {
   const { currentValue, targetValue, unit, progress, pace } = computeTargetStats(tracker);
-  const [val, setVal] = useState('');
-  const stop = e => e.stopPropagation();
-  const submit = () => {
-    const n = parseFloat(val);
-    if (isNaN(n)) return;
-    onUpdate(upsertLog(tracker, currentValue + n));
-    setVal('');
-  };
   const PACE = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', ahead: 'var(--color-blue)' };
   return (
-    <>
-      <div className="tc-ring-hero">
-        <ProgressRing pct={progress} color={color} />
-        <div className="tc-ring-meta">
-          <div className="tc-ring-nums">{currentValue}<span className="tc-ring-unit">/{targetValue}{unit}</span></div>
-          <span className="tc-pace" style={{ color: PACE[pace] }}>{pace}</span>
-        </div>
+    <div className="tc-ring-hero">
+      <ProgressRing pct={progress} color={color} />
+      <div className="tc-ring-meta">
+        <div className="tc-ring-nums">{currentValue}<span className="tc-ring-unit">/{targetValue}{unit}</span></div>
+        <span className="tc-pace" style={{ color: PACE[pace] }}>{pace}</span>
+        <span className="tc-open-hint">Open to log →</span>
       </div>
-      <div className="tc-inline" onClick={stop}>
-        <input className="tc-inline-input" type="number" value={val} step="any" min="0"
-          onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder={`+${unit || 'amount'}`} />
-        <button className="tc-inline-btn" style={{ '--card-cat': color }} onClick={submit} disabled={!val}>Add</button>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -461,16 +330,8 @@ function ProjectCardBody({ tracker, color }) {
   );
 }
 
-function AverageCardBody({ tracker, color, onUpdate }) {
-  const { todayValue, avg7, targetAverage, unit } = computeAverageStats(tracker);
-  const [val, setVal] = useState('');
-  const stop = e => e.stopPropagation();
-  const submit = () => {
-    const n = parseFloat(val);
-    if (isNaN(n)) return;
-    onUpdate(upsertLog(tracker, n));
-    setVal('');
-  };
+function AverageCardBody({ tracker, color }) {
+  const { avg7, targetAverage, unit } = computeAverageStats(tracker);
   const spark = getSparklineData(tracker);
   const pct = avg7 != null && targetAverage > 0 ? Math.min(100, Math.round((avg7 / targetAverage) * 100)) : null;
   return (
@@ -485,12 +346,7 @@ function AverageCardBody({ tracker, color, onUpdate }) {
       {targetAverage > 0 && (
         <div className="tc-avg-gauge"><div className="tc-avg-gauge-fill" style={{ width: `${pct}%`, background: color }} /></div>
       )}
-      <div className="tc-inline" onClick={stop}>
-        <input className="tc-inline-input" type="number" value={val} step="any" min="0"
-          onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder={todayValue != null ? `today: ${todayValue}${unit}` : (unit || 'value')} />
-        <button className="tc-inline-btn" style={{ '--card-cat': color }} onClick={submit} disabled={!val}>Log</button>
-      </div>
+      <span className="tc-open-hint">Open to log →</span>
     </>
   );
 }
@@ -631,40 +487,6 @@ function CardHeatmap({ tracker, range, reduceMotion }) {
         </AnimatePresence>
       )}
     </div>
-  );
-}
-
-// ─── First-run quick-start ─────────────────────────────────────────
-function QuickStartEmpty({ seeds, onPick, onAddTracker }) {
-  return (
-    <div className="quickstart">
-      <div className="quickstart-icon">📈</div>
-      <h3 className="quickstart-title">Start your first habit</h3>
-      <p className="quickstart-sub">Pick one to begin — rename or fine-tune it any time.</p>
-      <div className="quickstart-chips">
-        {seeds.map(s => (
-          <button key={s.name} className="quickstart-chip" onClick={() => onPick(s)}>
-            <span className="quickstart-chip-ico">{s.icon}</span>
-            <span>{s.name}</span>
-          </button>
-        ))}
-      </div>
-      {onAddTracker && (
-        <button className="quickstart-custom" onClick={onAddTracker}>or create a custom tracker →</button>
-      )}
-    </div>
-  );
-}
-
-// ─── Small inline icons ────────────────────────────────────────────
-function CheckIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
   );
 }
 
@@ -1080,18 +902,6 @@ function StatCard({ val, lbl, color }) {
       <div className="stat-val" style={color ? { color } : {}}>{val}</div>
       <div className="stat-lbl">{lbl}</div>
     </div>
-  );
-}
-
-// ─── Icons ─────────────────────────────────────────────────────────
-
-function IconPlusCircle() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="12" y1="8" x2="12" y2="16"/>
-      <line x1="8" y1="12" x2="16" y2="12"/>
-    </svg>
   );
 }
 
