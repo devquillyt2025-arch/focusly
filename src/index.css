@@ -2559,6 +2559,68 @@ kbd {
 .heat-range-toggle button:hover { color: var(--text-primary); }
 .heat-range-toggle .hr-active { background: var(--accent); color: #fff; }
 
+/* ── R2 analytics: period overview, comparisons, habit performance ── */
+.ra-period-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.ra-range-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ra-seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px; }
+.ra-seg button {
+  padding: 5px 14px; border: none; border-radius: 6px; cursor: pointer; font-family: inherit;
+  font-size: 0.76rem; font-weight: 600; background: transparent; color: var(--text-secondary);
+  transition: background var(--ease), color var(--ease);
+}
+.ra-seg button:hover { color: var(--text-primary); }
+.ra-seg .ra-seg-on { background: var(--accent); color: #fff; }
+.ra-custom { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.8rem; }
+.ra-custom input {
+  padding: 5px 8px; border-radius: 7px; background: var(--bg-card);
+  border: 1px solid var(--border-strong); color: var(--text-primary); font-family: inherit; font-size: 0.78rem;
+}
+.ra-range-caption { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 16px; }
+
+.ra-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.ra-kpi {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 3px;
+}
+.ra-kpi-val { font-size: 1.7rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; line-height: 1.1; }
+.ra-kpi-lbl { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
+.ra-kpi-sub { font-size: 0.68rem; color: var(--text-muted); }
+.ra-delta { display: inline-flex; align-items: baseline; gap: 4px; font-size: 0.72rem; font-weight: 700; margin-top: 6px; }
+.ra-delta-vs { font-weight: 500; color: var(--text-muted); }
+.ra-up   { color: var(--color-green); }
+.ra-down { color: var(--color-red); }
+.ra-flat { color: var(--text-muted); }
+
+.ra-divider { height: 1px; background: var(--border); }
+.ra-grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.ra-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.ra-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin: 0 0 14px; }
+.ra-empty { color: var(--text-muted); font-size: 0.82rem; }
+
+.ra-trend-list { display: flex; flex-direction: column; gap: 9px; }
+.ra-trend-row { display: flex; align-items: center; gap: 9px; }
+.ra-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ra-trend-name { flex: 1; min-width: 0; font-size: 0.84rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ra-trend-delta { font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
+
+.ra-focus-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.ra-focus-big { font-size: 1.9rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+.ra-focus-sub { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+.ra-icon-btn {
+  width: 34px; height: 34px; display: grid; place-items: center; flex-shrink: 0;
+  border-radius: 8px; background: transparent; border: 1px solid var(--border-strong);
+  color: var(--text-secondary); cursor: pointer; transition: color var(--ease), border-color var(--ease);
+}
+.ra-icon-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+
+@media (max-width: 900px) {
+  .ra-kpis  { grid-template-columns: repeat(2, 1fr); }
+  .ra-grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .ra-kpis { grid-template-columns: 1fr; }
+}
+
 /* Ring hero (target / project) */
 .tc-ring-hero { display: flex; align-items: center; gap: 13px; padding: 3px 0; }
 .tc-ring-hero-project { padding-bottom: 6px; }

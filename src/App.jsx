@@ -1366,13 +1366,9 @@ export default function App() {
 
           {activeTab === 'reports' && (
             <ReportsView
-              trackers={trackers}
+              habits={habits}
               tasks={tasks}
               pomodoroLog={pomodoroLog}
-              onUpdateTracker={updateTracker}
-              onDeleteTracker={deleteTracker}
-              onEditTracker={openEditTracker}
-              onAddTracker={openAddTracker}
             />
           )}
 
