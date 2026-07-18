@@ -1,9 +1,11 @@
-import { memo, useState, useRef, lazy, Suspense } from 'react';
+import { memo, useState, useRef, useMemo, useCallback, forwardRef, lazy, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
-  getLogForDate, todayStr, dateStrOf, isScheduledOn, computeGlobalStats, getSparklineData,
-  upsertLog, toggleMilestone, getConfig
+  getLogForDate, todayStr, dateStrOf, isScheduledOn, isScheduledToday, isLoggedToday,
+  computeGlobalStats, getSparklineData, upsertLog, toggleMilestone, getConfig,
+  genId, defaultConfig,
 } from '../trackers/trackerUtils';
 const HabitStreakChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitStreakChart })));
 const HabitDayOfWeekChart = lazy(() => import('./TrackerCharts').then(m => ({ default: m.HabitDayOfWeekChart })));
@@ -16,10 +18,29 @@ import AnalyticsDashboard from './AnalyticsDashboard';
 import html2canvas from 'html2canvas';
 
 // ─── Reports view ──────────────────────────────────────────────────
-export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker }) {
+export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdateTracker, onDeleteTracker, onEditTracker, onAddTracker, onQuickAdd }) {
   const [catFilter,  setCatFilter]  = useState('all');
   const [viewMode,   setViewMode]   = useState('trackers'); // 'trackers' | 'analytics'
   const [detail,     setDetail]     = useState(null); // tracker shown in detail
+  const [highlightId, setHighlightId] = useState(null); // card pulsed after a stat-card jump
+
+  // Refs to each rendered card + the Today's Focus strip, so the Best Streak /
+  // Perfect Days stat cards can scroll to the responsible habit and flash it.
+  const cardRefs  = useRef({});
+  const focusRef  = useRef(null);
+
+  const jumpToCard = useCallback((id) => {
+    const el = cardRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(id);
+    // Clear so the same card can be re-flashed on a later click.
+    setTimeout(() => setHighlightId(cur => (cur === id ? null : cur)), 1600);
+  }, []);
+
+  const jumpToFocus = useCallback(() => {
+    focusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const global = computeGlobalStats(trackers);
   const daysInMonthSoFar = new Date().getDate();
@@ -42,14 +63,60 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
     return sched > 0 ? Math.round((logged / sched) * 100) : 0;
   })();
 
-  const trackersWithTrends = calculateTrends(trackers);
-  
+  const trackersWithTrends = useMemo(() => calculateTrends(trackers), [trackers]);
+
+  // Habit that owns the longest streak — target of the Best Streak stat card.
+  const bestStreakOwnerId = useMemo(() => {
+    let bestId = null, best = 0;
+    for (const t of trackers) {
+      if (t.type !== 'habit') continue;
+      const { longest } = computeHabitStreaks(t);
+      if (longest > best) { best = longest; bestId = t.id; }
+    }
+    return bestId;
+  }, [trackers]);
+
+  // Today's Focus: everything scheduled today that isn't logged yet, ordered by
+  // "streak at risk" — the pending habit with the biggest current streak is the
+  // most urgent, since that's what tonight's miss would break. Projects are
+  // excluded (they have no daily log). timeTag is a soft secondary sort.
+  const TIME_ORDER = { morning: 0, afternoon: 1, evening: 2, night: 3 };
+  const todaysFocus = useMemo(() => {
+    return trackers
+      // Only daily-cadence types belong here — targets/projects are long-horizon.
+      .filter(t => (t.type === 'habit' || t.type === 'average') && isScheduledToday(t) && !isLoggedToday(t))
+      .map(t => {
+        const streak = t.type === 'habit' ? computeHabitStreaks(t).current : 0;
+        const tag = getConfig(t).timeTag;
+        return { tracker: t, streak, tagOrder: TIME_ORDER[tag] ?? 99 };
+      })
+      .sort((a, b) => a.tagOrder - b.tagOrder || b.streak - a.streak);
+  }, [trackers]);
+
   let filtered = catFilter === 'all'
     ? trackersWithTrends
     : trackersWithTrends.filter(t => t.category === catFilter);
-    
-  // Sort by trend if in trackers view (improving first)
+
+  // Sort by trend (improving first)
   filtered = [...filtered].sort((a, b) => (b._trendScore || 0) - (a._trendScore || 0));
+
+  // Quick-start seeds for the first-run empty state — pre-filled so a new user
+  // isn't staring at a blank input. Each becomes a real habit-type tracker.
+  const QUICK_STARTS = [
+    { name: 'Drink Water',           category: 'health',   icon: '💧' },
+    { name: 'Read 10 mins',          category: 'personal', icon: '📖' },
+    { name: 'No Screens After 10pm', category: 'health',   icon: '🌙' },
+  ];
+  const handleQuickStart = (seed) => {
+    if (!onQuickAdd) { onAddTracker?.(); return; }
+    const exists = trackers.some(t => t.name.trim().toLowerCase() === seed.name.toLowerCase());
+    if (exists) return;
+    onQuickAdd({
+      id: genId(), type: 'habit', logs: [], createdAt: new Date().toISOString(),
+      name: seed.name, category: seed.category, description: '',
+      config: defaultConfig('habit'),
+    });
+  };
 
   const openDetail = (tracker) => setDetail(tracker);
   const closeDetail = () => setDetail(null);
@@ -83,24 +150,44 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
         <AnalyticsDashboard trackers={trackers} tasks={tasks} pomodoroLog={pomodoroLog} />
       ) : (
         <>
-          {/* Global stats */}
+          {/* Today's Focus — what's still pending today, most urgent first */}
+          {todaysFocus.length > 0 && (
+            <TodaysFocusStrip
+              ref={focusRef}
+              items={todaysFocus}
+              onLog={(t, v) => onUpdateTracker(upsertLog(t, v))}
+              onOpen={openDetail}
+            />
+          )}
+
+          {/* Global stats — Best Streak & Perfect Days jump to the habit responsible */}
           <div className="reports-global-stats">
             <div className="rgs-card">
               <div className="rgs-val">{global.activeTrackers}</div>
               <div className="rgs-lbl">Trackers</div>
             </div>
-            <div className="rgs-card">
+            <button
+              className={`rgs-card${todaysFocus.length ? ' rgs-card-link' : ''}`}
+              onClick={todaysFocus.length ? jumpToFocus : undefined}
+              disabled={!todaysFocus.length}
+              title={todaysFocus.length ? 'Jump to what’s left today' : undefined}
+            >
               <div className="rgs-val">{global.perfectDaysMonth}</div>
               <div className="rgs-lbl">Perfect Days</div>
               <div className="rgs-sub">{global.perfectDaysMonth} of {daysInMonthSoFar} days</div>
-            </div>
-            <div className="rgs-card">
+            </button>
+            <button
+              className={`rgs-card${bestStreakOwnerId ? ' rgs-card-link' : ''}`}
+              onClick={bestStreakOwnerId ? () => jumpToCard(bestStreakOwnerId) : undefined}
+              disabled={!bestStreakOwnerId}
+              title={bestStreakOwnerId ? 'Jump to this habit' : undefined}
+            >
               <div className="rgs-val">{global.longestStreak > 0 ? `${global.longestStreak}d` : '—'}</div>
               <div className="rgs-lbl">Best Streak</div>
               {global.longestStreak !== global.bestStreak && (
                 <div className="rgs-sub">current: {global.bestStreak}d</div>
               )}
-            </div>
+            </button>
             <div className="rgs-card">
               <div className="rgs-val">{successRate}%</div>
               <div className="rgs-lbl">Success Rate</div>
@@ -127,25 +214,30 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
             })}
           </div>
 
-          {/* Tracker list */}
+          {/* Tracker grid */}
           {filtered.length === 0 ? (
-            <div className="empty-state">
-              <span>📊</span>
-              <p>{trackers.length === 0 ? 'No trackers yet.' : 'No trackers in this category.'}</p>
-              {trackers.length === 0 && onAddTracker && (
-                <button className="tracker-add-cta" onClick={onAddTracker}>
-                  <IconPlusCircle />
-                  <span>Track a new habit</span>
-                </button>
-              )}
-            </div>
+            trackers.length === 0 ? (
+              <QuickStartEmpty seeds={QUICK_STARTS} onPick={handleQuickStart} onAddTracker={onAddTracker} />
+            ) : (
+              <div className="empty-state">
+                <span>📊</span>
+                <p>No trackers in this category.</p>
+              </div>
+            )
           ) : (
-            <div className="report-list">
+            <div className="tracker-grid">
               {filtered.map(t => (
-                <TrackerReportRow key={t.id} tracker={t} onClick={() => openDetail(t)} />
+                <TrackerCard
+                  key={t.id}
+                  tracker={t}
+                  cardRef={el => { if (el) cardRefs.current[t.id] = el; else delete cardRefs.current[t.id]; }}
+                  highlighted={highlightId === t.id}
+                  onOpen={() => openDetail(t)}
+                  onUpdate={onUpdateTracker}
+                />
               ))}
               {trackers.length < 3 && onAddTracker && (
-                <button className="tracker-add-cta" onClick={onAddTracker}>
+                <button className="tracker-add-cta tracker-add-cta-grid" onClick={onAddTracker}>
                   <IconPlusCircle />
                   <span>Track a new habit</span>
                 </button>
@@ -169,69 +261,313 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
   );
 });
 
-// ─── Report row ────────────────────────────────────────────────────
-function TrackerReportRow({ tracker, onClick }) {
-  const catMeta  = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
+// ─── Today's Focus strip ───────────────────────────────────────────
+const TodaysFocusStrip = forwardRef(function TodaysFocusStrip({ items, onLog, onOpen }, ref) {
+  return (
+    <div className="focus-strip" ref={ref}>
+      <div className="focus-strip-hdr">
+        <span className="focus-strip-title">Today’s Focus</span>
+        <span className="focus-strip-count">{items.length} left</span>
+      </div>
+      <div className="focus-strip-scroll">
+        {items.map(({ tracker, streak }) => {
+          const cat = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
+          const isHabit = tracker.type === 'habit';
+          return (
+            <div key={tracker.id} className="focus-pill" style={{ borderColor: cat.color + '55' }}>
+              <button className="focus-pill-main" onClick={() => onOpen(tracker)}>
+                <span className="focus-pill-dot" style={{ background: cat.color }} />
+                <span className="focus-pill-name">{tracker.name}</span>
+                {isHabit && streak > 0 && <span className="focus-pill-streak">🔥{streak}</span>}
+              </button>
+              <button
+                className="focus-pill-check"
+                style={{ '--pill-accent': cat.color }}
+                onClick={() => (isHabit ? onLog(tracker, true) : onOpen(tracker))}
+                aria-label={isHabit ? `Mark ${tracker.name} done` : `Log ${tracker.name}`}
+              >
+                {isHabit ? <CheckIcon /> : <PlusIcon />}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+// ─── Tracker card (unified chassis, 3 hero variants) ───────────────
+const TrackerCard = memo(function TrackerCard({ tracker, cardRef, highlighted, onOpen, onUpdate }) {
+  const cat      = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
-  const spark    = getSparklineData(tracker);
 
-  let statA = '—', statB = '—', pct = 0;
-  if (tracker.type === 'habit') {
-    const s = computeHabitStreaks(tracker);
-    statA = `${s.current}d`;
-    statB = `${s.successRate}%`;
-    pct   = s.successRate;
-  } else if (tracker.type === 'target') {
-    const s = computeTargetStats(tracker);
-    statA = `${s.progress}%`;
-    statB = s.pace;
-    pct   = s.progress;
-  } else if (tracker.type === 'average') {
-    const s = computeAverageStats(tracker);
-    statA = s.avg7 != null ? `${s.avg7}${s.unit}` : '—';
-    statB = '7d avg';
-    pct   = s.avg7 != null && s.targetAverage > 0
-      ? Math.min(100, Math.round((s.avg7 / s.targetAverage) * 100))
-      : s.avg7 != null ? 75 : 0;
-  } else if (tracker.type === 'project') {
-    const s = computeProjectStats(tracker);
-    statA = `${s.progress}%`;
-    statB = s.pace;
-    pct   = s.progress;
-  }
-
-  const dotColor = pct >= 80 ? 'var(--color-green)' : pct >= 50 ? 'var(--color-amber)' : 'var(--color-red)';
+  const openKey = (e) => {
+    // Only the card chassis handles Enter/Space; inner controls stopPropagation.
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+      e.preventDefault();
+      onOpen();
+    }
+  };
 
   return (
-    <button className="report-row" onClick={onClick}>
-      <div className="report-row-bar" style={{ background: catMeta.color }} />
-      <span className="report-row-icon">{typeMeta.icon}</span>
-      <div className="report-row-info">
-        <div className="report-row-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {tracker.name}
-          {tracker.trend === 'improving' && <span title="Improving" style={{ color: 'var(--color-green)', fontSize: '0.8rem' }}>↑</span>}
-          {tracker.trend === 'declining' && <span title="Declining" style={{ color: 'var(--color-red)', fontSize: '0.8rem' }}>↓</span>}
-        </div>
-        <div className="report-row-sub">
+    <div
+      ref={cardRef}
+      className={`tracker-card${highlighted ? ' tracker-card-flash' : ''}`}
+      style={{ '--card-cat': cat.color }}
+      onClick={onOpen}
+      onKeyDown={openKey}
+      role="button"
+      tabIndex={0}
+      aria-label={`${tracker.name} — open details`}
+    >
+      <div className="tc-topbar" style={{ background: cat.color }} />
+      <div className="tc-head">
+        <span className="tc-name">{tracker.name}</span>
+        <span className="tc-sub">
           <span className="mini-cat-badge"
-            style={{ background: catMeta.color + '22', color: catMeta.color, border: `1px solid ${catMeta.color}44` }}>
-            {catMeta.label}
+            style={{ background: cat.color + '22', color: cat.color, border: `1px solid ${cat.color}44` }}>
+            {cat.label}
           </span>
-          <span className="report-row-type">{typeMeta.label}</span>
+          <span className="tc-type">{typeMeta.label}</span>
+          {tracker.trend === 'improving' && <span className="tc-trend up" title="Improving">↑</span>}
+          {tracker.trend === 'declining' && <span className="tc-trend down" title="Declining">↓</span>}
+        </span>
+      </div>
+
+      {tracker.type === 'habit'   && <HabitCardBody   tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+      {tracker.type === 'target'  && <TargetCardBody  tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+      {tracker.type === 'project' && <ProjectCardBody tracker={tracker} color={cat.color} />}
+      {tracker.type === 'average' && <AverageCardBody tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+    </div>
+  );
+});
+
+function HabitCardBody({ tracker, color, onUpdate }) {
+  const { current, longest, successRate } = computeHabitStreaks(tracker);
+  const today    = todayStr();
+  const todayLog = getLogForDate(tracker, today);
+  const stop  = e => e.stopPropagation();
+  const log   = (v) => onUpdate(upsertLog(tracker, v));
+  const unlog = () => onUpdate({ ...tracker, logs: (tracker.logs || []).filter(l => l.date !== today) });
+
+  return (
+    <>
+      <div className="tc-habit-hero">
+        <StreakFlame streak={current} />
+        <div className="tc-habit-stats">
+          <div className="tc-stat"><span className="tc-stat-v">{longest}d</span><span className="tc-stat-l">Best</span></div>
+          <div className="tc-stat"><span className="tc-stat-v">{successRate}%</span><span className="tc-stat-l">Success</span></div>
         </div>
       </div>
-      <div className="report-row-stats">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span className="rrs-status-dot" style={{ background: dotColor }} />
-          <span className="rrs-val">{statA}</span>
+      <CardHeatmap tracker={tracker} weeks={5} />
+      <div className="tc-actions" onClick={stop}>
+        {todayLog?.value === true ? (
+          <button className="tc-btn tc-btn-done tc-btn-active" style={{ '--card-cat': color }} onClick={unlog}>
+            <CheckIcon /> Done today
+          </button>
+        ) : todayLog?.value === false ? (
+          <button className="tc-btn tc-btn-skip tc-btn-active" onClick={unlog}>→ Skipped</button>
+        ) : (
+          <>
+            <button className="tc-btn tc-btn-done" style={{ '--card-cat': color }} onClick={() => log(true)}>
+              <CheckIcon /> Done
+            </button>
+            <button className="tc-btn tc-btn-skip" onClick={() => log(false)}>Skip</button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TargetCardBody({ tracker, color, onUpdate }) {
+  const { currentValue, targetValue, unit, progress, pace } = computeTargetStats(tracker);
+  const [val, setVal] = useState('');
+  const stop = e => e.stopPropagation();
+  const submit = () => {
+    const n = parseFloat(val);
+    if (isNaN(n)) return;
+    onUpdate(upsertLog(tracker, currentValue + n));
+    setVal('');
+  };
+  const PACE = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', ahead: 'var(--color-blue)' };
+  return (
+    <>
+      <div className="tc-ring-hero">
+        <ProgressRing pct={progress} color={color} />
+        <div className="tc-ring-meta">
+          <div className="tc-ring-nums">{currentValue}<span className="tc-ring-unit">/{targetValue}{unit}</span></div>
+          <span className="tc-pace" style={{ color: PACE[pace] }}>{pace}</span>
         </div>
-        <span className="rrs-lbl">{statB}</span>
       </div>
-      <div className="report-row-spark">
-        <Sparkline data={spark} color={catMeta.color} type={tracker.type} />
+      <div className="tc-inline" onClick={stop}>
+        <input className="tc-inline-input" type="number" value={val} step="any" min="0"
+          onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+          placeholder={`+${unit || 'amount'}`} />
+        <button className="tc-inline-btn" style={{ '--card-cat': color }} onClick={submit} disabled={!val}>Add</button>
       </div>
-      <span className="report-row-arrow">›</span>
-    </button>
+    </>
+  );
+}
+
+function ProjectCardBody({ tracker, color }) {
+  const { done, total, progress, pace } = computeProjectStats(tracker);
+  const PACE = { behind: 'var(--color-red)', 'on-track': 'var(--color-green)', complete: 'var(--accent)' };
+  return (
+    <div className="tc-ring-hero tc-ring-hero-project">
+      <ProgressRing pct={progress} color={color} />
+      <div className="tc-ring-meta">
+        <div className="tc-ring-nums">{done}<span className="tc-ring-unit">/{total} done</span></div>
+        <span className="tc-pace" style={{ color: PACE[pace] }}>{pace}</span>
+        <span className="tc-open-hint">Open to update →</span>
+      </div>
+    </div>
+  );
+}
+
+function AverageCardBody({ tracker, color, onUpdate }) {
+  const { todayValue, avg7, targetAverage, unit } = computeAverageStats(tracker);
+  const [val, setVal] = useState('');
+  const stop = e => e.stopPropagation();
+  const submit = () => {
+    const n = parseFloat(val);
+    if (isNaN(n)) return;
+    onUpdate(upsertLog(tracker, n));
+    setVal('');
+  };
+  const spark = getSparklineData(tracker);
+  const pct = avg7 != null && targetAverage > 0 ? Math.min(100, Math.round((avg7 / targetAverage) * 100)) : null;
+  return (
+    <>
+      <div className="tc-avg-hero">
+        <div className="tc-avg-nums">
+          <span className="tc-avg-v" style={{ color }}>{avg7 != null ? `${avg7}${unit}` : '—'}</span>
+          <span className="tc-avg-l">7-day avg{targetAverage > 0 ? ` · target ${targetAverage}${unit}` : ''}</span>
+        </div>
+        <div className="tc-avg-spark"><Sparkline data={spark} color={color} type="average" /></div>
+      </div>
+      {targetAverage > 0 && (
+        <div className="tc-avg-gauge"><div className="tc-avg-gauge-fill" style={{ width: `${pct}%`, background: color }} /></div>
+      )}
+      <div className="tc-inline" onClick={stop}>
+        <input className="tc-inline-input" type="number" value={val} step="any" min="0"
+          onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
+          placeholder={todayValue != null ? `today: ${todayValue}${unit}` : (unit || 'value')} />
+        <button className="tc-inline-btn" style={{ '--card-cat': color }} onClick={submit} disabled={!val}>Log</button>
+      </div>
+    </>
+  );
+}
+
+// ─── Streak flame — scales + intensifies with streak length ────────
+function StreakFlame({ streak }) {
+  const tier   = streak >= 30 ? 4 : streak >= 14 ? 3 : streak >= 7 ? 2 : streak >= 1 ? 1 : 0;
+  const COLORS = ['#6b7280', '#fbbf24', '#fb923c', '#f97316', '#ef4444'];
+  const color  = COLORS[tier];
+  const size   = 30 + tier * 6; // 30 → 54px
+  return (
+    <div className={`streak-flame streak-flame-t${tier}`} style={{ '--flame': color }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
+        <path d="M12 2c1 3-1 4.5-2.5 6C8 9.5 7 11 7 13a5 5 0 0 0 10 0c0-1.5-1-3.9-2-5-1.2 2-2.2 2-3 1 1.4-2.5 1-5.5 0-8z" />
+      </svg>
+      <div className="streak-flame-num">
+        <span className="streak-flame-v" style={{ color: tier ? color : 'var(--text-muted)' }}>{streak}</span>
+        <span className="streak-flame-d">day{streak === 1 ? '' : 's'}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Progress ring (target / project hero) ─────────────────────────
+function ProgressRing({ pct, color, size = 62 }) {
+  const stroke = 6;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.min(100, Math.max(0, pct));
+  const off = c - (clamped / 100) * c;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="tc-ring" aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ring-track)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} className="tc-ring-arc" />
+      <text x="50%" y="50%" dy="0.35em" textAnchor="middle" className="tc-ring-pct" fill="var(--text-primary)">{pct}%</text>
+    </svg>
+  );
+}
+
+// ─── Compact card heatmap (habit variant) ──────────────────────────
+function CardHeatmap({ tracker, weeks = 5 }) {
+  const today = new Date();
+  const logMap = {};
+  for (const l of tracker.logs || []) logMap[l.date] = l.value;
+
+  const start = new Date(today);
+  start.setDate(start.getDate() - (weeks * 7 - 1));
+  start.setDate(start.getDate() - start.getDay()); // snap to Sunday
+  const todayS = dateStrOf(today);
+
+  const cols = [];
+  let d = new Date(start);
+  for (let w = 0; w < weeks; w++) {
+    const col = [];
+    for (let dow = 0; dow < 7; dow++) {
+      const ds = dateStrOf(d);
+      const isFuture = ds > todayS;
+      col.push({ ds, isFuture, val: logMap[ds], scheduled: !isFuture && isScheduledOn(tracker, d) });
+      d.setDate(d.getDate() + 1);
+    }
+    cols.push(col);
+  }
+
+  return (
+    <div className="card-heatmap" aria-hidden="true">
+      {cols.map((col, wi) => (
+        <div key={wi} className="card-hm-col">
+          {col.map((cell, di) => {
+            const cls = cell.isFuture ? 'chm-future'
+              : cell.scheduled && cell.val === true  ? 'chm-done'
+              : cell.scheduled && cell.val === false ? 'chm-skip'
+              : cell.scheduled ? 'chm-missed' : 'chm-idle';
+            return <div key={di} className={`card-hm-cell ${cls}`} title={cell.ds} />;
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── First-run quick-start ─────────────────────────────────────────
+function QuickStartEmpty({ seeds, onPick, onAddTracker }) {
+  return (
+    <div className="quickstart">
+      <div className="quickstart-icon">📈</div>
+      <h3 className="quickstart-title">Start your first habit</h3>
+      <p className="quickstart-sub">Pick one to begin — rename or fine-tune it any time.</p>
+      <div className="quickstart-chips">
+        {seeds.map(s => (
+          <button key={s.name} className="quickstart-chip" onClick={() => onPick(s)}>
+            <span className="quickstart-chip-ico">{s.icon}</span>
+            <span>{s.name}</span>
+          </button>
+        ))}
+      </div>
+      {onAddTracker && (
+        <button className="quickstart-custom" onClick={onAddTracker}>or create a custom tracker →</button>
+      )}
+    </div>
+  );
+}
+
+// ─── Small inline icons ────────────────────────────────────────────
+function CheckIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+  );
+}
+function PlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
   );
 }
 
