@@ -1211,13 +1211,13 @@ export default function App() {
         {/* ── Section: Main ── */}
         <span className="nav-section-label">Main</span>
         {[
-          { id:'daily',      label:'Today',       Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
+          { id:'daily',      label:'Today',        Icon: NavIcoSun,         badge: unloggedToday.length || 0 },
           { id:'tasks',      label:'Tasks',        Icon: NavIcoCheckSquare, badge: tasks.filter(t=>!t.completed).length || 0 },
-          { id:'notes',      label:'Notes',        Icon: NavIcoNotes },
           { id:'calendar',   label:'Calendar',     Icon: NavIcoCalendar },
+          { id:'habits',     label:'Habits',       Icon: NavIcoRepeat },
+          { id:'journal',    label:'Journal',      Icon: NavIcoBookOpen },
           { id:'reminders',  label:'Reminders',    Icon: NavIcoBell },
-          { id:'links',      label:'Links',        Icon: NavIcoLinks },
-          { id:'countdowns', label:'Countdowns',   Icon: NavIcoHourglass },
+          { id:'notes',      label:'Notes',        Icon: NavIcoNotes },
         ].map(tab => (
           <button key={tab.id}
             className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
@@ -1237,12 +1237,29 @@ export default function App() {
         <div className="nav-divider" />
         <span className="nav-section-label">More</span>
         {[
-          { id:'habits',   label:'Habits',       Icon: NavIcoRepeat },
-          { id:'timer',    label:'Focus',         Icon: NavIcoTimerIcon },
-          { id:'journal',  label:'Journal',       Icon: NavIcoBookOpen },
-          { id:'vault',    label:'Saved Logins',  Icon: NavIcoVault },
+          { id:'timer',      label:'Focus',        Icon: NavIcoTimerIcon },
+          { id:'links',      label:'Links',        Icon: NavIcoLinks },
+          { id:'countdowns', label:'Countdowns',   Icon: NavIcoHourglass },
+        ].map(tab => (
+          <button key={tab.id}
+            className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}
+            onClick={() => setActiveTab(tab.id)}
+            data-tooltip={tab.label}
+          >
+            <span className="nav-icon-wrap">
+              <span className="nav-icon"><tab.Icon /></span>
+            </span>
+            <span className="nav-label">{tab.label}</span>
+          </button>
+        ))}
+
+        {/* ── Section: Utility — reports, audit, credentials ── */}
+        <div className="nav-divider" />
+        <span className="nav-section-label">Utility</span>
+        {[
           { id:'reports',  label:'Reports',       Icon: NavIcoBarChart },
           { id:'activity', label:'Activity Log',  Icon: NavIcoHistory },
+          { id:'vault',    label:'Saved Logins',  Icon: NavIcoVault },
         ].map(tab => (
           <button key={tab.id}
             className={`main-nav-btn${activeTab===tab.id?' nav-active':''}`}

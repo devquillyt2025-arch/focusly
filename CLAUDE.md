@@ -341,6 +341,23 @@ The sidebar is now an **always-mounted icon rail**, not a mount/unmount toggle.
 - Mobile (≤768px): `.main-nav` is `display: none` regardless of state. The mobile bottom
   nav handles navigation there. Do not change this behaviour.
 
+### Nav order & section grouping (App.jsx, ~line 1212)
+
+The desktop rail renders three inline arrays, each preceded by a
+`.nav-section-label` (CSS `text-transform: uppercase`, so title-case in source
+renders as MAIN/MORE/UTILITY), with a `.nav-divider` before More and Utility.
+Settings is pinned at the bottom after `.nav-spacer` + `.nav-settings-separator`,
+outside every section. Current order (reordered 2026-07-18):
+
+- **Main:** Today, Tasks, Calendar, Habits, Journal, Reminders, Notes
+- **More:** Focus (`timer`), Links, Countdowns
+- **Utility:** Reports, Activity Log, Saved Logins (`vault`)
+
+Only the Main array carries badges (`daily` → `unloggedToday`, `tasks` →
+incomplete count); the other rows render icon + label only. The mobile bottom nav
+(Today, Tasks, Journal, Habits + More) is a **separate hardcoded list** — it does
+not follow this order and is not driven by these arrays.
+
 ---
 
 ## 10. Activity Log live-reload (added 2026-07)
