@@ -2544,15 +2544,42 @@ kbd {
 .streak-flame-v { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px; }
 .streak-flame-d { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 
-/* Compact card heatmap — fixed squares, centred (GitHub-style contribution grid) */
-.card-heatmap { display: flex; gap: 3px; justify-content: center; padding: 1px 0; }
+/* Compact card heatmap — capped squares, centred in a faint framed well so the
+   grid reads as a contained widget at any card width (incl. 390px mobile). */
+.card-heatmap {
+  display: flex; justify-content: center; align-items: center;
+  min-height: 92px; padding: 8px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+}
+.card-hm-fade { display: flex; justify-content: center; width: 100%; }
+.card-hm-grid { display: flex; gap: 3px; justify-content: center; }
 .card-hm-col { display: flex; flex-direction: column; gap: 3px; }
 .card-hm-cell { width: 14px; height: 14px; border-radius: 3px; background: var(--bg-elevated); }
+/* 7-day: one labelled row */
+.card-hm-week { display: flex; gap: 7px; justify-content: center; align-items: flex-end; }
+.card-hm-daycol { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.card-hm-cell-lg { width: 22px; height: 22px; border-radius: 4px; }
+.card-hm-daylabel { font-size: 0.58rem; color: var(--text-muted); line-height: 1; }
 .card-hm-cell.chm-done   { background: var(--card-cat, var(--color-green)); }
 .card-hm-cell.chm-skip   { background: var(--border-strong); }
-.card-hm-cell.chm-missed { background: var(--bg-elevated); border: 1px solid var(--border); }
+.card-hm-cell.chm-missed { background: var(--bg-card); box-shadow: inset 0 0 0 1px var(--border); }
 .card-hm-cell.chm-idle   { background: transparent; }
 .card-hm-cell.chm-future { background: transparent; }
+
+/* Filter bar: category chips left, heatmap-range toggle right */
+.cat-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cat-filter-bar .cat-filter-row { flex: 1; min-width: 0; }
+.heat-range-toggle {
+  display: inline-flex; flex-shrink: 0; gap: 2px; padding: 3px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px;
+}
+.heat-range-toggle button {
+  padding: 4px 12px; border: none; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text-secondary); font-family: inherit;
+  font-size: 0.74rem; font-weight: 600; transition: background var(--ease), color var(--ease);
+}
+.heat-range-toggle button:hover { color: var(--text-primary); }
+.heat-range-toggle .hr-active { background: var(--accent); color: #fff; }
 
 /* Quick-complete + inline log actions */
 .tc-actions { display: flex; gap: 7px; margin-top: 1px; }

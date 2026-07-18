@@ -1,5 +1,5 @@
-import { memo, useState, useRef, useMemo, useCallback, forwardRef, lazy, Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { memo, useState, useRef, useMemo, useCallback, useEffect, forwardRef, lazy, Suspense } from 'react';
+import { motion, AnimatePresence, useReducedMotion, useAnimationControls } from 'framer-motion';
 import {
   TRACKER_CATS, TRACKER_TYPES,
   computeHabitStreaks, computeTargetStats, computeAverageStats, computeProjectStats,
@@ -23,6 +23,8 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
   const [viewMode,   setViewMode]   = useState('trackers'); // 'trackers' | 'analytics'
   const [detail,     setDetail]     = useState(null); // tracker shown in detail
   const [highlightId, setHighlightId] = useState(null); // card pulsed after a stat-card jump
+  const [heatRange,  setHeatRange]  = useState('30'); // '30' (pattern) | '7' (this week)
+  const reduceMotion = useReducedMotion();
 
   // Refs to each rendered card + the Today's Focus strip, so the Best Streak /
   // Perfect Days stat cards can scroll to the responsible habit and flash it.
@@ -99,6 +101,9 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
 
   // Sort by trend (improving first)
   filtered = [...filtered].sort((a, b) => (b._trendScore || 0) - (a._trendScore || 0));
+
+  // The heatmap range toggle only affects habit cards — hide it if none exist.
+  const hasHabits = trackers.some(t => t.type === 'habit');
 
   // Quick-start seeds for the first-run empty state — pre-filled so a new user
   // isn't staring at a blank input. Each becomes a real habit-type tracker.
@@ -197,21 +202,29 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
             </div>
           </div>
 
-          {/* Category filter */}
-          <div className="cat-filter-row" style={{ padding: '0 0 4px' }}>
-            {['all', ...Object.keys(TRACKER_CATS)].map(key => {
-              const m = TRACKER_CATS[key];
-              const active = catFilter === key;
-              return (
-                <button key={key}
-                  className={`cat-chip${active ? ' cat-chip-active' : ''}`}
-                  style={active && m ? { background: m.color, borderColor: m.color, color: '#fff' } : {}}
-                  onClick={() => setCatFilter(key)}
-                >
-                  {m?.label ?? 'All'}
-                </button>
-              );
-            })}
+          {/* Category filter + heatmap range toggle */}
+          <div className="cat-filter-bar">
+            <div className="cat-filter-row" style={{ padding: '0 0 4px' }}>
+              {['all', ...Object.keys(TRACKER_CATS)].map(key => {
+                const m = TRACKER_CATS[key];
+                const active = catFilter === key;
+                return (
+                  <button key={key}
+                    className={`cat-chip${active ? ' cat-chip-active' : ''}`}
+                    style={active && m ? { background: m.color, borderColor: m.color, color: '#fff' } : {}}
+                    onClick={() => setCatFilter(key)}
+                  >
+                    {m?.label ?? 'All'}
+                  </button>
+                );
+              })}
+            </div>
+            {hasHabits && (
+              <div className="heat-range-toggle" role="group" aria-label="Heatmap range">
+                <button className={heatRange === '30' ? 'hr-active' : ''} onClick={() => setHeatRange('30')} aria-pressed={heatRange === '30'}>30d</button>
+                <button className={heatRange === '7'  ? 'hr-active' : ''} onClick={() => setHeatRange('7')}  aria-pressed={heatRange === '7'}>7d</button>
+              </div>
+            )}
           </div>
 
           {/* Tracker grid */}
@@ -225,24 +238,28 @@ export default memo(function ReportsView({ trackers, tasks, pomodoroLog, onUpdat
               </div>
             )
           ) : (
-            <div className="tracker-grid">
-              {filtered.map(t => (
-                <TrackerCard
-                  key={t.id}
-                  tracker={t}
-                  cardRef={el => { if (el) cardRefs.current[t.id] = el; else delete cardRefs.current[t.id]; }}
-                  highlighted={highlightId === t.id}
-                  onOpen={() => openDetail(t)}
-                  onUpdate={onUpdateTracker}
-                />
-              ))}
+            <motion.div className="tracker-grid" layout={!reduceMotion}>
+              <AnimatePresence mode="popLayout" initial={false}>
+                {filtered.map(t => (
+                  <TrackerCard
+                    key={t.id}
+                    tracker={t}
+                    heatRange={heatRange}
+                    reduceMotion={reduceMotion}
+                    cardRef={el => { if (el) cardRefs.current[t.id] = el; else delete cardRefs.current[t.id]; }}
+                    highlighted={highlightId === t.id}
+                    onOpen={() => openDetail(t)}
+                    onUpdate={onUpdateTracker}
+                  />
+                ))}
+              </AnimatePresence>
               {trackers.length < 3 && onAddTracker && (
                 <button className="tracker-add-cta tracker-add-cta-grid" onClick={onAddTracker}>
                   <IconPlusCircle />
                   <span>Track a new habit</span>
                 </button>
               )}
-            </div>
+            </motion.div>
           )}
         </>
       )}
@@ -297,9 +314,17 @@ const TodaysFocusStrip = forwardRef(function TodaysFocusStrip({ items, onLog, on
 });
 
 // ─── Tracker card (unified chassis, 3 hero variants) ───────────────
-const TrackerCard = memo(function TrackerCard({ tracker, cardRef, highlighted, onOpen, onUpdate }) {
+// forwardRef so AnimatePresence (popLayout) can attach its measurement ref;
+// merged with cardRef, our own scroll-to-card handle for the stat-card jumps.
+const TrackerCard = memo(forwardRef(function TrackerCard({ tracker, cardRef, highlighted, heatRange, reduceMotion, onOpen, onUpdate }, ref) {
   const cat      = TRACKER_CATS[tracker.category] ?? TRACKER_CATS.health;
   const typeMeta = TRACKER_TYPES[tracker.type] ?? TRACKER_TYPES.habit;
+
+  const setRefs = (node) => {
+    cardRef(node);
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  };
 
   const openKey = (e) => {
     // Only the card chassis handles Enter/Space; inner controls stopPropagation.
@@ -309,9 +334,19 @@ const TrackerCard = memo(function TrackerCard({ tracker, cardRef, highlighted, o
     }
   };
 
+  // Enter/exit + reposition are transform/opacity only (no layout reflow); the
+  // reduced-motion path drops straight to the final frame with no `layout`.
+  const anim = reduceMotion ? {} : {
+    layout: true,
+    initial: { opacity: 0, scale: 0.94 },
+    animate: { opacity: 1, scale: 1 },
+    exit:    { opacity: 0, scale: 0.94 },
+    transition: { duration: 0.22, ease: 'easeOut' },
+  };
+
   return (
-    <div
-      ref={cardRef}
+    <motion.div
+      ref={setRefs}
       className={`tracker-card${highlighted ? ' tracker-card-flash' : ''}`}
       style={{ '--card-cat': cat.color }}
       onClick={onOpen}
@@ -319,6 +354,7 @@ const TrackerCard = memo(function TrackerCard({ tracker, cardRef, highlighted, o
       role="button"
       tabIndex={0}
       aria-label={`${tracker.name} — open details`}
+      {...anim}
     >
       <div className="tc-topbar" style={{ background: cat.color }} />
       <div className="tc-head">
@@ -334,15 +370,15 @@ const TrackerCard = memo(function TrackerCard({ tracker, cardRef, highlighted, o
         </span>
       </div>
 
-      {tracker.type === 'habit'   && <HabitCardBody   tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
+      {tracker.type === 'habit'   && <HabitCardBody   tracker={tracker} color={cat.color} heatRange={heatRange} reduceMotion={reduceMotion} onUpdate={onUpdate} />}
       {tracker.type === 'target'  && <TargetCardBody  tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
       {tracker.type === 'project' && <ProjectCardBody tracker={tracker} color={cat.color} />}
       {tracker.type === 'average' && <AverageCardBody tracker={tracker} color={cat.color} onUpdate={onUpdate} />}
-    </div>
+    </motion.div>
   );
-});
+}));
 
-function HabitCardBody({ tracker, color, onUpdate }) {
+function HabitCardBody({ tracker, color, heatRange, reduceMotion, onUpdate }) {
   const { current, longest, successRate } = computeHabitStreaks(tracker);
   const today    = todayStr();
   const todayLog = getLogForDate(tracker, today);
@@ -353,13 +389,13 @@ function HabitCardBody({ tracker, color, onUpdate }) {
   return (
     <>
       <div className="tc-habit-hero">
-        <StreakFlame streak={current} />
+        <StreakFlame streak={current} reduceMotion={reduceMotion} />
         <div className="tc-habit-stats">
           <div className="tc-stat"><span className="tc-stat-v">{longest}d</span><span className="tc-stat-l">Best</span></div>
           <div className="tc-stat"><span className="tc-stat-v">{successRate}%</span><span className="tc-stat-l">Success</span></div>
         </div>
       </div>
-      <CardHeatmap tracker={tracker} weeks={5} />
+      <CardHeatmap tracker={tracker} range={heatRange} reduceMotion={reduceMotion} />
       <div className="tc-actions" onClick={stop}>
         {todayLog?.value === true ? (
           <button className="tc-btn tc-btn-done tc-btn-active" style={{ '--card-cat': color }} onClick={unlog}>
@@ -460,16 +496,30 @@ function AverageCardBody({ tracker, color, onUpdate }) {
 }
 
 // ─── Streak flame — scales + intensifies with streak length ────────
-function StreakFlame({ streak }) {
+function StreakFlame({ streak, reduceMotion }) {
   const tier   = streak >= 30 ? 4 : streak >= 14 ? 3 : streak >= 7 ? 2 : streak >= 1 ? 1 : 0;
   const COLORS = ['#6b7280', '#fbbf24', '#fb923c', '#f97316', '#ef4444'];
   const color  = COLORS[tier];
   const size   = 30 + tier * 6; // 30 → 54px
+
+  // Pop the flame the moment a streak ticks up — but never on first mount
+  // (prevInit guards against animating on tab-open) or under reduced motion.
+  const controls = useAnimationControls();
+  const prev = useRef(streak);
+  useEffect(() => {
+    const rose = streak > prev.current;
+    prev.current = streak;
+    if (rose && !reduceMotion) {
+      controls.start({ scale: [1, 1.45, 1], transition: { duration: 0.45, ease: 'easeOut' } });
+    }
+  }, [streak, reduceMotion, controls]);
+
   return (
     <div className={`streak-flame streak-flame-t${tier}`} style={{ '--flame': color }}>
-      <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
+      <motion.svg animate={controls} style={{ originX: 0.5, originY: 1 }}
+        width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
         <path d="M12 2c1 3-1 4.5-2.5 6C8 9.5 7 11 7 13a5 5 0 0 0 10 0c0-1.5-1-3.9-2-5-1.2 2-2.2 2-3 1 1.4-2.5 1-5.5 0-8z" />
-      </svg>
+      </motion.svg>
       <div className="streak-flame-num">
         <span className="streak-flame-v" style={{ color: tier ? color : 'var(--text-muted)' }}>{streak}</span>
         <span className="streak-flame-d">day{streak === 1 ? '' : 's'}</span>
@@ -497,42 +547,89 @@ function ProgressRing({ pct, color, size = 62 }) {
 }
 
 // ─── Compact card heatmap (habit variant) ──────────────────────────
-function CardHeatmap({ tracker, weeks = 5 }) {
-  const today = new Date();
+// range '30' → 5 weeks as columns × 7 day-of-week rows, so weekday patterns
+//   (e.g. weekday-consistent / weekend-drop) are legible at a glance.
+// range '7'  → just the trailing week as one labelled row (the zoomed-in view).
+// Cells are capped squares (not width-filling) so the grid stays a compact,
+// pattern-legible widget at every breakpoint incl. the 390px single column.
+function CardHeatmap({ tracker, range, reduceMotion }) {
+  const today  = new Date();
+  const todayS = dateStrOf(today);
   const logMap = {};
   for (const l of tracker.logs || []) logMap[l.date] = l.value;
 
-  const start = new Date(today);
-  start.setDate(start.getDate() - (weeks * 7 - 1));
-  start.setDate(start.getDate() - start.getDay()); // snap to Sunday
-  const todayS = dateStrOf(today);
+  const cellClass = (ds, d) => {
+    const isFuture = ds > todayS;
+    const val = logMap[ds];
+    const scheduled = !isFuture && isScheduledOn(tracker, d);
+    return isFuture ? 'chm-future'
+      : scheduled && val === true  ? 'chm-done'
+      : scheduled && val === false ? 'chm-skip'
+      : scheduled ? 'chm-missed' : 'chm-idle';
+  };
 
-  const cols = [];
-  let d = new Date(start);
-  for (let w = 0; w < weeks; w++) {
-    const col = [];
-    for (let dow = 0; dow < 7; dow++) {
+  const buildGrid = () => {
+    const weeks = 5;
+    const start = new Date(today);
+    start.setDate(start.getDate() - (weeks * 7 - 1));
+    start.setDate(start.getDate() - start.getDay()); // snap to Sunday
+    const cols = [];
+    let d = new Date(start);
+    for (let w = 0; w < weeks; w++) {
+      const col = [];
+      for (let dow = 0; dow < 7; dow++) {
+        const ds = dateStrOf(d);
+        col.push({ ds, cls: cellClass(ds, d) });
+        d.setDate(d.getDate() + 1);
+      }
+      cols.push(col);
+    }
+    return cols;
+  };
+
+  const buildWeek = () => {
+    const L = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const days = [];
+    const d = new Date(today);
+    d.setDate(d.getDate() - 6);
+    for (let i = 0; i < 7; i++) {
       const ds = dateStrOf(d);
-      const isFuture = ds > todayS;
-      col.push({ ds, isFuture, val: logMap[ds], scheduled: !isFuture && isScheduledOn(tracker, d) });
+      days.push({ ds, label: L[d.getDay()], cls: cellClass(ds, d) });
       d.setDate(d.getDate() + 1);
     }
-    cols.push(col);
-  }
+    return days;
+  };
+
+  const inner = range === '7' ? (
+    <div className="card-hm-week">
+      {buildWeek().map((c, i) => (
+        <div key={i} className="card-hm-daycol">
+          <div className={`card-hm-cell card-hm-cell-lg ${c.cls}`} title={c.ds} />
+          <span className="card-hm-daylabel">{c.label}</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="card-hm-grid">
+      {buildGrid().map((col, wi) => (
+        <div key={wi} className="card-hm-col">
+          {col.map((cell, di) => <div key={di} className={`card-hm-cell ${cell.cls}`} title={cell.ds} />)}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="card-heatmap" aria-hidden="true">
-      {cols.map((col, wi) => (
-        <div key={wi} className="card-hm-col">
-          {col.map((cell, di) => {
-            const cls = cell.isFuture ? 'chm-future'
-              : cell.scheduled && cell.val === true  ? 'chm-done'
-              : cell.scheduled && cell.val === false ? 'chm-skip'
-              : cell.scheduled ? 'chm-missed' : 'chm-idle';
-            return <div key={di} className={`card-hm-cell ${cls}`} title={cell.ds} />;
-          })}
-        </div>
-      ))}
+      {reduceMotion ? inner : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={range} className="card-hm-fade"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}>
+            {inner}
+          </motion.div>
+        </AnimatePresence>
+      )}
     </div>
   );
 }
