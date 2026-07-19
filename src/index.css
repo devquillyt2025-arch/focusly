@@ -6995,6 +6995,11 @@ select.modal-input {
   border-radius: 12px;
   box-shadow: var(--shadow-xs);
   overflow: hidden;
+  /* Keep full content height inside the flex-column .tasks-scroll-list so that
+     scroll-list (maxHeight:60vh, overflow:auto) actually scrolls. Without this
+     the container's overflow:hidden forces min-height:0, letting it shrink to
+     the scroll-list height and clip the overflowing rows with no scrollbar. */
+  flex-shrink: 0;
 }
 
 /* Scrollable task list with thin scrollbar */
