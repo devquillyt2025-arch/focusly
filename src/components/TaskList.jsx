@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CAT_META } from '../utils/categoryMeta';
@@ -115,6 +115,39 @@ function TaskRow({
   const priColor = !isDone && task.priority !== 'none' ? (PRI_META[task.priority]?.color ?? null) : null;
   const cardBorderLeft = priColor ? `4px solid ${priColor}` : '4px solid transparent';
   const urgency = computeUrgency(task, now, isDone);
+
+  // ── Kebab menu positioning ──
+  // The menu is portalled to <body> so the pending-list scroll container can't
+  // clip it. Position is derived from the button's viewport rect, flipping above
+  // the button when there isn't room below.
+  const kebabBtnRef = useRef(null);
+  const menuOpen = kebabOpenId === task.id;
+  const [menuPos, setMenuPos] = useState(null);
+  useLayoutEffect(() => {
+    if (!menuOpen || !kebabBtnRef.current) return;
+    const rect = kebabBtnRef.current.getBoundingClientRect();
+    const MENU_W = 224;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < 360 && rect.top > spaceBelow;
+    setMenuPos({
+      left: Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8)),
+      top:    openUp ? null : Math.round(rect.bottom + 6),
+      bottom: openUp ? Math.round(window.innerHeight - rect.top + 6) : null,
+    });
+  }, [menuOpen]);
+  // Close on scroll/resize so the fixed dropdown can't drift from its button.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setKebabOpenId(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [menuOpen, setKebabOpenId]);
+
+  const menuItemStyle = { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left', fontSize: '0.875rem', fontWeight: 500, fontFamily: 'inherit' };
 
   return (
     <motion.div
@@ -262,10 +295,11 @@ function TaskRow({
 
             {/* Kebab Menu Button */}
             <button
+              ref={kebabBtnRef}
               type="button"
               className="linear-action-btn kebab-btn"
-              style={{ background: kebabOpenId === task.id ? 'var(--bg-hover)' : 'transparent', color: 'var(--text-secondary)' }}
-              onClick={e => { e.stopPropagation(); setKebabOpenId(kebabOpenId === task.id ? null : task.id); }}
+              style={{ background: menuOpen ? 'var(--bg-hover)' : 'transparent', color: 'var(--text-secondary)' }}
+              onClick={e => { e.stopPropagation(); setKebabOpenId(menuOpen ? null : task.id); }}
               aria-label="More actions"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -273,23 +307,27 @@ function TaskRow({
               </svg>
             </button>
 
-            {/* Dropdown Menu */}
-            {kebabOpenId === task.id && (
+            {/* Dropdown Menu — portalled to <body> so the pending-list scroll
+                container can't clip it. Positioned from the button rect (menuPos).
+                onMouseDown stopPropagation keeps the outside-click handler from
+                closing it before an item's onClick fires. */}
+            {menuOpen && menuPos && createPortal(
               <div
                 className="kebab-dropdown-menu"
+                onMouseDown={e => e.stopPropagation()}
                 style={{
-                  position: 'absolute', top: 32, right: 0, zIndex: 100, width: 220,
+                  position: 'fixed', left: menuPos.left,
+                  ...(menuPos.top != null ? { top: menuPos.top } : { bottom: menuPos.bottom }),
+                  zIndex: 1000, width: 224, maxHeight: '72vh', overflowY: 'auto',
                   background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
-                  borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', padding: '8px 0',
-                  display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left',
-                  color: 'var(--text-primary)', fontSize: '0.9rem'
+                  borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.4)', padding: 6,
+                  display: 'flex', flexDirection: 'column', gap: 1, textAlign: 'left',
+                  color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 500,
                 }}
               >
                 <button
-                  type="button"
-                  className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => setShowDatePicker(true), 120); }}
+                  type="button" className="kebab-menu-item" style={menuItemStyle}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task, 'scheduling'); setTimeout(() => setShowDatePicker(true), 120); }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -297,10 +335,8 @@ function TaskRow({
                   Add deadline
                 </button>
                 <button
-                  type="button"
-                  className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 100); }}
+                  type="button" className="kebab-menu-item" style={menuItemStyle}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task, 'subtasks'); setTimeout(() => { const el = document.getElementById('subtask-input'); el?.focus(); }, 120); }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -308,10 +344,8 @@ function TaskRow({
                   Add a subtask
                 </button>
                 <button
-                  type="button"
-                  className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 100); }}
+                  type="button" className="kebab-menu-item" style={menuItemStyle}
+                  onClick={e => { e.stopPropagation(); setKebabOpenId(null); openDetail(task, 'details'); setTimeout(() => { const el = document.getElementById('attachment-input'); el?.click(); }, 120); }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -319,36 +353,35 @@ function TaskRow({
                   Add attachment
                 </button>
                 <button
-                  type="button"
-                  className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  type="button" className="kebab-menu-item" style={{ ...menuItemStyle, color: 'var(--color-red)' }}
                   onClick={e => { e.stopPropagation(); setKebabOpenId(null); setConfirmDeleteId(task.id); }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-red-bg, rgba(239,68,68,0.12))'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                   Delete
                 </button>
 
-                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                <div style={{ height: 1, background: 'var(--border)', margin: '5px 4px' }} />
+                <div style={{ padding: '4px 10px 4px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Move to list</div>
 
                 {/* List selection */}
                 {ALL_CATS.map(catKey => {
                   const isCur = task.category === catKey;
+                  const cMeta = CAT_META[catKey];
                   return (
                     <button
                       key={catKey}
                       type="button"
                       className="kebab-menu-item"
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                      style={menuItemStyle}
                       onClick={e => { e.stopPropagation(); setKebabOpenId(null); (onQuickUpdate || onUpdate)({ ...task, category: catKey }); }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <span style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isCur && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                      </span>
-                      {CAT_META[catKey]?.label}
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: cMeta?.color, flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{cMeta?.label}</span>
+                      {isCur && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                     </button>
                   );
                 })}
@@ -356,7 +389,7 @@ function TaskRow({
                 <button
                   type="button"
                   className="kebab-menu-item"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                  style={{ ...menuItemStyle, color: 'var(--text-secondary)' }}
                   onClick={e => { e.stopPropagation(); handleNewList(task); }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -364,7 +397,8 @@ function TaskRow({
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                   New list
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
