@@ -596,7 +596,12 @@ export default memo(function JournalView() {
                     Only this outer placement changed — the export dropdown's own
                     contents/logic below are untouched. */}
                 <div className="jnx-right-today-group">
-                {!isToday && <button className="jnx-today-btn" onClick={goToToday}>Today</button>}
+                <button
+                  className={`jnx-today-btn${isToday ? ' jnx-today-btn-current' : ''}`}
+                  onClick={goToToday}
+                  disabled={isToday}
+                  title={isToday ? 'Viewing today' : 'Jump to today'}
+                >Today</button>
             <div className="jnx-export-dropdown" ref={exportMenuRef}>
               <button
                 className="jnx-export-trigger"

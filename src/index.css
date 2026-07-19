@@ -3511,7 +3511,14 @@ select.modal-input {
   transition: all var(--ease);
 }
 .jnx-today-btn { color: var(--accent); background: var(--accent-glow); }
-.jnx-today-btn:hover { background: var(--accent); color: #fff; }
+.jnx-today-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+/* Always rendered so the row width never shifts when the viewing date changes.
+   On today it's a muted, non-interactive "you're here" marker rather than a jump
+   button — no hover lift, default cursor. */
+.jnx-today-btn-current {
+  color: var(--text-faint); background: var(--bg-hover);
+  cursor: default; opacity: 0.7;
+}
 .jnx-search-btn:hover { color: var(--text-primary); border-color: var(--border); }
 .jnx-kbd {
   font-size: 0.66rem; font-weight: 700; color: var(--text-muted);
@@ -8183,6 +8190,14 @@ select.modal-input {
   border-radius: 999px;
   background: var(--bg-hover);
   border: 1px solid var(--jnx-line);
+  /* Pin the width so swapping "Autosave" ⇄ "Saving…" ⇄ "Saved" while typing can't
+     reflow the flex row and jitter the Today/Export buttons beside it. Fixed (not
+     just min-) width sized above the widest state ("Saving…" + pulsing dot + gap),
+     so the box never grows or shrinks and content just re-centres in place. */
+  width: 100px;
+  flex: 0 0 auto;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 /* ── Write Panel: pure canvas, no chrome ───────────────────────────── */
