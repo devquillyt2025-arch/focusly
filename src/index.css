@@ -123,11 +123,17 @@
 /* ─── Reset ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* App shell is a fixed 100dvh flex column (.app has overflow:hidden and its own
+   internal scroll containers), so the document itself must never scroll. Locking
+   html/body overflow here guarantees zero page-level scrollbars in either axis on
+   every tab — a stray descendant that overflows the shell gets clipped instead of
+   surfacing a body scroll (and the horizontal scrollbar-corner artifact). */
+html, body { overflow: hidden; }
 body {
   font-family: var(--font);
   background: var(--bg-base);
   color: var(--text-primary);
-  min-height: 100dvh;
+  height: 100dvh;
   letter-spacing: -0.012em;
   line-height: 1.5;
 }
@@ -4501,6 +4507,69 @@ select.modal-input {
   }
 }
 
+/* ── Contained scroll (≥768px): bound the Journal tab to the .tab-content viewport
+   so the PAGE never scrolls — only the two columns scroll their own content. This
+   supersedes the sticky + 100dvh-slack mechanism above (higher specificity via the
+   .journal-tab-active wrapper class): with no page scroll there's nothing for the
+   columns to stick against, so they become plain fixed-height scroll viewports that
+   fill the bounded grid row. min-height:0 at every flex/grid level is what lets the
+   inner scroll actually engage instead of the page growing. Mobile (<768px) keeps
+   its stacked page-scroll layout. ── */
+@media (min-width: 768px) {
+  .sunsama-tab-transition.journal-tab-active {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .journal-tab-active .jnx-page {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .journal-tab-active .jnx-split {
+    flex: 1;
+    min-height: 0;
+    /* Fill the bounded page instead of the 100dvh-based slack row above. */
+    grid-template-rows: minmax(0, 1fr);
+  }
+  /* Both columns fill the bounded grid row; no longer sticky. */
+  .journal-tab-active .jnx-write-panel,
+  .journal-tab-active .jnx-meta {
+    align-self: stretch;
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+  /* Metadata column scrolls its own content (stats / calendar / recent entries). */
+  .journal-tab-active .jnx-meta { position: static; overflow-y: auto; }
+
+  /* Write panel is a fixed shell — the date/day heading + nav arrows + divider
+     stay pinned, and ONLY the editor below the divider scrolls. .jnx-canvas
+     becomes the flex column; the header rows above the divider don't shrink,
+     the editor takes the remaining height and owns the scroll. Keep
+     position:relative (NOT static) so the absolutely-positioned .jnx-aura glow
+     stays scoped to this panel — with static it escapes to the initial
+     containing block and balloons to full page width, adding a ~10px horizontal
+     document scroll. overflow:hidden then clips the glow bleed. */
+  .journal-tab-active .jnx-write-panel { position: relative; overflow: hidden; }
+  .journal-tab-active .jnx-canvas {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .journal-tab-active .jnx-title-row,
+  .journal-tab-active .jnx-write-divider { flex-shrink: 0; }
+  .journal-tab-active .jnx-editor {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 /* Mobile — stacked; week view reverts to a horizontal scrollable strip */
 @media (max-width: 767px) {
   .jnx-meta-stats { gap: 8px; }
@@ -4954,6 +5023,11 @@ select.modal-input {
   display: flex; flex-direction: column; gap: 20px;
   background: transparent;
   position: relative;
+  /* Fill the bounded habits tab wrapper and clip, so scrolling is contained to
+     .hv-sections below rather than growing the page. */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 /* ambient accent glow behind the whole view */
 .hv::before {
@@ -4975,7 +5049,9 @@ select.modal-input {
    Opaque page-colour background + z-index 5 so cards slide cleanly behind it
    (z-index beats the .hv > * z-index:1 that cards inherit). */
 .hv-header {
-  position: sticky; top: 0; z-index: 5;
+  /* Static, non-shrinking header: stats card + filter row stay pinned above the
+     scrollable .hv-sections (which is now the only scroll container). */
+  flex-shrink: 0;
   display: flex; flex-direction: column; gap: 20px;
   background: var(--bg-base);
   padding-bottom: 4px;
@@ -5124,7 +5200,20 @@ select.modal-input {
 }
 .hv-pill-sep { display: none; }
 
-.hv-sections { display: flex; flex-direction: column; gap: 22px; }
+.hv-sections {
+  display: flex; flex-direction: column; gap: 22px;
+  /* The only scroll container on the Habits tab: takes the remaining height and
+     scrolls the habit list. min-height:0 is essential so this flex child can be
+     shorter than its content (otherwise it grows and the page scrolls instead). */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.hv-sections::-webkit-scrollbar { width: 8px; }
+.hv-sections::-webkit-scrollbar-track { background: transparent; }
+.hv-sections::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
 .hv-section  { display: flex; flex-direction: column; gap: 10px; }
 .hv-section-label {
   display: flex; align-items: center; gap: 9px;
@@ -5882,6 +5971,40 @@ select.modal-input {
   .sunsama-tab-transition.yartu-tab-active {
     padding: 24px 16px 80px;
   }
+}
+
+/* Habits: bound the tab wrapper to the .tab-content viewport (flex:1 + min-height:0
+   overrides the base flex:1 0 auto so it can't grow to content) and clip, so the
+   page no longer scrolls — only the habit list inside .hv-sections scrolls. The
+   base 80px bottom padding is page-scroll breathing room that would become dead
+   space under a contained scroll, so it's dropped here (top/side padding kept). */
+.sunsama-tab-transition.habits-tab-active {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+/* Tasks: same containment — bound the wrapper to the viewport so the two dashboard
+   cards (Pending Tasks + Completion Analytics) fill the full remaining height and
+   align, instead of sitting at a fixed 60vh with empty space below. The toolbar
+   stays fixed; each card scrolls its own content. */
+.sunsama-tab-transition.tasks-tab-active {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+/* Both the .tasks-tab wrapper (base flex:1 0 auto — shrink 0, so it wouldn't
+   shrink below content) and the TaskList root fill the bounded wrapper. flex:1
+   (shrink 1) + min-height:0 + overflow:hidden let each shrink to the available
+   height so the inner grid is bounded and the cards' own scroll engages instead
+   of the page growing. */
+.tasks-tab-active .tasks-tab,
+.tasks-tab-active .task-list-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Full-width, unpadded workspace for Calendar */
@@ -7342,7 +7465,7 @@ select.modal-input {
   top: 0;
   z-index: 30;
   background: var(--bg-base);
-  padding: 10px 0;
+  padding: 24px 0 14px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -7357,7 +7480,7 @@ select.modal-input {
   flex: 1; min-width: 0; border: none; background: transparent; outline: none;
   font-size: 0.85rem; color: var(--text-primary);
 }
-.al-tb-inp:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
+.al-tb-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow2); }
 .al-tb-inp::placeholder { color: var(--text-muted); }
 .al-tb-clear {
   background: none; border: none; cursor: pointer; padding: 0;

@@ -1035,11 +1035,24 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
         .tasks-dashboard-grid {
           display: grid;
           grid-template-columns: 60% 1fr;
+          /* Bound the single row to the grid's own (viewport-filling) height so the
+             cards can't grow past it — minmax(0, 1fr) lets each card shrink below
+             its content and hand the overflow to its own inner scroll. */
+          grid-template-rows: minmax(0, 1fr);
           gap: 24px;
           width: 100%;
           flex: 1;
           min-height: 0;
-          align-items: start;
+          /* Clamp to the bounded parent so the grid can't grow to its content
+             height — otherwise the cards' inner scroll never engages. */
+          overflow: hidden;
+          /* The single grid row fills the full available height (viewport minus the
+             top toolbar) and align-items:stretch makes BOTH cards fill it — so the
+             Pending and Completion Analytics cards are as tall as the space allows
+             and their bottom edges align. The Pending list (flex:1 inside its card)
+             fills the taller card and scrolls; Analytics content sits at the top
+             with any extra space falling to the bottom. */
+          align-items: stretch;
         }
         @media (max-width: 992px) {
           .tasks-dashboard-grid { grid-template-columns: 1fr; }
@@ -1183,7 +1196,7 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
               </button>
             </div>
           </div>
-          <div className="yartu-list tasks-scroll-list" style={{ padding: '4px 0 0 0', gap: 0, overflowY: 'auto', maxHeight: '60vh' }}>
+          <div className="yartu-list tasks-scroll-list" style={{ padding: '4px 0 0 0', gap: 0, overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
             {inlineAddCat === 'top' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-base)', padding: '12px 18px', borderRadius: '12px', border: '1px solid var(--accent)', boxShadow: '0 4px 12px var(--accent-glow)', marginBottom: 8 }}>
