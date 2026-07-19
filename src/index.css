@@ -4963,6 +4963,17 @@ select.modal-input {
    into the content flow (renders inline, undimmed, pushes layout). Restore it. */
 .hv > .modal-overlay { position: fixed; inset: 0; z-index: 100; }
 
+/* Sticky header — stats + filter row stay pinned to the top of the scroll
+   container (.tab-content) while only the habit list scrolls under them.
+   Opaque page-colour background + z-index 5 so cards slide cleanly behind it
+   (z-index beats the .hv > * z-index:1 that cards inherit). */
+.hv-header {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-direction: column; gap: 20px;
+  background: var(--bg-base);
+  padding-bottom: 4px;
+}
+
 /* ═══ Liquid-glass treatment — habit detail + Edit/New Habit modals only ═══
    Tunable knobs. Adjust these six values to dial the effect in live:
    - backdrop-blur / backdrop-tint : the frosted app-content behind the modal

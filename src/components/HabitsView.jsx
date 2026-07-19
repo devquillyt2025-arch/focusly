@@ -88,6 +88,9 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
   return (
     <div className="hv">
 
+      {/* ── Sticky header: stats + filters stay pinned; only the list below scrolls ── */}
+      <div className="hv-header">
+
       {/* ── Command bar ── */}
       <div className="hv-stat-bar">
         {/* Today progress ring */}
@@ -184,6 +187,7 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
           New Habit
         </button>
       </div>
+      </div>{/* end .hv-header */}
 
       {/* ── Content ── */}
       {habits.length === 0 ? (
@@ -225,12 +229,6 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
               ))}
             </section>
           )}
-
-          {/* ── Ghost Row ── */}
-          <div className="hv-ghost-row" onClick={() => setShowModal(true)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Add another habit</span>
-          </div>
 
         </div>
       )}
