@@ -4957,6 +4957,44 @@ select.modal-input {
   opacity: 0.85;
 }
 .hv > * { position: relative; z-index: 1; }
+/* Modals rendered inside .hv (habit detail + edit) must stay fixed, full-viewport
+   overlays. The rule above — which layers .hv's content over its background auras —
+   has equal specificity to .modal-overlay but wins by order, pinning the overlay
+   into the content flow (renders inline, undimmed, pushes layout). Restore it. */
+.hv > .modal-overlay { position: fixed; inset: 0; z-index: 100; }
+
+/* ═══ Liquid-glass treatment — habit detail + Edit/New Habit modals only ═══
+   Tunable knobs. Adjust these six values to dial the effect in live:
+   - backdrop-blur / backdrop-tint : the frosted app-content behind the modal
+   - card-opacity                  : modal card background opacity (0.85–0.92)
+   - highlight                     : top/left inner light edge (glass catching light)
+   - glow                          : soft coloured outer glow
+   Content (text/numbers/icons) is never blurred or made transparent. */
+.hv {
+  --hv-glass-backdrop-blur: 14px;               /* ↑ = softer, more frosted */
+  --hv-glass-backdrop-tint: rgba(8, 10, 16, 0.42); /* ↓ alpha = app more visible */
+  --hv-glass-card-opacity: 0.90;                /* modal card near-opaque */
+  --hv-glass-highlight: rgba(255, 255, 255, 0.16); /* inner top/left highlight */
+  --hv-glass-glow: rgba(129, 140, 248, 0.20);   /* soft outer glow colour */
+}
+/* Backdrop: frosted glass instead of flat black */
+.hv > .modal-overlay {
+  background: var(--hv-glass-backdrop-tint);
+  backdrop-filter: blur(var(--hv-glass-backdrop-blur)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--hv-glass-backdrop-blur)) saturate(1.15);
+}
+/* Card: near-opaque dark surface + inner light edge + soft outer glow.
+   color-mix keeps the tint theme-accurate; content stays fully opaque. */
+.hv > .modal-overlay .modal-box {
+  background: color-mix(in srgb, var(--bg-surface) calc(var(--hv-glass-card-opacity) * 100%), transparent);
+  border: 1px solid var(--border-strong);
+  border-top-color: var(--hv-glass-highlight);
+  border-left-color: var(--hv-glass-highlight);
+  box-shadow:
+    inset 1px 1px 0 var(--hv-glass-highlight),          /* glass highlight catching light */
+    0 24px 64px rgba(0, 0, 0, 0.55),                     /* depth shadow */
+    0 0 44px var(--hv-glass-glow);                       /* soft coloured glow */
+}
 
 /* ─── Hero header ─── */
 .hv-hdr { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -5198,6 +5236,10 @@ select.modal-input {
 .hc-btn-press { transform: scale(0.94); }
 
 .hv-panel { width: 340px; }
+/* Habit detail rendered inside a centered .modal-box: make it a flex column so
+   the shared .tdp-body (flex:1) scrolls internally with the header/footer pinned,
+   matching the old drawer's internal behaviour inside the modal. */
+.hv-detail-box { display: flex; flex-direction: column; }
 .hv-panel-action { width: 100%; justify-content: center; padding: 8px; font-size: 0.86rem; }
 .hv-panel-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .hv-ps {
@@ -5207,10 +5249,13 @@ select.modal-input {
 .hv-ps-val { font-size: 1.05rem; font-weight: 800; color: var(--accent); }
 .hv-ps-lbl { font-size: 0.63rem; color: var(--text-muted); margin-top: 2px; }
 
-.hv-heatmap { display: flex; gap: 2px; overflow-x: auto; }
-.hv-hm-week { display: flex; flex-direction: column; gap: 2px; }
+/* Compact GitHub-style density: fixed 13px cells, 3px gaps, centered in the card.
+   Cells never stretch; if the 12 weeks somehow overflow the card, only the
+   heatmap scrolls horizontally — the modal itself stays fully visible. */
+.hv-heatmap { display: flex; gap: 3px; justify-content: center; max-width: 100%; overflow-x: auto; }
+.hv-hm-week { display: flex; flex-direction: column; gap: 3px; }
 .hv-hm-cell {
-  width: 10px; height: 10px; border-radius: 2px;
+  width: 13px; height: 13px; flex-shrink: 0; border-radius: 2px;
   background: var(--bg-elevated); border: 1px solid var(--border);
 }
 .hv-hm-done    { }

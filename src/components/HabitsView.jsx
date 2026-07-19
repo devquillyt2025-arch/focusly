@@ -235,20 +235,22 @@ function HabitsView({ habits, onAddHabit, onUpdateHabit, onDeleteHabit }) {
         </div>
       )}
 
-      {/* ── Detail panel ── */}
-      {liveDetail && <div className="task-detail-backdrop" onClick={() => setDetailHabit(null)} />}
-      <div className={`task-detail-panel hv-panel${liveDetail ? ' tdp-open' : ''}`} aria-hidden={!liveDetail}>
-        {liveDetail && (
-          <HabitDetailPanel
-            habit={liveDetail}
-            onClose={() => setDetailHabit(null)}
-            onEdit={() => { setDetailHabit(null); openEdit(liveDetail); }}
-            onDelete={() => { onDeleteHabit(liveDetail.id); setDetailHabit(null); }}
-            onToggle={handleToggle}
-            today={today}
-          />
-        )}
-      </div>
+      {/* ── Detail modal ── centered popup, same pattern as HabitModal (Edit) so
+          the two share one modal system instead of a side-drawer + a modal. */}
+      {liveDetail && (
+        <div className="modal-overlay" onClick={() => setDetailHabit(null)}>
+          <div className="modal-box hv-detail-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <HabitDetailPanel
+              habit={liveDetail}
+              onClose={() => setDetailHabit(null)}
+              onEdit={() => { setDetailHabit(null); openEdit(liveDetail); }}
+              onDelete={() => { onDeleteHabit(liveDetail.id); setDetailHabit(null); }}
+              onToggle={handleToggle}
+              today={today}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Modal ── */}
       {showModal && (
