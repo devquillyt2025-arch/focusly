@@ -51,21 +51,20 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Deadline-urgency bar value — DERIVED at render time from createdAt → dueDate.
-// Never stored on the task or synced. Returns null when there's nothing to show
-// (task done, no dueDate, or no createdAt — missing createdAt is a valid "no bar"
-// fallback, see migrateTask in App.jsx). The deadline is end-of-due-day so the
-// overdue flip matches fmtDue's day-granularity logic.
+// Deadline-urgency bar value — DERIVED at render time from the due date's full
+// calendar day. Never stored on the task or synced. The range is FIXED to the
+// due day itself (local midnight → local end-of-day), independent of createdAt
+// or when the page loaded, so the bar means the same thing on every render.
+// Returns null when there's nothing to show (task done or no dueDate).
 function computeUrgency(task, nowMs, isDone) {
-  if (isDone || !task.dueDate || !task.createdAt) return null;
-  const created = new Date(task.createdAt).getTime();
-  const due     = new Date(task.dueDate + 'T23:59:59').getTime();
-  if (!Number.isFinite(created) || !Number.isFinite(due)) return null;
-  // Overdue takes priority: a past due date always shows a full red bar, even when
-  // the due date sits at/ before createdAt (e.g. a Google-imported or edited task).
-  if (nowMs > due) return { pct: 100, color: 'var(--color-red)' };            // overdue
-  if (due <= created) return null;   // no meaningful window (due not after creation)
-  const pct = Math.min(100, Math.max(0, ((nowMs - created) / (due - created)) * 100));
+  if (isDone || !task.dueDate) return null;
+  const dayStart = new Date(task.dueDate + 'T00:00:00').getTime(); // 12:00:00 AM local, due date
+  const dayEnd   = new Date(task.dueDate + 'T23:59:59').getTime(); // 11:59:59 PM local, due date
+  if (!Number.isFinite(dayStart) || !Number.isFinite(dayEnd)) return null;
+  // Past the end of the due day → expired: full red bar (also covers Overdue tasks
+  // sharing this component). Before the due day → clamps to 0% (empty bar).
+  if (nowMs > dayEnd) return { pct: 100, color: 'var(--color-red)' };
+  const pct = Math.min(100, Math.max(0, ((nowMs - dayStart) / (dayEnd - dayStart)) * 100));
   const color = pct < 60 ? 'var(--accent)'
               : pct <= 90 ? 'var(--color-amber)'
               : 'var(--color-orange)';
@@ -414,6 +413,31 @@ function DonutChart({ pendingCount, completedCount }) {
         <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{pct}%</span>
         <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</span>
       </div>
+    </div>
+  );
+}
+
+// Subsection header inside the pending list (Overdue / Today / Upcoming)
+function SectionLabel({ title, count, color }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 4px 6px' }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{title}</span>
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-base)', borderRadius: 20, padding: '1px 8px' }}>{count}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+    </div>
+  );
+}
+
+// One bordered card per pending group (Overdue / Today / Upcoming). Rendered
+// only when it has tasks — empty groups are skipped by the caller.
+function TaskGroupCard({ title, count, color, tasks, renderTask }) {
+  return (
+    <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 12, padding: '2px 14px 10px', marginBottom: 12 }}>
+      <SectionLabel title={title} count={count} color={color} />
+      <AnimatePresence initial={false}>
+        {tasks.map(task => renderTask(task, false))}
+      </AnimatePresence>
     </div>
   );
 }
@@ -909,6 +933,21 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, catFilter, sortBy, query]);
 
+  // Split the (already sorted + filtered) pending list into three groups.
+  // Overdue = due before today; Today = due exactly today; Upcoming = due after
+  // today OR undated. `_today` is a LOCAL-date YYYY-MM-DD (see todayISO), and
+  // dueDate is date-only, so plain string comparison is chronological here.
+  // Sort order within each group is preserved.
+  const { overdueTasks, todayTasks, upcomingTasks } = useMemo(() => {
+    const overdue = [], today = [], upcoming = [];
+    for (const t of pending) {
+      if (t.dueDate && t.dueDate < _today) overdue.push(t);
+      else if (t.dueDate && t.dueDate === _today) today.push(t);
+      else upcoming.push(t); // future-dated or no due date
+    }
+    return { overdueTasks: overdue, todayTasks: today, upcomingTasks: upcoming };
+  }, [pending, _today]);
+
   // ── Single source of truth for the analytics panel ──
   // The left list is filtered by catFilter/query; the analytics dashboard
   // (ring, completed count, category bars) always reflects the FULL task set
@@ -1144,9 +1183,17 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                   No pending tasks in this view. Click "＋ Quick Add" above to create one!
                 </div>
               ) : (
-                <AnimatePresence initial={false}>
-                  {pending.map(task => renderTask(task, false))}
-                </AnimatePresence>
+                <>
+                  {overdueTasks.length > 0 && (
+                    <TaskGroupCard key="overdue" title="Overdue" count={overdueTasks.length} color="var(--color-red)" tasks={overdueTasks} renderTask={renderTask} />
+                  )}
+                  {todayTasks.length > 0 && (
+                    <TaskGroupCard key="today" title="Today" count={todayTasks.length} color="var(--color-amber)" tasks={todayTasks} renderTask={renderTask} />
+                  )}
+                  {upcomingTasks.length > 0 && (
+                    <TaskGroupCard key="upcoming" title="Upcoming" count={upcomingTasks.length} color="var(--accent)" tasks={upcomingTasks} renderTask={renderTask} />
+                  )}
+                </>
               )}
             </div>
 
