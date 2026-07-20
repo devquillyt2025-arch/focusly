@@ -28,6 +28,7 @@ import {
   isScheduledToday, isLoggedToday, computeHabitStreaks, getConfig
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
+import { pushTask, pushTasks, softDeleteTask, softDeleteTasks, fetchTasks, reconcileTasks, migrateLocalTasks, isTasksSyncConfigured, getUserId, subscribeToTasks, reconcileRemoteChange } from './utils/tasksService';
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
 import { handleDriveBackupCallback } from './utils/driveBackup';
 import { maybeRunAutoBackup } from './utils/autoBackup';
@@ -107,7 +108,7 @@ const CROSS_TAB_IGNORE_KEYS = new Set([
   'nook_google_tokens', 'nook_pkce_verifier', 'nook_sync_queue', 'nook_deleted_tasks',
   'nook_last_pull_sync', 'nook_sync_enabled',
   'nook-notif-state', 'nook-visits', 'nook-install-dismissed', 'nook-analytics',
-  'nook_cleaned_w_duplicates', 'nook_habits_migrated',
+  'nook_cleaned_w_duplicates', 'nook_habits_migrated', 'nook_tasks_migrated',
   // UI-only preferences — not user content, so changing these in another tab
   // should not trigger the "data changed" reload banner:
   'nook-sidebar-open',
@@ -421,6 +422,78 @@ export default function App() {
   useEffect(() => { settingsRef.current        = settings;        }, [settings]);
   useEffect(() => { pomoLogRef.current         = pomodoroLog;     }, [pomodoroLog]);
   useEffect(() => { tasksRef.current           = tasks;           }, [tasks]);
+
+  // Fetch the remote task snapshot and reconcile it into state (LWW on
+  // updatedAt), then push anything the server is missing (local-only or
+  // local-newer) back up. Shared by the mount hydrate and the focus refresh.
+  // No-op when offline / signed out (fetchTasks returns null → keep cache).
+  const hydrateTasksFromSupabase = useCallback(async () => {
+    const snapshot = await fetchTasks();
+    if (!snapshot) return;
+    // Push decision is made against the pre-merge local list (what the server
+    // hasn't got yet); the merge itself runs against the freshest prev.
+    const { toPush } = reconcileTasks(tasksRef.current, snapshot.live, snapshot.tombstones);
+    setTasks(prev => reconcileTasks(prev, snapshot.live, snapshot.tombstones).merged);
+    if (toPush.length) pushTasks(toPush);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Supabase tasks: one-time migration, then hydrate on mount ──
+  // Supabase is the cross-device source of truth; localStorage is a write-
+  // through cache. Sequenced as a single async flow so migration and hydrate
+  // never race each other. No-ops cleanly when auth is unconfigured / signed
+  // out / offline (each step bails and the local cache is kept untouched).
+  // Runs beside googleTasksSync — both merge into the same array via setTasks.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isTasksSyncConfigured()) return;
+      const uid = await getUserId();
+      if (cancelled || !uid) return;
+
+      // Phase 4 — one-time seed of localStorage tasks into Supabase.
+      // SEQUENCING (timing, not guaranteed): we read the local list from
+      // tasksRef.current here, after the awaits above. The one-time duplicate-
+      // cleanup effect (nook_cleaned_w_duplicates) runs earlier and removes junk
+      // via setTasks. The awaited getUserId()+count round-trips are almost always
+      // longer than React's re-render + passive ref-sync, so we almost always
+      // read the CLEANED list — but React makes no ordering promise between a
+      // passive effect and an unrelated await resolving. On a very fast/cached
+      // auth path there is a narrow window where a junk task cleanup would have
+      // removed could still be uploaded. Accepted: the failure mode is minor
+      // (an extra row, no data loss) and reconcile self-heals nothing worse.
+      // If a stray post-migration duplicate ever appears, THIS is where to look.
+      const result = await migrateLocalTasks(tasksRef.current);
+      if (result.status === 'migrated') showToast(`Synced ${result.count} task${result.count === 1 ? '' : 's'} to your account`, 'success');
+      if (cancelled) return;
+
+      // Phase 3 — hydrate + reconcile (LWW on updatedAt).
+      await hydrateTasksFromSupabase();
+    })();
+    return () => { cancelled = true; };
+  }, [hydrateTasksFromSupabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Supabase tasks: refresh on window focus (Phase 5) ──
+  // A cheaper, always-on counterpart to Realtime: when the user returns to the
+  // tab, re-fetch and reconcile so changes made elsewhere land even if the
+  // Realtime socket was asleep/dropped. Separate from the Google focus-sync
+  // handler above (that one is gated by nook_sync_enabled).
+  useEffect(() => {
+    if (!isTasksSyncConfigured()) return;
+    const onFocus = () => { hydrateTasksFromSupabase(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [hydrateTasksFromSupabase]);
+
+  // ── Supabase tasks: live Realtime subscription (Phase 5) ──
+  // Applies each incoming insert/update/delete to state, LWW-guarded, so a task
+  // created/edited/deleted on another device appears here without a reload. The
+  // reconcile no-ops on the echo of our own writes (equal updatedAt).
+  useEffect(() => {
+    const unsubscribe = subscribeToTasks((payload) => {
+      setTasks(prev => reconcileRemoteChange(prev, payload));
+    });
+    return unsubscribe;
+  }, []);
 
   // ── Persistence ──
   useEffect(() => { persist(SK.tasks,      tasks);      }, [tasks]);
@@ -779,6 +852,7 @@ export default function App() {
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
       return next;
     });
+    pushTask(t); // Supabase cross-device sync (full row; fire-and-forget)
     setOpenModal(null);
     showToast(`"${t.name}" added ✓`,'success');
   }, [showToast]);
@@ -793,6 +867,7 @@ export default function App() {
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      if (old) pushTask({ ...old, ...nextUpdated }); // Supabase: full merged row, not the partial
       return next;
     });
     setEditingTask(null);
@@ -814,6 +889,9 @@ export default function App() {
       const next = prev.map(t => t.id === updated.id ? { ...t, ...nextUpdated } : t);
       pushSyncQueue({ type: 'UPDATE', taskId: updated.id });
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      // Supabase: send the FULL merged row. quickUpdateTask receives a partial
+      // patch, so pushing nextUpdated alone would null every omitted column.
+      if (old) pushTask({ ...old, ...nextUpdated });
       return next;
     });
   }, []);
@@ -897,26 +975,27 @@ export default function App() {
     const performLocalUpdate = (forceSync = false) => {
       setTasks(prev => {
         const task = prev.find(t => t.id === id);
-        const mapped = prev.map(t => {
-          if (t.id !== id) return t;
-          return { ...t, completed: done, status: done ? 'completed' : 'needsAction', completedAt: done ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
-        });
+        const toggled = task && { ...task, completed: done, status: done ? 'completed' : 'needsAction', completedAt: done ? new Date().toISOString() : null, updatedAt: new Date().toISOString() };
+        const mapped = prev.map(t => t.id === id ? toggled : t);
         let finalTasks = mapped;
+        let newOccurrence = null;
         // Auto-create next occurrence when completing a recurring task
         if (done && task?.recurrence) {
           const due  = nextDueDate(task.dueDate, task.recurrence, task.recurrenceDays);
-          const next = {
+          newOccurrence = {
             ...task,
             id: genId(), completed: false, status: 'needsAction', completedAt: null,
             dueDate: due, timeLogged: 0, pomodorosCompleted: 0,
             createdAt: new Date().toISOString(),
             googleTaskId: null, lastSyncedAt: null, updatedAt: new Date().toISOString(), syncConflict: null
           };
-          finalTasks = [...mapped, next];
-          pushSyncQueue({ type: 'CREATE', taskId: next.id });
+          finalTasks = [...mapped, newOccurrence];
+          pushSyncQueue({ type: 'CREATE', taskId: newOccurrence.id });
         }
         pushSyncQueue({ type: 'UPDATE', taskId: id });
         setTimeout(() => syncTasks(finalTasks, setTasks, setSyncStatus), forceSync ? 10 : 500);
+        // Supabase: push the toggled task (full row) + any new recurrence occurrence.
+        if (toggled) pushTasks(newOccurrence ? [toggled, newOccurrence] : [toggled]);
         return finalTasks;
       });
       if (id===activeTaskId && timerState==='running') pauseTimer();
@@ -948,6 +1027,10 @@ export default function App() {
         // it's given, erasing just-applied local changes).
         let nextTasks = tasksRef.current.map(applyDone);
         setTasks(prev => prev.map(applyDone));
+        // Supabase: push the toggled task (full row). Sourced from nextTasks so
+        // it carries the just-flushed timeLogged, not a stale snapshot.
+        const toggledRow = nextTasks.find(t => t.id === id);
+        if (toggledRow) pushTask(toggledRow);
 
         if (done && currentTask.recurrence) {
            const due = nextDueDate(currentTask.dueDate, currentTask.recurrence, currentTask.recurrenceDays);
@@ -961,6 +1044,7 @@ export default function App() {
            nextTasks = [...nextTasks, next];
            setTasks(prev => [...prev, next]);
            pushSyncQueue({ type: 'CREATE', taskId: next.id });
+           pushTask(next); // Supabase: new recurrence occurrence (full row)
         }
 
         // Force a fresh sync to pull the status update from Google. Pass the list
@@ -987,6 +1071,7 @@ export default function App() {
       }
       const next = prev.filter(t => t.id !== id);
       setTimeout(() => syncTasks(next, setTasks, setSyncStatus), 500);
+      if (task) softDeleteTask(task); // Supabase: tombstone so the delete propagates across devices
       return next;
     });
     if (activeTaskId===id) { setActiveTaskId(null); if(timerState==='running') pauseTimer(); }
@@ -998,6 +1083,8 @@ export default function App() {
     if (!completedTasks.length) return;
 
     logActivity({ module: 'tasks', entity_type: 'task', entity_id: '', action: 'deleted', title: `Cleared ${completedTasks.length} completed task${completedTasks.length > 1 ? 's' : ''}` });
+
+    softDeleteTasks(completedTasks); // Supabase: tombstone the whole batch (both branches remove them locally)
 
     if (isSyncEnabled) {
       setSyncStatus('Deleting Completed Tasks...');
