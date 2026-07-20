@@ -29,6 +29,7 @@ import {
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
 import { pushTask, pushTasks, softDeleteTask, softDeleteTasks, fetchTasks, reconcileTasks, migrateLocalTasks, isTasksSyncConfigured, getUserId, subscribeToTasks, reconcileRemoteChange } from './utils/tasksService';
+import { pushHabit, softDeleteHabit, fetchHabits, reconcileHabits, migrateLocalHabits, isHabitsSyncConfigured, subscribeToHabits, reconcileRemoteHabitChange, pushHabits } from './utils/habitsService';
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
 import { handleDriveBackupCallback } from './utils/driveBackup';
 import { maybeRunAutoBackup } from './utils/autoBackup';
@@ -108,7 +109,7 @@ const CROSS_TAB_IGNORE_KEYS = new Set([
   'nook_google_tokens', 'nook_pkce_verifier', 'nook_sync_queue', 'nook_deleted_tasks',
   'nook_last_pull_sync', 'nook_sync_enabled',
   'nook-notif-state', 'nook-visits', 'nook-install-dismissed', 'nook-analytics',
-  'nook_cleaned_w_duplicates', 'nook_habits_migrated', 'nook_tasks_migrated',
+  'nook_cleaned_w_duplicates', 'nook_habits_migrated', 'nook_tasks_migrated', 'nook_habits_sync_migrated',
   // UI-only preferences — not user content, so changing these in another tab
   // should not trigger the "data changed" reload banner:
   'nook-sidebar-open',
@@ -413,6 +414,7 @@ export default function App() {
   // Stable ref so focus/sync callbacks always see the current tasks list without
   // closing over a stale snapshot or depending on `tasks` in their effect deps.
   const tasksRef           = useRef(tasks);
+  const habitsRef          = useRef(habits);
 
   useEffect(() => { activeTaskRef.current      = activeTaskId;    }, [activeTaskId]);
   useEffect(() => { timerModeRef.current       = timerMode;       }, [timerMode]);
@@ -422,6 +424,7 @@ export default function App() {
   useEffect(() => { settingsRef.current        = settings;        }, [settings]);
   useEffect(() => { pomoLogRef.current         = pomodoroLog;     }, [pomodoroLog]);
   useEffect(() => { tasksRef.current           = tasks;           }, [tasks]);
+  useEffect(() => { habitsRef.current          = habits;          }, [habits]);
 
   // Fetch the remote task snapshot and reconcile it into state (LWW on
   // updatedAt), then push anything the server is missing (local-only or
@@ -491,6 +494,58 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToTasks((payload) => {
       setTasks(prev => reconcileRemoteChange(prev, payload));
+    });
+    return unsubscribe;
+  }, []);
+
+  // ── Supabase habits: hydrate + reconcile (shared by mount & focus) ──
+  const hydrateHabitsFromSupabase = useCallback(async () => {
+    const snapshot = await fetchHabits();
+    if (!snapshot) return;
+    const { toPush } = reconcileHabits(habitsRef.current, snapshot.live, snapshot.tombstones);
+    setHabits(prev => reconcileHabits(prev, snapshot.live, snapshot.tombstones).merged);
+    if (toPush.length) pushHabits(toPush);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Supabase habits: one-time migration, then hydrate on mount ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isHabitsSyncConfigured()) return;
+      const uid = await getUserId();
+      if (cancelled || !uid) return;
+
+      // Phase 4 — one-time seed of localStorage habits into Supabase.
+      // SEQUENCING vs migrateFromTrackers (timing, not guaranteed — same care as
+      // the tasks cleanup effect): migrateFromTrackers runs in its own mount
+      // effect and, on a first-ever run, setHabits() the trackers-derived list.
+      // We read habitsRef.current only AFTER the awaits above, whose network
+      // round-trips are almost always longer than React's re-render + passive
+      // ref-sync, so we migrate the POST-trackers list rather than an empty one.
+      // React makes no ordering promise here; worst case on a very fast/cached
+      // path is that a just-migrated-from-trackers habit lands via the later
+      // focus/realtime reconcile instead of this first pass. No data loss.
+      const result = await migrateLocalHabits(habitsRef.current);
+      if (result.status === 'migrated') showToast(`Synced ${result.count} habit${result.count === 1 ? '' : 's'} to your account`, 'success');
+      if (cancelled) return;
+
+      await hydrateHabitsFromSupabase();
+    })();
+    return () => { cancelled = true; };
+  }, [hydrateHabitsFromSupabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Supabase habits: refresh on window focus ──
+  useEffect(() => {
+    if (!isHabitsSyncConfigured()) return;
+    const onFocus = () => { hydrateHabitsFromSupabase(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [hydrateHabitsFromSupabase]);
+
+  // ── Supabase habits: live Realtime subscription ──
+  useEffect(() => {
+    const unsubscribe = subscribeToHabits((payload) => {
+      setHabits(prev => reconcileRemoteHabitChange(prev, payload));
     });
     return unsubscribe;
   }, []);
@@ -928,36 +983,46 @@ export default function App() {
 
   // ── Habit callbacks ──
   const addHabit = useCallback((h) => {
-    logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action: 'created', title: h.name });
-    setHabits(prev => [h, ...prev]);
+    // Stamp updatedAt (habits had no such field originally) so the Supabase
+    // LWW guard has a comparable timestamp; store + push the full row.
+    const habit = { ...h, updatedAt: new Date().toISOString() };
+    logActivity({ module: 'habits', entity_type: 'habit', entity_id: habit.id, action: 'created', title: habit.name });
+    setHabits(prev => [habit, ...prev]);
+    pushHabit(habit); // Supabase cross-device sync (full row; fire-and-forget)
   }, []);
   const updateHabit = useCallback((h) => {
+    const updated = { ...h, updatedAt: new Date().toISOString() };
     setHabits(prev => {
       const old = prev.find(x => x.id === h.id);
-      const changes = old ? diffObjects(old, h, ['name', 'frequency', 'category', 'color', 'reminderEnabled', 'reminderTime', 'archived']) : null;
+      const changes = old ? diffObjects(old, updated, ['name', 'frequency', 'category', 'color', 'reminderEnabled', 'reminderTime', 'archived']) : null;
       // Distinguish archive/restore from a plain edit
-      const action = old?.archived === false && h.archived === true ? 'archived'
-                   : old?.archived === true  && h.archived === false ? 'restored'
+      const action = old?.archived === false && updated.archived === true ? 'archived'
+                   : old?.archived === true  && updated.archived === false ? 'restored'
                    : 'updated';
-      logActivity({ module: 'habits', entity_type: 'habit', entity_id: h.id, action, title: h.name, field_changes: changes });
-      return prev.map(x => x.id === h.id ? h : x);
+      logActivity({ module: 'habits', entity_type: 'habit', entity_id: updated.id, action, title: updated.name, field_changes: changes });
+      pushHabit(updated); // Supabase: full row (HabitsView already sends complete objects)
+      return prev.map(x => x.id === updated.id ? updated : x);
     });
   }, []);
   const deleteHabit = useCallback((id) => {
     setHabits(prev => {
       const h = prev.find(x => x.id === id);
-      if (h) logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: 'deleted', title: h.name });
+      if (h) {
+        logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: 'deleted', title: h.name });
+        softDeleteHabit(h); // Supabase: tombstone so the delete propagates across devices
+      }
       return prev.filter(x => x.id !== id);
     });
   }, []);
   const markHabitDone = useCallback((id) => {
     setHabits(prev => {
       const h = prev.find(x => x.id === id);
-      if (h) {
-        const wasCompleted = h.completions?.includes(localDateStr());
-        logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: wasCompleted ? 'updated' : 'completed', title: h.name, field_changes: wasCompleted ? [{ field: 'completed_today', from: 'true', to: 'false' }] : null });
-      }
-      return prev.map(x => x.id === id ? toggleCompletion(x) : x);
+      if (!h) return prev;
+      const wasCompleted = h.completions?.includes(localDateStr());
+      logActivity({ module: 'habits', entity_type: 'habit', entity_id: id, action: wasCompleted ? 'updated' : 'completed', title: h.name, field_changes: wasCompleted ? [{ field: 'completed_today', from: 'true', to: 'false' }] : null });
+      const toggled = { ...toggleCompletion(h), updatedAt: new Date().toISOString() };
+      pushHabit(toggled); // Supabase: full row with the updated completions array
+      return prev.map(x => x.id === id ? toggled : x);
     });
   }, []);
 
