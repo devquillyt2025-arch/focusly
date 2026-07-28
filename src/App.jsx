@@ -37,7 +37,7 @@ import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { setTickSeconds, getTickSeconds } from './utils/timerTickStore';
 import { logActivity, diffObjects } from './utils/activityLog';
-import { clearReminder } from './utils/reminders';
+import { clearReminder, renameReminder } from './utils/reminders';
 import { localDateStr, todayStr } from './utils/date';
 import { genId } from './utils/id';
 import FocusCompanion from './components/FocusCompanion';
@@ -950,8 +950,26 @@ export default function App() {
     showToast(`"${t.name}" added ✓`,'success');
   }, [showToast]);
 
+  // A reminder row carries a snapshot of the task's title, because the Edge
+  // Function that sends the email/push can't read localStorage. Renaming a task
+  // therefore has to reach that row, or the notification keeps the old text.
+  //
+  // Compared against tasksRef and called BEFORE setTasks rather than inside the
+  // updater: React re-invokes updaters (StrictMode, and on a retried render),
+  // and the existing clearReminder calls in there get away with it only because
+  // DELETE is idempotent. Firing a network write once, outside, is the honest
+  // version. No-ops when the name is unchanged, blank, or the task is unknown —
+  // quickUpdateTask takes partial patches that may carry no name at all.
+  const syncReminderTitle = useCallback((taskId, nextName) => {
+    if (!nextName) return;
+    const prevName = tasksRef.current.find(t => t.id === taskId)?.name;
+    if (!prevName || prevName === nextName) return;
+    renameReminder('task', taskId, nextName).catch(() => {});
+  }, []);
+
   const updateTaskData = useCallback((updated) => {
     const nextUpdated = { ...updated, name: updated.name.trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
+    syncReminderTitle(updated.id, nextUpdated.name);
     setTasks(prev => {
       const old = prev.find(t => t.id === updated.id);
       const changes = old ? diffObjects(old, nextUpdated, ['name', 'notes', 'priority', 'category', 'dueDate', 'timeEstimate']) : null;
@@ -965,13 +983,14 @@ export default function App() {
     });
     setEditingTask(null);
     showToast(`"${updated.name.trim()}" updated ✓`, 'success');
-  }, [showToast]);
+  }, [showToast, syncReminderTitle]);
 
   // Silent update for detail-panel auto-saves (no toast, no modal side-effects).
   // Still logs to the Activity Log so edits via the detail panel appear in the
   // audit trail — they just don't interrupt the user with a toast or close a modal.
   const quickUpdateTask = useCallback((updated) => {
     const nextUpdated = { ...updated, name: (updated.name||'').trim(), notes: (updated.notes||'').trim(), updatedAt: new Date().toISOString() };
+    syncReminderTitle(updated.id, nextUpdated.name);
     setTasks(prev => {
       const old = prev.find(t => t.id === updated.id);
       const changes = old ? diffObjects(old, nextUpdated, ['name', 'notes', 'priority', 'category', 'dueDate', 'timeEstimate']) : null;
@@ -987,7 +1006,7 @@ export default function App() {
       if (old) pushTask({ ...old, ...nextUpdated });
       return next;
     });
-  }, []);
+  }, [syncReminderTitle]);
 
   // Stable handlers passed to the memoized TaskList (keep its props referentially stable)
   const openAddTaskModal = useCallback(() => setOpenModal('add'), []);
@@ -1642,7 +1661,7 @@ export default function App() {
           {activeTab === 'notes'    && <NotesView onOpenNoteEditor={setNoteEditorCtx} globalSearchQuery={searchQuery} />}
           {activeTab === 'vault'    && <VaultView />}
           {activeTab === 'links'   && <LinksView />}
-          {activeTab === 'reminders' && <RemindersView onNavigateToSource={navigateToReminderSource} />}
+          {activeTab === 'reminders' && <RemindersView onNavigateToSource={navigateToReminderSource} tasks={tasks} />}
           {activeTab === 'activity' && <ActivityLogView setActiveTab={setActiveTab} />}
 
           {activeTab === 'tasks' && (

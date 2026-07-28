@@ -1,4 +1,4 @@
-import { memo,  useState, useEffect, useCallback } from 'react';
+import { memo,  useState, useEffect, useCallback, useMemo } from 'react';
 import { listReminders, groupReminders, clearReminder } from '../utils/reminders';
 import { isAuthConfigured } from '../utils/authClient';
 
@@ -6,7 +6,7 @@ import { isAuthConfigured } from '../utils/authClient';
 // page has no independent create/delete, it only surfaces and lets you
 // jump to the task that owns each reminder (set from a task's
 // Scheduling tab). Snooze/dismiss actions land in the next pass.
-export default memo(function RemindersView({ onNavigateToSource }) {
+export default memo(function RemindersView({ onNavigateToSource, tasks }) {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
@@ -29,8 +29,23 @@ export default memo(function RemindersView({ onNavigateToSource }) {
     return () => window.removeEventListener('focus', onFocus);
   }, [load]);
 
-  const { overdue, today, upcoming } = groupReminders(reminders);
-  const total = reminders.length;
+  // A reminder's `title` is a snapshot taken when the reminder was set, but the
+  // task stays the source of truth for its own content (03-tabs-and-features).
+  // Resolve through the live task so a rename — a fixed typo, say — shows here
+  // straight away, without waiting on a refetch or a network round-trip, and so
+  // rows written before renameReminder existed correct themselves on read with
+  // no backfill migration. Falls back to the stored title when the task is gone
+  // or the source isn't a task.
+  const resolved = useMemo(() => {
+    const names = new Map((tasks || []).map(t => [t.id, t.name]));
+    return reminders.map(r => {
+      const live = r.source_type === 'task' ? names.get(r.source_id) : null;
+      return live && live !== r.title ? { ...r, title: live } : r;
+    });
+  }, [reminders, tasks]);
+
+  const { overdue, today, upcoming } = groupReminders(resolved);
+  const total = resolved.length;
 
   return (
     <div className="cdp-page">

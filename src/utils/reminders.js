@@ -68,6 +68,28 @@ export async function saveReminder({ sourceType, sourceId, title, targetAt, mode
   if (error) throw error;
 }
 
+// Keep the denormalised `title` snapshot in step with a renamed task.
+//
+// The Reminders tab resolves titles through the live task, so it doesn't need
+// this — but the Edge Function that sends the email/push CANNOT read
+// localStorage, and builds its subject and body from this column. Without a
+// rename reaching the row, the tab reads correctly while the notification that
+// actually lands in the user's inbox still carries the old, misspelled text.
+//
+// update() and not upsert(): if the task has no reminder there is nothing to
+// rename, and inserting here would invent a reminder the user never set.
+// Blank titles are ignored — quickUpdateTask can pass a partial patch with no
+// name, and that must never blank out the notification text.
+export async function renameReminder(sourceType, sourceId, title) {
+  if (!isAuthConfigured) return;
+  const next = (title || '').trim();
+  if (!next) return;
+  await supabase.from('reminders')
+    .update({ title: next })
+    .eq('source_type', sourceType)
+    .eq('source_id', sourceId);
+}
+
 export async function clearReminder(sourceType, sourceId) {
   if (!isAuthConfigured) return;
   await supabase.from('reminders')
