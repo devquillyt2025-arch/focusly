@@ -21,6 +21,38 @@ const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '�
 // /^nook[-_]/ sweeps (import allowlist, Clear All, cross-tab filter) see it.
 const LAST_EXPORT_KEY = 'nook-last-export';
 
+// Build and download a rollback copy of the current data, in exactly the same
+// schema-v1 zip shape a manual export produces — so recovering from a regretted
+// import is just importing this file back. Uses buildBackup(), which is
+// read-only, and writes nothing to Supabase.
+//
+// KNOWN DEBT (accepted, not a bug): these are written to the user's download
+// folder and never cleaned up, so repeated imports leave a pile of
+// nook-rollback-before-import-*.zip files behind. The browser gives a page no
+// way to delete what it has downloaded; a real fix means keeping the last N in
+// IndexedDB instead and offering restore from inside Settings. Deliberately out
+// of scope for the batch that added this.
+async function downloadRollbackSnapshot() {
+  const [{ buildBackup }, JSZipMod] = await Promise.all([
+    import('../utils/backup'),
+    import('jszip'),
+  ]);
+  const backup = await buildBackup();
+  const zip = new JSZipMod.default();
+  zip.file('backup.json', JSON.stringify(backup, null, 2));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nook-rollback-before-import-${stamp}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ─── Backup inventory ────────────────────────────────────────────────
 // Counts read from the same localStorage keys backup.js sweeps, so the panel
 // can never advertise more than the archive actually carries.
@@ -290,6 +322,27 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
         } else {
           data = JSON.parse(await file.text());
         }
+        // Stash a rollback of the CURRENT state before handing over to the
+        // importer, which overwrites localStorage behind a single confirm and
+        // then reloads. Downloaded rather than held in memory precisely because
+        // of that reload — anything in memory or in a React ref is gone, and a
+        // base64 zip in localStorage would compete for the quota we're about to
+        // overwrite. Silent by design: no extra prompt, it's insurance.
+        //
+        // If the rollback can't be produced we abort instead of continuing —
+        // losing data because the safety net failed is the worse outcome.
+        try {
+          await downloadRollbackSnapshot();
+        } catch (rollbackErr) {
+          console.error('[Import] rollback snapshot failed:', rollbackErr);
+          alert(
+            `Import cancelled — couldn't save a rollback copy of your current data first.\n\n` +
+            `${rollbackErr?.message || 'unknown error'}\n\n` +
+            `Nothing was changed. Export manually, then import again.`
+          );
+          return;
+        }
+
         onImportData(data);
       } catch (err) {
         alert(`Import failed: ${err.message}`);
