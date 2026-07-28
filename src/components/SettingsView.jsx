@@ -3,6 +3,7 @@ import { connectGoogleTasks, disconnectGoogleTasks } from '../utils/googleTasksS
 import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
+import { listReminders } from '../utils/reminders';
 import { exportBackup } from '../utils/backup';
 import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, getDriveConnectionState, setBackupFrequency, getRecentRuns, runDriveBackup } from '../utils/driveBackup';
 import Select from './Select';
@@ -15,6 +16,30 @@ const PRESETS = [
 ];
 
 const EMOJI_AVATARS = ['😎', '🤓', '👩‍💻', '👨‍🚀', '🦄', '👻'];
+
+// When the user last ran a manual export. Hyphen prefix so the existing
+// /^nook[-_]/ sweeps (import allowlist, Clear All, cross-tab filter) see it.
+const LAST_EXPORT_KEY = 'nook-last-export';
+
+// ─── Backup inventory ────────────────────────────────────────────────
+// Counts read from the same localStorage keys backup.js sweeps, so the panel
+// can never advertise more than the archive actually carries.
+function countJson(key) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || 'null');
+    return Array.isArray(v) ? v.length : v ? 1 : 0;
+  } catch { return 0; }
+}
+
+// Only date-keyed entries are journal content — nook_journal_icons,
+// _calview and _calcollapsed share the prefix but are view preferences.
+function countJournalEntries() {
+  let n = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    if (/^nook_journal_\d{4}-\d{2}-\d{2}$/.test(localStorage.key(i) || '')) n++;
+  }
+  return n;
+}
 
 export default memo(function SettingsView({ settings, onSaveSettings, theme, onSetTheme, onClearData, onImportData, syncStatus, onSyncToggle, onDisconnect, onSyncNow, onUpdateProfile, initialProfileName, initialProfileEmail, initialProfileAvatar, gcalConnected, onConnectGCal, onDisconnectGCal }) {
   // Profile state — seed from App.jsx's already-resolved state (same values the header shows)
@@ -137,6 +162,28 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
 
   const driveState = getDriveConnectionState(driveConfig);
 
+  // What an export would contain, right now. Local counts are synchronous;
+  // the reminder count is a Supabase read (SELECT only) and lands after.
+  const [lastExport, setLastExport] = useState(() => localStorage.getItem(LAST_EXPORT_KEY));
+  const [inventory, setInventory] = useState(null);
+  useEffect(() => {
+    setInventory({
+      tasks: countJson('nook-tasks'),
+      habits: countJson('nook_habits'),
+      journal: countJournalEntries(),
+      notes: countJson('nook_notes'),
+      links: countJson('nook_links'),
+      countdowns: countJson('nook_countdowns'),
+      vault: countJson('nook_vault'),
+      reminders: null,            // pending
+    });
+    let alive = true;
+    listReminders()
+      .then(rs => { if (alive) setInventory(inv => inv && { ...inv, reminders: rs.length }); })
+      .catch(() => { if (alive) setInventory(inv => inv && { ...inv, reminders: 0 }); });
+    return () => { alive = false; };
+  }, []);
+
   const [runBusy, setRunBusy] = useState(false);
   const handleBackupNow = async () => {
     if (runBusy) return;
@@ -202,6 +249,12 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     setBackupBusy(true);
     try {
       const counts = await exportBackup();
+      // Record when an export last happened — nothing tracked this before, so
+      // "have I backed up recently?" was unanswerable. Written here in the
+      // caller rather than inside exportBackup(), which stays read-only.
+      const stamp = new Date().toISOString();
+      try { localStorage.setItem(LAST_EXPORT_KEY, stamp); } catch {}
+      setLastExport(stamp);
       // "Download started", not "downloaded ✓" — a browser can silently block,
       // cancel, or redirect a triggered download with no JS-visible signal
       // either way, so we can only confirm the file was built, not saved.
@@ -691,6 +744,42 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
             You're close to this browser's storage limit for Nook. Export a backup soon —
             writes can start silently failing once the limit is reached.
           </p>
+        )}
+
+        {/* What's included — live counts, so the export's scope is visible
+            before you rely on it rather than only in the post-hoc alert. */}
+        {inventory && (
+          <div style={{ marginBottom: 14, padding: '11px 13px', borderRadius: 10, background: 'var(--surface-nested)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', fontWeight: 700 }}>
+                What's included
+              </span>
+              <span style={{ fontSize: '0.75rem', color: lastExport ? 'var(--text-secondary)' : 'var(--color-amber, #f59e0b)', fontWeight: lastExport ? 500 : 700 }}>
+                {lastExport
+                  ? `Last exported ${new Date(lastExport).toLocaleString()}`
+                  : 'Never exported'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+              {[
+                ['Tasks', inventory.tasks],
+                ['Habits', inventory.habits],
+                ['Journal entries', inventory.journal],
+                ['Notes', inventory.notes],
+                ['Links', inventory.links],
+                ['Countdowns', inventory.countdowns],
+                ['Saved logins', inventory.vault],
+                ['Reminders', inventory.reminders],
+              ].map(([label, n]) => (
+                <span key={label} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {label}{' '}
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+                    {n === null ? '…' : n}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

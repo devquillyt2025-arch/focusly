@@ -140,6 +140,9 @@ const CROSS_TAB_IGNORE_KEYS = new Set([
   // UI-only preferences — not user content, so changing these in another tab
   // should not trigger the "data changed" reload banner:
   'nook-sidebar-open',
+  // Bookkeeping for "Last exported" in Settings — running an export in another
+  // tab is not a content change and must not raise the reload banner.
+  'nook-last-export',
   // Each window keeps its own in-memory activeTab; this key is only the seed
   // for the NEXT cold load (last switch wins). Ignoring it here is what stops
   // two open windows from fighting: switching tabs in one must not raise the
