@@ -95,6 +95,26 @@ export function isDriveConnected(config) {
   return Boolean(config?.refresh_secret_id);
 }
 
+// Errors that mean the stored refresh token is no longer usable and only a
+// fresh Google consent can fix it — as opposed to a transient upload/network
+// failure, which resolves itself on the next run.
+const DRIVE_REAUTH_ERROR = /invalid_grant|token_refresh_failed|drive_not_connected|vault_read_failed/i;
+
+// Three-state connection status for the Settings UI.
+//
+// isDriveConnected() answers "was a refresh token ever stored?", which stays
+// true after Google revokes it. Settings hid the Connect button on that basis,
+// so a revoked token rendered as a healthy connection with no way to repair it
+// — every backup failed silently and re-consent was impossible without editing
+// the database by hand. 'needs_reconnect' is what brings the button back.
+export function getDriveConnectionState(config) {
+  if (!config?.refresh_secret_id) return 'not_connected';
+  if (config.last_status === 'error' && DRIVE_REAUTH_ERROR.test(config.last_error || '')) {
+    return 'needs_reconnect';
+  }
+  return 'connected';
+}
+
 // Persist the chosen frequency (off | daily | weekly).
 export async function setBackupFrequency(frequency) {
   if (!supabase) throw new Error('sync not configured');

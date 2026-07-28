@@ -4,7 +4,7 @@ import { supabase, isAuthConfigured } from '../utils/authClient';
 import { isPushSupported, isCurrentlySubscribed, subscribeToPush, unsubscribeFromPush } from '../utils/pushSubscription';
 import { isEmailRemindersEnabled, setEmailRemindersEnabled } from '../utils/notificationPrefs';
 import { exportBackup } from '../utils/backup';
-import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, setBackupFrequency, getRecentRuns, runDriveBackup } from '../utils/driveBackup';
+import { connectGoogleDriveBackup, getBackupConfig, isDriveConnected, getDriveConnectionState, setBackupFrequency, getRecentRuns, runDriveBackup } from '../utils/driveBackup';
 import Select from './Select';
 
 const PRESETS = [
@@ -121,6 +121,21 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     }
     return bytes >= 1024 * 1024 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
   };
+
+  // Sign-in identity for the Connections overview. Distinct from the editable
+  // profile email above, which is a local display name and proves nothing about
+  // whether cloud features (reminders, sync, backup) can actually work.
+  const [accountEmail, setAccountEmail] = useState(null);
+  useEffect(() => {
+    if (!isAuthConfigured) return;
+    let alive = true;
+    supabase.auth.getUser()
+      .then(({ data }) => { if (alive) setAccountEmail(data?.user?.email ?? null); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const driveState = getDriveConnectionState(driveConfig);
 
   const [runBusy, setRunBusy] = useState(false);
   const handleBackupNow = async () => {
@@ -366,6 +381,56 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
       </section>
 
       {/* Notifications Section */}
+      {/* ── Connections overview ──
+          Every integration's live state in one place. Each row is derived from
+          the same source the section below it uses, so this can't drift out of
+          step with the controls themselves. */}
+      <section className="settings-card">
+        <h3 className="settings-card-title">Connections</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: 10 }}>
+          Where Nook is currently connected. Anything amber needs attention.
+        </p>
+
+        <ConnRow
+          label="Account"
+          tone={!isAuthConfigured ? 'off' : accountEmail ? 'ok' : 'warn'}
+          detail={!isAuthConfigured
+            ? 'Local only — no cloud features'
+            : accountEmail || 'Signed out'}
+        />
+        <ConnRow
+          label="Google Tasks"
+          tone={syncStatus === 'Not connected' ? 'off' : 'ok'}
+          detail={syncStatus === 'Not connected' ? 'Not connected' : syncStatus}
+        />
+        <ConnRow
+          label="Google Calendar"
+          tone={gcalConnected ? 'ok' : 'off'}
+          detail={gcalConnected ? 'Connected' : 'Not connected'}
+        />
+        <ConnRow
+          label="Google Drive backup"
+          tone={driveState === 'connected' ? 'ok' : driveState === 'needs_reconnect' ? 'warn' : 'off'}
+          detail={
+            driveState === 'needs_reconnect' ? 'Access expired — reconnect'
+            : driveState === 'not_connected' ? 'Not connected'
+            : driveConfig?.last_backup_at
+              ? `Last backup ${new Date(driveConfig.last_backup_at).toLocaleDateString()}`
+              : 'Connected — no backup yet'
+          }
+        />
+        <ConnRow
+          label="Push reminders"
+          tone={!isPushSupported() ? 'off' : pushEnabled ? 'ok' : 'off'}
+          detail={!isPushSupported() ? 'Not supported here' : pushEnabled ? 'On, this device' : 'Off'}
+        />
+        <ConnRow
+          label="Email reminders"
+          tone={emailEnabled ? 'ok' : 'off'}
+          detail={emailEnabled ? 'On' : 'Off'}
+        />
+      </section>
+
       <section className="settings-card">
         <h3 className="settings-card-title">Notifications</h3>
 
@@ -670,15 +735,20 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
               </div>
             </div>
 
-            {/* Connect prompt (until a Drive refresh token exists) */}
-            {!isDriveConnected(driveConfig) && (
+            {/* Connect prompt — shown when Drive was never connected AND when a
+                stored token has been revoked. The second case is the important
+                one: it used to render as a healthy connection with this button
+                hidden, leaving no way to re-consent. */}
+            {driveState !== 'connected' && (
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={connectGoogleDriveBackup}>
+                <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${driveState === 'needs_reconnect' ? 'var(--color-amber, #f59e0b)' : 'var(--accent)'}`, background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={connectGoogleDriveBackup}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-                  Connect Google Drive
+                  {driveState === 'needs_reconnect' ? 'Reconnect Google Drive' : 'Connect Google Drive'}
                 </button>
-                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                  Needed once to allow background uploads to a private “Nook Backups” folder.
+                <span style={{ fontSize: '0.76rem', color: driveState === 'needs_reconnect' ? 'var(--color-amber, #f59e0b)' : 'var(--text-secondary)', fontWeight: driveState === 'needs_reconnect' ? 600 : 400 }}>
+                  {driveState === 'needs_reconnect'
+                    ? 'Google revoked access — backups are failing until you reconnect.'
+                    : 'Needed once to allow background uploads to a private “Nook Backups” folder.'}
                 </span>
               </div>
             )}
@@ -690,7 +760,11 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
                   {driveConfig?.last_backup_at
                     ? <>Last backed up: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date(driveConfig.last_backup_at).toLocaleString()}</span>
                         {driveRuns[0]?.counts?.local != null && <> · {driveRuns[0].counts.local} data sets, {driveRuns[0].counts.reminders ?? 0} reminders ({backupSizeLabel()})</>}
-                        {driveConfig.last_status === 'error' && <span style={{ color: 'var(--color-red)' }}> · last run failed</span>}</>
+                        {driveConfig.last_status === 'error' && (
+                          <span style={{ color: driveState === 'needs_reconnect' ? 'var(--color-amber, #f59e0b)' : 'var(--color-red)' }}>
+                            {driveState === 'needs_reconnect' ? ' · access expired' : ' · last run failed'}
+                          </span>
+                        )}</>
                     : <>Connected — no backup has run yet{driveFreq === 'off' ? ' (choose Daily or Weekly to enable).' : '. It’ll run on next load, or click “Back up now”.'}</>}
                 </div>
                 <button className="secondary-btn" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--accent)', background: 'var(--surface-nested)', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.8rem', cursor: runBusy ? 'default' : 'pointer', opacity: runBusy ? 0.65 : 1, flexShrink: 0, whiteSpace: 'nowrap' }} onClick={handleBackupNow} disabled={runBusy}>
@@ -740,3 +814,35 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
     </div>
   );
 });
+
+// ─── Connections overview row ────────────────────────────────────────
+// tone: 'ok'   — live and working
+//       'warn' — set up but broken, needs the user to do something
+//       'off'  — not connected / switched off, which is not a problem
+// 'warn' is deliberately distinct from 'off': a revoked Drive token is not the
+// same as never having connected, and reading them the same way is what let a
+// two-week backup outage go unnoticed.
+function ConnRow({ label, tone, detail }) {
+  const color = tone === 'ok'   ? 'var(--color-green)'
+              : tone === 'warn' ? 'var(--color-amber, #f59e0b)'
+              :                   'var(--text-muted)';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '1px solid var(--border)' }}>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0,
+          boxShadow: tone === 'ok' ? '0 0 6px rgba(34,197,94,0.5)' : 'none',
+        }}
+      />
+      <span style={{ fontSize: '0.83rem', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+      <span style={{
+        marginLeft: 'auto', textAlign: 'right', fontSize: '0.78rem',
+        color: tone === 'warn' ? color : 'var(--text-secondary)',
+        fontWeight: tone === 'warn' ? 700 : 500,
+      }}>
+        {detail}
+      </span>
+    </div>
+  );
+}
