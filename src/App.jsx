@@ -386,7 +386,12 @@ export default function App() {
       }
     }
     
-    if (data?.data?.reminders?.length > 0) {
+    // Reminders live in Supabase, not localStorage, and this import writes only
+    // localStorage — so they are genuinely not restored and the user has to be
+    // told. buildBackup() nests them under data.remote.reminders; this read
+    // data.reminders, which never resolves, so the warning was unreachable dead
+    // code and restores silently dropped every reminder.
+    if (data?.data?.remote?.reminders?.length > 0) {
         alert("Backup imported successfully.\n\nNote: Reminders are device-specific and were not restored. You may need to re-enable them for your tasks.");
     }
 
