@@ -402,7 +402,14 @@ export default function App() {
   }, []);
 
   const handleClearData = useCallback(() => {
-    if (confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
+    // Copy is precise about scope on purpose: this clears localStorage only.
+    // Tasks and habits also live in Supabase and are NOT deleted here — they
+    // sync back down on the next load. Promising "ALL data" was misleading.
+    if (confirm(
+      "Clear all data stored in this browser?\n\n" +
+      "This deletes everything Nook keeps on this device — tasks, habits, journal, notes, links, countdowns and saved logins — and cannot be undone.\n\n" +
+      "It does NOT delete your synced copies in the cloud: if Google or account sync is on, tasks and habits will sync back down on the next load. Reminders are also kept."
+    )) {
       // Nook keys use BOTH prefixes: 'nook-' (tasks, settings, calendar…) and
       // 'nook_' (notes, links, countdowns, journal, goals, Google tokens/sync).
       // Match both so "Clear all data" actually clears everything — leaving the

@@ -792,6 +792,12 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
           your Saved Logins (passwords included, unencrypted) — store the file
           somewhere you'd store a password export.
         </p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: 14 }}>
+          <strong style={{ color: 'var(--text-primary)' }}>Clear Local Data</strong> only erases this
+          browser's copy. Synced tasks and habits stay in the cloud and come back on the next
+          load, and reminders are kept. Importing replaces local data — a rollback copy of your
+          current data is downloaded automatically first.
+        </p>
         {quotaPct !== null && quotaPct >= 80 && (
           <p style={{ color: 'var(--color-red)', fontSize: '0.78rem', lineHeight: 1.5, marginTop: -6, marginBottom: 14 }}>
             You're close to this browser's storage limit for Nook. Export a backup soon —
@@ -849,7 +855,7 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
 
           <button className="secondary-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid #ef4444', background: 'rgba(239,68,68,0.06)', color: 'var(--color-red)', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }} onClick={onClearData}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Clear All
+            Clear Local Data
           </button>
         </div>
 
