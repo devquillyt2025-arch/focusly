@@ -74,6 +74,10 @@ export async function connectGoogleCalendar() {
     code_challenge_method: 'S256',
     access_type: 'offline',
     prompt: 'consent',
+    // Shared OAuth client — see the same flag in googleTasksSync.js and
+    // driveBackup.js. Without it, re-consenting for calendar.events alone
+    // narrows the grant and invalidates the Tasks and Drive refresh tokens.
+    include_granted_scopes: 'true',
     state: 'gcal',
   });
 

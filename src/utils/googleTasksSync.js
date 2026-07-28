@@ -75,7 +75,15 @@ export async function connectGoogleTasks() {
     code_challenge: challenge,
     code_challenge_method: 'S256',
     access_type: 'offline',
-    prompt: 'consent' // Forces refresh token generation
+    prompt: 'consent', // Forces refresh token generation
+    // Tasks, Calendar and Drive backup all share ONE OAuth client. Google
+    // treats a re-consent as a REPLACEMENT of the grant, so asking for just
+    // `tasks` here without this flag narrows the grant to `tasks` alone and
+    // invalidates the refresh tokens issued for the other two — reconnecting
+    // Tasks would silently kill Drive backup and Calendar, which then fail
+    // with `invalid_grant: Token has been expired or revoked`. Carrying the
+    // already-granted scopes forward keeps all three alive.
+    include_granted_scopes: 'true',
   });
 
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
