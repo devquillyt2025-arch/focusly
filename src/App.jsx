@@ -101,6 +101,33 @@ const SK = {
 
 function persist(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 
+// ─── Active tab persistence ──────────────────────────────────────
+// Nav state only — which view is showing, nothing about its contents. Kept in
+// its own key so it never rides along with a content slice.
+//
+// Hyphen prefix (not `nook:active-tab`) on purpose: every path that sweeps
+// Nook's storage — import's ALLOWED_PREFIX, "Clear all data", the cross-tab
+// filter — matches /^nook[-_]/. A `nook:` key would be invisible to all three
+// and survive a "clear everything". Matches the `nook-sidebar-open` precedent.
+const ACTIVE_TAB_KEY = 'nook-active-tab';
+
+// The 14 real tab ids. Anything else — a renamed/removed tab, a hand-edited
+// value, the dead 'goals' id DailyGoalsView still links to — falls back to
+// 'daily' rather than rendering a blank content area.
+const TAB_IDS = new Set([
+  'daily', 'tasks', 'calendar', 'habits', 'journal', 'reminders', 'notes',
+  'timer', 'links', 'countdowns', 'reports', 'activity', 'vault', 'settings',
+]);
+
+// Read synchronously as a useState initializer — NOT in a mount effect, which
+// would paint Today first and then visibly swap to the real tab.
+function loadActiveTab() {
+  try {
+    const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+    return TAB_IDS.has(saved) ? saved : 'daily';
+  } catch { return 'daily'; }
+}
+
 // Sync-engine-internal keys that shouldn't trigger the cross-tab reload banner —
 // these are plumbing (tokens, queue, tombstones, one-time migration flags), not
 // content the user actually authored, so a change here isn't "your data changed
@@ -113,6 +140,12 @@ const CROSS_TAB_IGNORE_KEYS = new Set([
   // UI-only preferences — not user content, so changing these in another tab
   // should not trigger the "data changed" reload banner:
   'nook-sidebar-open',
+  // Each window keeps its own in-memory activeTab; this key is only the seed
+  // for the NEXT cold load (last switch wins). Ignoring it here is what stops
+  // two open windows from fighting: switching tabs in one must not raise the
+  // "data changed elsewhere" reload banner in the other, and must not yank the
+  // other window's view out from under whatever it's showing.
+  ACTIVE_TAB_KEY,
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -310,7 +343,12 @@ export default function App() {
   const [crossTabChanged, setCrossTabChanged] = useState(false);
 
   // ── New state ──
-  const [activeTab,      setActiveTab]      = useState('daily');
+  const [activeTab,      setActiveTab]      = useState(loadActiveTab);
+  // Persist nav state so a reload lands where you left off. Write-through on
+  // every switch, same shape as the sidebar-collapse pref below.
+  useEffect(() => {
+    try { localStorage.setItem(ACTIVE_TAB_KEY, activeTab); } catch {}
+  }, [activeTab]);
   const [pendingOpenTaskId, setPendingOpenTaskId] = useState(null); // deep-link from Reminders tab
   const [trackers,       setTrackers]       = useState(loadTrackers);
   const [intentions,     setIntentions]     = useState(loadIntentions);
