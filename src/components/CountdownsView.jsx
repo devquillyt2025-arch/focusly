@@ -577,6 +577,8 @@ function CountdownModal({ onSave, onClose, editCd = null, onDelete }) {
               value={form.notes}
               onChange={e => setF('notes', e.target.value.slice(0, 500))}
               placeholder="Trip itinerary, project description, anything worth remembering…"
+              spellCheck="true"
+              autoCorrect="on"
             />
             <span className="cdp-char-count">{notesLen}/500</span>
           </div>

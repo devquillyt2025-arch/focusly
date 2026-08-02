@@ -133,17 +133,17 @@ export default function WeeklyReviewModal({ trackers, tasks, pomodoroLog, onClos
               
               <div className="form-group">
                 <label>What went well this week?</label>
-                <textarea className="modal-input" rows={3} value={wentWell} onChange={e => setWentWell(e.target.value)} />
+                <textarea className="modal-input" rows={3} value={wentWell} onChange={e => setWentWell(e.target.value)} spellCheck="true" autoCorrect="on" />
               </div>
               
               <div className="form-group">
                 <label>What made it hard?</label>
-                <textarea className="modal-input" rows={3} value={wasHard} onChange={e => setWasHard(e.target.value)} />
+                <textarea className="modal-input" rows={3} value={wasHard} onChange={e => setWasHard(e.target.value)} spellCheck="true" autoCorrect="on" />
               </div>
               
               <div className="form-group">
                 <label>One thing to focus on next week</label>
-                <textarea className="modal-input" rows={2} value={nextFocus} onChange={e => setNextFocus(e.target.value)} />
+                <textarea className="modal-input" rows={2} value={nextFocus} onChange={e => setNextFocus(e.target.value)} spellCheck="true" autoCorrect="on" />
               </div>
 
               <div className="form-group" style={{ marginTop: 16 }}>

@@ -173,7 +173,8 @@ export default function AddTaskModal({ onAdd, onEdit, onClose, editTask, existin
           <div className="form-grp">
             <label>Notes</label>
             <textarea className="form-inp form-textarea" value={form.notes}
-              onChange={e => set('notes', e.target.value)} placeholder="Optional…" rows={3} />
+              onChange={e => set('notes', e.target.value)} placeholder="Optional…" rows={3}
+              spellCheck="true" autoCorrect="on" />
           </div>
 
           <div className="modal-footer">

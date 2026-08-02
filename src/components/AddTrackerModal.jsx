@@ -146,7 +146,8 @@ export default function AddTrackerModal({ onSave, onClose, editTracker = null, e
               <textarea className="form-inp form-textarea" rows={2}
                 value={form.description}
                 onChange={e => setF('description', e.target.value)}
-                placeholder="Why does this matter to you?" />
+                placeholder="Why does this matter to you?"
+                spellCheck="true" autoCorrect="on" />
             </div>
 
             <div className="modal-footer">

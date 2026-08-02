@@ -748,7 +748,7 @@ export default memo(function CalendarView({ tasks, onAddTask, onUpdateTask }) {
                 </div>
                 <div>
                   <label style={LABEL_STYLE}>Notes</label>
-                  <textarea value={modalNotes} onChange={e => setModalNotes(e.target.value)} placeholder="Add notes…" rows={3} style={{ ...INPUT_STYLE, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                  <textarea value={modalNotes} onChange={e => setModalNotes(e.target.value)} placeholder="Add notes…" rows={3} spellCheck="true" autoCorrect="on" style={{ ...INPUT_STYLE, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
                 </div>
                 {gcalConnected && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '9px 13px', background: 'rgba(66,133,244,.08)', border: '1px solid rgba(66,133,244,.2)', borderRadius: 10 }}>

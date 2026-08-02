@@ -1419,6 +1419,8 @@ function TaskList({ tasks, activeTaskId, timerRunning, onSelect, onToggle, onDel
                         if (cur !== orig) { (onQuickUpdate || onUpdate)(local); showSaved(); }
                       }}
                       placeholder="Add notes..."
+                      spellCheck="true"
+                      autoCorrect="on"
                     />
                   </div>
 

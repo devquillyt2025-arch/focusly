@@ -192,6 +192,8 @@ export function NoteModal({ note, onSave, onClose, onDelete, onColorChange }) {
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="Take a note…"
+              spellCheck="true"
+              autoCorrect="on"
               style={{
                 resize: 'none',
                 minHeight: 150,
