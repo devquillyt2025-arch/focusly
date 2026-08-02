@@ -37,7 +37,7 @@ import { sendNotification } from './utils/notificationUtils';
 import { getSecsForMode } from './utils/timerUtils';
 import { setTickSeconds, getTickSeconds } from './utils/timerTickStore';
 import { logActivity, diffObjects } from './utils/activityLog';
-import { clearReminder, renameReminder } from './utils/reminders';
+import { clearReminder, renameReminder, restoreReminders } from './utils/reminders';
 import { localDateStr, todayStr } from './utils/date';
 import { genId } from './utils/id';
 import FocusCompanion from './components/FocusCompanion';
@@ -366,7 +366,7 @@ export default function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
 
-  const handleImportData = useCallback((data) => {
+  const handleImportData = useCallback(async (data) => {
     // Support schema-v1 ZIP exports (the current exportBackup format)
     // as well as legacy flat {key: string} imports.
     const isSchemaV1 = data?.schemaVersion === 1 && data?.data?.local;
@@ -389,14 +389,40 @@ export default function App() {
       }
     }
     
-    // Reminders live in Supabase, not localStorage, and this import writes only
-    // localStorage — so they are genuinely not restored and the user has to be
-    // told. buildBackup() nests them under data.remote.reminders; this read
-    // data.reminders, which never resolves, so the warning was unreachable dead
-    // code and restores silently dropped every reminder.
-    if (data?.data?.remote?.reminders?.length > 0) {
-        alert("Backup imported successfully.\n\nNote: Reminders are device-specific and were not restored. You may need to re-enable them for your tasks.");
+    // Reminders live in Supabase, not localStorage, so restoring them is a
+    // separate write that has to finish BEFORE the reload below — a reload
+    // mid-request would abandon it silently.
+    const backupReminders = data?.data?.remote?.reminders || [];
+    let reminderNote = '';
+    if (backupReminders.length > 0) {
+      try {
+        const { restored, skipped } = await restoreReminders(backupReminders);
+        if (skipped) {
+          // Genuinely not restored — keep telling the user, as before.
+          reminderNote =
+            `\n\n${backupReminders.length} reminder${backupReminders.length === 1 ? '' : 's'} could NOT be restored — ` +
+            (skipped === 'signed_out'
+              ? 'you are not signed in.'
+              : 'this Nook has no account sync configured.') +
+            `\nSign in and import again to restore them.`;
+        } else {
+          reminderNote = `\n\n${restored} reminder${restored === 1 ? '' : 's'} restored.`;
+        }
+      } catch (err) {
+        // Local data is already written at this point; say so plainly rather
+        // than letting the user assume the whole import failed.
+        console.error('[Import] reminder restore failed:', err);
+        reminderNote =
+          `\n\nYour local data was imported, but reminders could not be restored:\n` +
+          `${err?.message || 'unknown error'}\n` +
+          `Nothing else was affected — you can re-import to try the reminders again.`;
+      }
     }
+
+    alert(
+      `Backup imported successfully.${reminderNote}\n\n` +
+      `A restore brings back everything in the file, so anything you deleted after this backup was taken — reminders included — is back.`
+    );
 
     window.location.reload();
   }, []);

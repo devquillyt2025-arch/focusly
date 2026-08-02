@@ -343,7 +343,9 @@ export default memo(function SettingsView({ settings, onSaveSettings, theme, onS
           return;
         }
 
-        onImportData(data);
+        // Awaited: the importer now restores reminders to Supabase before it
+        // reloads, so a fire-and-forget call here would drop the rejection.
+        await onImportData(data);
       } catch (err) {
         alert(`Import failed: ${err.message}`);
       }

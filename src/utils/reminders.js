@@ -98,6 +98,55 @@ export async function clearReminder(sourceType, sourceId) {
     .eq('source_id', sourceId);
 }
 
+// Restore reminders from a backup archive into Supabase, completing the
+// round-trip that previously ended at localStorage.
+//
+// Semantics, settled in review (see 0010_upsert_reminders.sql for the full
+// reasoning): the backup wins unconditionally — no last-write-wins guard, so a
+// reminder edited after the backup is reverted — and nothing is ever deleted,
+// so reminders absent from the archive survive. Both match how the localStorage
+// half of the same import already behaves.
+//
+// id / user_id / created_at / updated_at are stripped before sending. The RPC
+// writes auth.uid() itself, so a hand-edited archive naming another user cannot
+// reach their rows; dropping id avoids a primary-key collision the business-key
+// conflict clause could not catch.
+//
+// The whole batch is one RPC call = one Postgres transaction: all reminders
+// restore, or none do.
+//
+// Returns { restored } on success, or { restored: 0, skipped } when there's no
+// account to restore into. Throws only on an actual write failure, so the
+// caller can tell "nothing to do" apart from "it broke".
+export async function restoreReminders(rows) {
+  if (!isAuthConfigured) return { restored: 0, skipped: 'not_configured' };
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return { restored: 0, skipped: 'signed_out' };
+
+  // Drop anything missing a NOT NULL column rather than letting one malformed
+  // row abort the entire transaction and lose the good ones with it.
+  const payload = (rows || [])
+    .filter(r => r && r.source_type && r.source_id && r.title && r.target_at && r.reminder_at)
+    .map(r => ({
+      source_type: r.source_type,
+      source_id: r.source_id,
+      title: r.title,
+      target_at: r.target_at,
+      reminder_at: r.reminder_at,
+      reminder_offset_minutes: r.reminder_offset_minutes ?? null,
+      // Preserved, not reset — an already-fired reminder must not fire again
+      // just because it was restored.
+      reminder_sent: r.reminder_sent === true,
+    }));
+
+  if (!payload.length) return { restored: 0 };
+
+  const { error } = await supabase.rpc('upsert_reminders', { p_reminders: payload });
+  if (error) throw new Error(error.message);
+  return { restored: payload.length };
+}
+
 // All reminders for the signed-in user (RLS-scoped), ascending by when they fire.
 export async function listReminders() {
   if (!isAuthConfigured) return [];
