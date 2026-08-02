@@ -16,6 +16,14 @@
  */
 
 import { invokeGoogleOAuth } from './googleOAuthClient';
+// The ONE intentional dependency on the Supabase task layer. tasksService is
+// otherwise deliberately independent of this file (see its header), but a
+// delete has to be agreed on by BOTH sync systems or neither owns it: a task
+// deleted on Google was being filtered out of local state here with no
+// Supabase tombstone, so the row stayed live remotely and the next
+// hydrateTasksFromSupabase() re-adopted it as remote-only — permanently.
+// Fire-and-forget and a no-op when Supabase isn't configured / signed out.
+import { softDeleteTask } from './tasksService';
 
 // ─── Cross-tab sync-queue mutex ─────────────────────────────────────────────
 // nook_sync_queue / nook_deleted_tasks are read-modified-written from two
@@ -680,6 +688,12 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
         } else {
           updatedTasks = updatedTasks.filter(t => t.id !== localTask.id);
           taskStateChanged = true;
+          // Tombstone in Supabase too, exactly as App.jsx's deleteTask does.
+          // Removing it from local state alone left the remote row live, and
+          // the next hydrate adopted it straight back as a remote-only task.
+          // Must be the PRE-filter task object: softDeleteTask sends a full
+          // row, and localTask is the only copy that still exists here.
+          softDeleteTask(localTask);
         }
       } else {
         // Compare timestamps (last-write-wins)

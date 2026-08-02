@@ -132,6 +132,26 @@ export async function migrateLocalHabits(localHabits) {
   return { status: 'migrated', count: stamped.length };
 }
 
+// ── Restore from a backup archive (audit C2) ────────────────────────
+// Habits half of the same fix as tasksService.restoreTasks — see that
+// function and the header of migration 0011. Backup wins, deleted_at is
+// cleared so a habit deleted after the backup comes back, and nothing is
+// ever deleted, so habits created since the backup survive.
+export async function restoreHabits(rows) {
+  if (!isHabitsSyncConfigured()) return { restored: 0, skipped: 'not_configured' };
+  const uid = await getUserId();
+  if (!uid) return { restored: 0, skipped: 'signed_out' };
+
+  const payload = (rows || [])
+    .filter(h => h && h.id)
+    .map(h => ({ ...h, updatedAt: h.updatedAt || h.createdAt || new Date().toISOString() }));
+  if (!payload.length) return { restored: 0 };
+
+  const { error } = await supabase.rpc('restore_habits', { p_habits: payload });
+  if (error) throw new Error(error.message);
+  return { restored: payload.length };
+}
+
 // ── Reconcile (pure, LWW on updatedAt) ──────────────────────────────
 export function reconcileHabits(local, remoteLive, tombstones = []) {
   const localById = new Map(local.map(h => [h.id, h]));

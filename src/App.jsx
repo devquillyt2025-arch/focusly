@@ -28,8 +28,8 @@ import {
   isScheduledToday, isLoggedToday, computeHabitStreaks, getConfig
 } from './trackers/trackerUtils';
 import { handleAuthCallback, syncTasks, pushSyncQueue, directGoogleTaskUpdate, directGoogleTaskDelete } from './utils/googleTasksSync';
-import { pushTask, pushTasks, softDeleteTask, softDeleteTasks, fetchTasks, reconcileTasks, migrateLocalTasks, isTasksSyncConfigured, getUserId, subscribeToTasks, reconcileRemoteChange } from './utils/tasksService';
-import { pushHabit, softDeleteHabit, fetchHabits, reconcileHabits, migrateLocalHabits, isHabitsSyncConfigured, subscribeToHabits, reconcileRemoteHabitChange, pushHabits } from './utils/habitsService';
+import { pushTask, pushTasks, softDeleteTask, softDeleteTasks, fetchTasks, reconcileTasks, migrateLocalTasks, isTasksSyncConfigured, getUserId, subscribeToTasks, reconcileRemoteChange, restoreTasks } from './utils/tasksService';
+import { pushHabit, softDeleteHabit, fetchHabits, reconcileHabits, migrateLocalHabits, isHabitsSyncConfigured, subscribeToHabits, reconcileRemoteHabitChange, pushHabits, restoreHabits } from './utils/habitsService';
 import { handleCalendarAuthCallback, isGCalConnected, connectGoogleCalendar, disconnectGoogleCalendar } from './utils/googleCalendarSync';
 import { handleDriveBackupCallback } from './utils/driveBackup';
 import { maybeRunAutoBackup } from './utils/autoBackup';
@@ -389,39 +389,74 @@ export default function App() {
       }
     }
     
-    // Reminders live in Supabase, not localStorage, so restoring them is a
-    // separate write that has to finish BEFORE the reload below — a reload
-    // mid-request would abandon it silently.
-    const backupReminders = data?.data?.remote?.reminders || [];
-    let reminderNote = '';
-    if (backupReminders.length > 0) {
+    // ── Cloud-backed slices ────────────────────────────────────────────
+    // Reminders, tasks and habits do NOT live in localStorage alone, so the
+    // writes above don't restore them. Each needs its own Supabase write, and
+    // all of them have to finish BEFORE the reload below — a reload mid-request
+    // abandons it silently.
+    //
+    // Tasks and habits additionally need the *tombstone* cleared, not just the
+    // row rewritten: Supabase is the cross-device source of truth, so anything
+    // deleted after the backup was taken still had a soft-delete whose
+    // updatedAt was newer than the restored copy's. Without restore_tasks /
+    // restore_habits (migration 0011, backup-wins + deleted_at cleared), the
+    // very next hydrate re-applied that tombstone and the task disappeared
+    // again seconds after the import claimed success.
+    const notes = [];
+
+    // Whether tasks/habits have a cloud copy at all. When they don't, the
+    // localStorage writes above ARE the whole restore and there is nothing
+    // further to do — reporting "could not be restored to your account" to a
+    // local-only user would be alarming and false.
+    const cloudSync = isTasksSyncConfigured();
+
+    // Each restore is independent: one failing must not stop the others, and
+    // the local data is already written either way, so a failure here is
+    // partial, never total. Say which part failed rather than implying the
+    // whole import did.
+    const runRestore = async (label, rows, fn) => {
+      if (!rows.length) return;
+      const plural = rows.length === 1 ? '' : 's';
       try {
-        const { restored, skipped } = await restoreReminders(backupReminders);
+        const { restored, skipped } = await fn(rows);
         if (skipped) {
-          // Genuinely not restored — keep telling the user, as before.
-          reminderNote =
-            `\n\n${backupReminders.length} reminder${backupReminders.length === 1 ? '' : 's'} could NOT be restored — ` +
+          notes.push(
+            `• ${rows.length} ${label}${plural} could NOT be restored to your account — ` +
             (skipped === 'signed_out'
-              ? 'you are not signed in.'
-              : 'this Nook has no account sync configured.') +
-            `\nSign in and import again to restore them.`;
+              ? 'you are not signed in. Sign in and import again.'
+              : 'this Nook has no account sync configured.')
+          );
         } else {
-          reminderNote = `\n\n${restored} reminder${restored === 1 ? '' : 's'} restored.`;
+          notes.push(`• ${restored} ${label}${plural} restored`);
         }
       } catch (err) {
-        // Local data is already written at this point; say so plainly rather
-        // than letting the user assume the whole import failed.
-        console.error('[Import] reminder restore failed:', err);
-        reminderNote =
-          `\n\nYour local data was imported, but reminders could not be restored:\n` +
-          `${err?.message || 'unknown error'}\n` +
-          `Nothing else was affected — you can re-import to try the reminders again.`;
+        console.error(`[Import] ${label} restore failed:`, err);
+        notes.push(`• ${label}s could NOT be restored: ${err?.message || 'unknown error'}`);
       }
+    };
+
+    // Reminders are Supabase-only with no local mirror, so this runs (and
+    // reports) regardless of whether task sync is on.
+    await runRestore('reminder', data?.data?.remote?.reminders || [], restoreReminders);
+
+    if (cloudSync) {
+      // Read back from localMap, not from state — these are the arrays just
+      // written above, in the backup's own shape.
+      await runRestore('task',  Array.isArray(localMap['nook-tasks'])  ? localMap['nook-tasks']  : [], restoreTasks);
+      await runRestore('habit', Array.isArray(localMap['nook_habits']) ? localMap['nook_habits'] : [], restoreHabits);
     }
 
+    // Copy is deliberately specific, because the two behaviours genuinely
+    // differ and the previous single sentence ("a restore brings back
+    // everything in the file") was false for tasks and habits — the exact
+    // thing people run a restore for.
     alert(
-      `Backup imported successfully.${reminderNote}\n\n` +
-      `A restore brings back everything in the file, so anything you deleted after this backup was taken — reminders included — is back.`
+      `Backup imported.\n\n` +
+      (notes.length ? `${notes.join('\n')}\n\n` : '') +
+      (cloudSync
+        ? `Notes, journal, links and other on-device data were REPLACED with the backup's copy — anything created since the backup was taken is gone.\n\n` +
+          `Tasks, habits and reminders were MERGED: everything in the backup is back, including items you deleted since, and items created since were kept.`
+        : `Your data was REPLACED with the backup's copy — anything created since the backup was taken is gone.`)
     );
 
     window.location.reload();

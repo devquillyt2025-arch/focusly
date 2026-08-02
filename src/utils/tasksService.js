@@ -7,6 +7,12 @@
 // two are independent. Both write to the same in-memory task array; both
 // reconcile with last-write-wins on the app-level `updatedAt`.
 //
+// ONE deliberate exception to that independence: googleTasksSync's pull path
+// imports softDeleteTask, because a delete has to be agreed on by both sync
+// systems or neither owns it. A task deleted on Google was removed from local
+// state with no Supabase tombstone, so the next hydrate re-adopted it as
+// remote-only, forever. Nothing else crosses the boundary.
+//
 // EVERY call is a clean no-op when auth isn't configured or nobody is signed
 // in (returns early before touching the network), so an unauthenticated,
 // local-only user degrades to exactly the pre-sync behavior — never an error.
@@ -31,6 +37,22 @@ export const TASKS_MIGRATED_KEY = 'nook_tasks_migrated';
 const INFRA_COLS = ['user_id', 'created_at', 'updated_at', 'deleted_at'];
 
 function ts(v) { const n = v ? Date.parse(v) : NaN; return Number.isNaN(n) ? 0 : n; }
+
+// Every row that leaves this module MUST carry a non-null updatedAt.
+//
+// upsert_tasks' LWW guard is `excluded."updatedAt" > t."updatedAt"`. SQL
+// three-valued logic makes that NULL — never true — the moment either side is
+// null, so a row that once lands with a null updatedAt can never be updated or
+// soft-deleted again, and resurrects on every hydrate. Tasks written by the app
+// are always stamped, but migrateTask() in App.jsx rebuilds pre-`updatedAt`
+// tasks without one, and a backup archive can carry the same shape.
+//
+// habitsService has always done this at its migration boundary; tasks did not.
+// Migration 0011 hardens the SQL guard as well — this is the client half.
+function stampUpdatedAt(rows) {
+  const now = new Date().toISOString();
+  return rows.map(t => t.updatedAt ? t : { ...t, updatedAt: t.createdAt || now });
+}
 
 // Row (camelCase task columns + snake_case infra columns) → clean task object.
 function rowToTask(row) {
@@ -66,7 +88,10 @@ export async function pushTasks(taskArray) {
   const uid = await getUserId();
   if (!uid) return;                          // signed out → clean no-op
   try {
-    const { error } = await supabase.rpc('upsert_tasks', { p_tasks: taskArray });
+    // Stamped at the boundary so no caller can freeze a row with a null
+    // updatedAt — see stampUpdatedAt. A task that already has one is passed
+    // through untouched, so this never rewrites a genuine edit time.
+    const { error } = await supabase.rpc('upsert_tasks', { p_tasks: stampUpdatedAt(taskArray) });
     if (error) console.warn('[tasksService] push failed:', error.message);
   } catch (e) {
     console.warn('[tasksService] push threw:', e?.message || e);
@@ -156,8 +181,14 @@ export async function migrateLocalTasks(localTasks) {
     return { status: 'nothing' };
   }
 
+  // Backfill the LWW timestamp for tasks that predate the updatedAt field
+  // (migrateTask() in App.jsx rebuilds the legacy shape without one). Without
+  // this they land with a null updatedAt and are frozen forever — the exact
+  // backfill habitsService has always done at this boundary.
+  const stamped = stampUpdatedAt(localTasks);
+
   try {
-    const { error } = await supabase.rpc('upsert_tasks', { p_tasks: localTasks });
+    const { error } = await supabase.rpc('upsert_tasks', { p_tasks: stamped });
     if (error) { console.warn('[tasksService] migration insert failed:', error.message); return { status: 'error' }; }
   } catch (e) {
     console.warn('[tasksService] migration insert threw:', e?.message || e);
@@ -165,7 +196,40 @@ export async function migrateLocalTasks(localTasks) {
   }
 
   localStorage.setItem(TASKS_MIGRATED_KEY, '1');
-  return { status: 'migrated', count: localTasks.length };
+  return { status: 'migrated', count: stamped.length };
+}
+
+// ── Restore from a backup archive (audit C2) ────────────────────────
+// Import writes localStorage and reloads — which was enough back when tasks
+// were local-only, and silently wrong once Supabase became the cross-device
+// source of truth. A task deleted AFTER the backup was taken still had a
+// tombstone with a newer updatedAt, so reconcileTasks deleted it again on the
+// very next hydrate: the restore reported success and the task vanished.
+//
+// restore_tasks is backup-wins (no LWW guard) and clears deleted_at, so the
+// archive's copy is what survives. It never deletes, so tasks created since
+// the backup are kept — a restore is a union, not a replacement. See the
+// header of migration 0011 for the full reasoning and the one deliberate
+// difference from the reminder restore in 0010 (task ids are kept, not
+// reassigned, because they are referenced by Google sync and reminders).
+//
+// Returns { restored } on success, or { restored: 0, skipped } when there is
+// no account to restore into. Throws only on a real write failure, so the
+// caller can tell "nothing to do" apart from "it broke" — same contract as
+// restoreReminders.
+export async function restoreTasks(rows) {
+  if (!isTasksSyncConfigured()) return { restored: 0, skipped: 'not_configured' };
+  const uid = await getUserId();
+  if (!uid) return { restored: 0, skipped: 'signed_out' };
+
+  // Drop anything unkeyable rather than letting one malformed row abort the
+  // transaction and lose the good ones with it.
+  const payload = stampUpdatedAt((rows || []).filter(t => t && t.id));
+  if (!payload.length) return { restored: 0 };
+
+  const { error } = await supabase.rpc('restore_tasks', { p_tasks: payload });
+  if (error) throw new Error(error.message);
+  return { restored: payload.length };
 }
 
 // Pure last-write-wins merge of local state with a remote snapshot.
