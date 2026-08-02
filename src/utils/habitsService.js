@@ -43,6 +43,21 @@ export async function getUserId() {
 
 export function isHabitsSyncConfigured() { return Boolean(isAuthConfigured && supabase); }
 
+// Every row that leaves this module MUST carry a non-null updatedAt — the
+// same contract as tasksService.stampUpdatedAt, and for the same reason:
+// upsert_habits' LWW guard can't act on a NULL.
+//
+// migrateLocalHabits has always backfilled, which is why habits looked
+// exempt. They were not. pushHabits never stamped, and the hydrate
+// push-back (App.jsx: `pushHabits(toPush)`) hands it raw local habits
+// straight out of reconcileHabits — so any habit predating the updatedAt
+// field went up with a null. Found in production: 3 such rows, all sharing
+// a created_at to the microsecond, i.e. one push batch.
+function stampUpdatedAt(rows) {
+  const now = new Date().toISOString();
+  return rows.map(h => h.updatedAt ? h : { ...h, updatedAt: h.createdAt || now });
+}
+
 // ── Writes (atomic, LWW-guarded RPC; fire-and-forget) ───────────────
 export async function pushHabits(habitArray) {
   if (!isHabitsSyncConfigured()) return;
@@ -50,7 +65,7 @@ export async function pushHabits(habitArray) {
   const uid = await getUserId();
   if (!uid) return;
   try {
-    const { error } = await supabase.rpc('upsert_habits', { p_habits: habitArray });
+    const { error } = await supabase.rpc('upsert_habits', { p_habits: stampUpdatedAt(habitArray) });
     if (error) console.warn('[habitsService] push failed:', error.message);
   } catch (e) {
     console.warn('[habitsService] push threw:', e?.message || e);
@@ -142,9 +157,7 @@ export async function restoreHabits(rows) {
   const uid = await getUserId();
   if (!uid) return { restored: 0, skipped: 'signed_out' };
 
-  const payload = (rows || [])
-    .filter(h => h && h.id)
-    .map(h => ({ ...h, updatedAt: h.updatedAt || h.createdAt || new Date().toISOString() }));
+  const payload = stampUpdatedAt((rows || []).filter(h => h && h.id));
   if (!payload.length) return { restored: 0 };
 
   const { error } = await supabase.rpc('restore_habits', { p_habits: payload });

@@ -162,10 +162,12 @@ begin
       "createdAt"       = excluded."createdAt",
       "updatedAt"       = excluded."updatedAt",
       deleted_at        = excluded.deleted_at
-      -- Same NULL-safe guard as upsert_tasks. habitsService already
-      -- backfilled at its migration boundary so no habit is known to be
-      -- frozen, but leaving the two guards asymmetric is precisely how
-      -- the tasks side ended up with this bug in the first place.
+      -- Same NULL-safe guard as upsert_tasks. Habits are NOT exempt: the
+      -- audit assumed they were, because migrateLocalHabits backfills —
+      -- but pushHabits never did, and the hydrate push-back sends raw
+      -- local habits through it. Production had 3 frozen habit rows and 0
+      -- frozen task rows, i.e. the opposite of what was predicted. The
+      -- client half is now stamped in habitsService.stampUpdatedAt.
       where excluded."updatedAt" is not null
         and (h."updatedAt" is null or excluded."updatedAt" > h."updatedAt")
     returning h.* into result;
