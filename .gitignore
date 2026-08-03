@@ -17,3 +17,6 @@ scratch-*.js
 # Next.js landing build output
 landing/.next
 landing/node_modules
+# MCP server config — holds a Supabase personal access token in plaintext.
+# Project-scoped and machine-local; never commit it.
+.mcp.json
