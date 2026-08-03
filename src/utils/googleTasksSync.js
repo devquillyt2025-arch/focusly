@@ -678,6 +678,13 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
   // sharing a title can't both re-attach to the same local row.
   const adoptedLocalIds = new Set();
 
+  // Task ids this pull decided to REMOVE (deleted on Google, not edited
+  // locally since the last sync). Tracked separately because the merge at the
+  // end rebuilds from `prev`, and absence from `updatedTasks` cannot express
+  // "delete this" — `prev.map()` keeps anything it doesn't find. Without this
+  // set the removal is computed and then silently undone.
+  const removedIds = new Set();
+
   const delStr = localStorage.getItem('nook_deleted_tasks');
   let deletedIds = [];
   try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
@@ -759,6 +766,8 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
           console.warn(`[Google Tasks Sync] Conflict logged: Task "${localTask.name}" deleted on Google Tasks, but edited locally.`);
         } else {
           updatedTasks = updatedTasks.filter(t => t.id !== localTask.id);
+          // Dropping it from updatedTasks is not enough — see removedIds.
+          removedIds.add(localTask.id);
           taskStateChanged = true;
           // Tombstone in Supabase too, exactly as App.jsx's deleteTask does.
           // Removing it from local state alone left the remote row live, and
@@ -880,9 +889,19 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
     // (consistent with the existing last-write-wins intent), but local-only
     // fields (timeLogged, pomodorosCompleted, notes, subtasks…) kept on prev
     // are never clobbered by a pull that doesn't know about them.
+    //
+    // The leading filter is what lets this merge express a DELETION. Rebuilding
+    // from `prev` means a task the pull removed is otherwise restored by the
+    // `.map()` below, because absence from `byId` reads as "no update for this
+    // task", not "remove it" — so a task deleted on Google came straight back
+    // on every pull. Dropping removedIds first is the only way to distinguish
+    // the two. (Before 638bd1c this was a wholesale setTasks(updatedTasks),
+    // which expressed deletion implicitly; the functional merge that replaced
+    // it fixed a clobbering bug and lost that property.)
     setTasks(prev => {
       const byId = Object.fromEntries(updatedTasks.map(t => [t.id, t]));
       const merged = prev
+        .filter(t => !removedIds.has(t.id))
         .map(t => byId[t.id] ? { ...t, ...byId[t.id] } : t)
         .concat(updatedTasks.filter(t => !prev.find(p => p.id === t.id)));
       return merged;
