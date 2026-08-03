@@ -377,7 +377,20 @@ function requeueWithBackoff(remainingQ, op) {
   remainingQ.push({ ...op, attempts, nextRetryAt: Date.now() + backoffMs(attempts) });
 }
 
-export async function pushLocalChangesToGoogle(tasks, token) {
+// setTasks is REQUIRED for correctness, not optional convenience.
+//
+// This function's sync bookkeeping — above all the googleTaskId Google hands
+// back on a CREATE — used to reach React state only as a side effect of
+// pullTasksFromGoogle's `if (taskStateChanged)` commit. When the pull had
+// nothing of its own to apply, that commit was skipped and the mapping was
+// discarded with it. That is the exact case right after creating one task: the
+// pull matches it, finds it already current, changes nothing.
+//
+// The task was then live on Google with no local googleTaskId, so every later
+// pull failed to recognise it and minted a fresh duplicate — and the original
+// never healed, because nothing else writes that field. Committing here makes
+// the push own its own result instead of borrowing the pull's.
+export async function pushLocalChangesToGoogle(tasks, token, setTasks) {
   const qStr = localStorage.getItem('nook_sync_queue');
   let q = [];
   try { q = qStr ? JSON.parse(qStr) : []; } catch {}
@@ -385,6 +398,16 @@ export async function pushLocalChangesToGoogle(tasks, token) {
 
   let updatedTasks = [...tasks];
   const remainingQ = [];
+
+  // Per-task record of ONLY the sync-bookkeeping fields this run changed.
+  // Deliberately not the whole task: `tasks` is a snapshot taken before a
+  // batch of network round-trips, so merging it wholesale onto live state
+  // could revert a rename the user made while the batch was in flight. These
+  // fields are owned solely by the sync engine, so applying just them is safe.
+  const pushedFields = new Map();
+  const recordPushed = (taskId, fields) => {
+    pushedFields.set(taskId, { ...(pushedFields.get(taskId) || {}), ...fields });
+  };
 
   // Fetch all existing Google Tasks once to match child subtasks easily
   const allRes = await fetch('https://www.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=true&showDeleted=true', {
@@ -445,6 +468,8 @@ export async function pushLocalChangesToGoogle(tasks, token) {
           const nowIso = new Date().toISOString();
           parentGoogleTaskId = data.id;
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, googleTaskId: data.id, lastSyncedAt: nowIso } : t);
+          // The mapping that was being lost. Without this the task is orphaned.
+          recordPushed(op.taskId, { googleTaskId: data.id, lastSyncedAt: nowIso });
           localTask = updatedTasks.find(t => t.id === op.taskId);
         } else if (isRetryableStatus(res.status)) {
           requeueWithBackoff(remainingQ, op); // rate limited / expired token / transient server error
@@ -468,10 +493,12 @@ export async function pushLocalChangesToGoogle(tasks, token) {
         if (res.ok) {
           const nowIso = new Date().toISOString();
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, lastSyncedAt: nowIso } : t);
+          recordPushed(op.taskId, { lastSyncedAt: nowIso });
           localTask = updatedTasks.find(t => t.id === op.taskId);
         } else if (res.status === 404) {
           console.warn('[Google Tasks Sync] Conflict: Task deleted on Google Tasks but updated locally.');
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, syncConflict: 'Deleted on Google Tasks, edited locally', googleTaskId: null } : t);
+          recordPushed(op.taskId, { syncConflict: 'Deleted on Google Tasks, edited locally', googleTaskId: null });
           continue;
         } else if (isRetryableStatus(res.status)) {
           requeueWithBackoff(remainingQ, op);
@@ -549,6 +576,9 @@ export async function pushLocalChangesToGoogle(tasks, token) {
 
         if (subtasksChanged) {
           updatedTasks = updatedTasks.map(t => t.id === op.taskId ? { ...t, subtasks: updatedSubtasks } : t);
+          // Carries the per-subtask googleTaskId mapping, which has the same
+          // orphaning problem as the parent's if it never reaches state.
+          recordPushed(op.taskId, { subtasks: updatedSubtasks });
         }
       }
 
@@ -602,6 +632,17 @@ export async function pushLocalChangesToGoogle(tasks, token) {
       .map(item => remainingByKey.get(keyOf(item)) || item);
     localStorage.setItem('nook_sync_queue', JSON.stringify(next));
   });
+
+  // Commit the push's own bookkeeping. Functional updater against live state,
+  // applying only the recorded fields, so this cannot revert edits made while
+  // the batch was in flight. Runs regardless of what the pull goes on to do —
+  // that dependency was the bug.
+  if (setTasks && pushedFields.size) {
+    setTasks(prev => prev.map(t => (
+      pushedFields.has(t.id) ? { ...t, ...pushedFields.get(t.id) } : t
+    )));
+  }
+
   return updatedTasks;
 }
 
@@ -633,6 +674,10 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
   let updatedTasks = [...tasks];
   let taskStateChanged = false;
 
+  // Local task ids claimed by orphan adoption below, so two Google tasks
+  // sharing a title can't both re-attach to the same local row.
+  const adoptedLocalIds = new Set();
+
   const delStr = localStorage.getItem('nook_deleted_tasks');
   let deletedIds = [];
   try { deletedIds = delStr ? JSON.parse(delStr) : []; } catch {}
@@ -651,6 +696,33 @@ export async function pullTasksFromGoogle(tasks, setTasks, token, onStatusChange
       if (deletedIds.includes(gTask.id)) {
         console.warn(`[Google Tasks Sync] Conflict logged: Task "${gTask.title}" was deleted locally but updated on Google Tasks.`);
       } else {
+        // ── Orphan adoption (safety net) ──────────────────────────────────
+        // Before minting a task, try to re-attach to a local one that is
+        // plainly the same task with a lost mapping: same title, no
+        // googleTaskId of its own, not already claimed earlier in this pull.
+        //
+        // Without this, ANY path that loses the mapping duplicates on every
+        // subsequent pull, forever, because the orphan never regains an id to
+        // match on. Subtask matching has always had this fallback (it matches
+        // `s.text === gSub.title`); parent tasks never did, which is why they
+        // duplicate and subtasks don't.
+        //
+        // Adopts the mapping only — no content is copied over. The normal
+        // last-write-wins comparison handles fields on the next pull, so this
+        // can't let a stale remote silently overwrite a local edit.
+        const gTitle = gTask.title || 'Untitled';
+        const orphan = updatedTasks.find(t =>
+          !t.googleTaskId && !adoptedLocalIds.has(t.id) && (t.name || '') === gTitle
+        );
+        if (orphan) {
+          console.warn(`[Google Tasks Sync] Re-attached "${gTitle}" to its Google task instead of creating a duplicate (lost googleTaskId).`);
+          adoptedLocalIds.add(orphan.id);
+          updatedTasks = updatedTasks.map(t => t.id === orphan.id
+            ? { ...t, googleTaskId: gTask.id, lastSyncedAt: nowIso } : t);
+          taskStateChanged = true;
+          continue;
+        }
+
         const extracted = extractDueDateTime(gTask.due);
         const newTask = {
           id: String(Date.now() + Math.random()),
@@ -846,7 +918,9 @@ export async function syncTasks(tasks, setTasks, onStatusChange, isFocusTrigger 
 
   try {
     // 1. Push local changes to Google Tasks first
-    const updatedTasks = await pushLocalChangesToGoogle(tasks, token);
+    // setTasks is passed so the push commits its own googleTaskId mapping
+    // instead of depending on the pull's taskStateChanged commit firing.
+    const updatedTasks = await pushLocalChangesToGoogle(tasks, token, setTasks);
 
     // 2. Pull remote changes from Google Tasks second
     await pullTasksFromGoogle(updatedTasks, setTasks, token, onStatusChange);
